@@ -1,0 +1,6 @@
+# HSTS 1.0 Known Hosts database for GNU Wget.
+# Edit at your own risk.
+# <hostname>	<port>	<incl. subdomains>	<created>	<max-age>
+blackarch.org	0	1	1716053203	31536000
+raw.githubusercontent.com	0	0	1716066309	31536000
+github.com	0	1	1716487211	31536000

@@ -1,0 +1,406 @@
+#.aliases 
+
+
+# Aliases
+function mkcd() { mkdir -p $1 && cd $1 }
+function cdf() { cd *$1*/ } # stolen from @topfunky
+
+#teamviewer
+alias teamv="sudo teamviewer daemon restart && teamviewer"
+
+#wget page
+alias get='wget -m -np -c -R "index.html*" '
+#-U "eye01"
+#youtube mp3 deownload
+alias ytmp3="youtube-dl --extract-audio --audio-format"
+#use rsync insted of cp
+alias cp="rsync -avhW --no-compress --progress "
+
+# Stop wget from creating ~/.wget-hsts file. I don't care about HSTS (HTTP
+# Strict Transport Security) for wget; it's not as if I'm logging into my bank
+# with it.
+alias wget='wget --no-hsts'
+=======
+#wget page
+#alias get='wget -m -np -c -U "eye01" -R "index.html*" '
+#youtube mp3 deownload
+
+alias ytmp3="youtube-dl --extract-audio --audio-format"
+#use rsync insted of cp
+alias cp="rsync -avhW --no-compress --progress "
+# Add this function to your ~/.zshrc file
+function ytt() {
+  if [ -z "$1" ]; then
+    echo "Usage: ytt <youtubelink>"
+    return 1
+  fi
+  yt_transcript_output=$(yt --transcript "$1")
+  echo "$yt_transcript_output" | fabric --stream --pattern extract_wisdom
+}
+
+alias lweather=ansiweather -l minto ontario
+screenfetch | lolcat
+neofetch | lolcat
+archey | lolcat
+pfetch | lolcat
+ansiweather -l minto ontario
+# Some useful nmap aliases for scan modes
+
+# Nmap options are:
+#  -sS - TCP SYN scan
+#  -v - verbose
+#  -T1 - timing of scan. Options are paranoid (0), sneaky (1), polite (2), normal (3), aggressive (4), and insane (5)
+#  -sF - FIN scan (can sneak through non-stateful firewalls)
+#  -PE - ICMP echo discovery probe
+#  -PP - timestamp discovery probe
+#  -PY - SCTP init ping
+#  -g - use given number as source port
+#  -A - enable OS detection, version detection, script scanning, and traceroute (aggressive)
+#  -O - enable OS detection
+#  -sA - TCP ACK scan
+#  -F - fast scan
+#  --script=vuln - also access vulnerabilities in target
+
+alias nmap_open_ports="nmap --open"
+alias nmap_list_interfaces="nmap --iflist"
+alias nmap_slow="sudo nmap -sS -v -T1"
+alias nmap_fin="sudo nmap -sF -v"
+alias nmap_full="sudo nmap -sS -T4 -PE -PP -PS80,443 -PY -g 53 -A -p1-65535 -v"
+alias nmap_check_for_firewall="sudo nmap -sA -p1-65535 -v -T4"
+alias nmap_ping_through_firewall="nmap -PS -PA"
+alias nmap_fast="nmap -F -T5 --version-light --top-ports 300"
+alias nmap_detect_versions="sudo nmap -sV -p1-65535 -O --osscan-guess -T4 -Pn"
+alias nmap_check_for_vulns="nmap --script=vuln"
+alias nmap_full_udp="sudo nmap -sS -sU -T4 -A -v -PE -PS22,25,80 -PA21,23,80,443,3389 "
+alias nmap_traceroute="sudo nmap -sP -PE -PS22,25,80 -PA21,23,80,3389 -PU -PO --traceroute "
+alias nmap_fulls="sudo nmap -sS -sU -T4 -A -v -PE -PP -PS21,22,23,25,80,113,31339 -PA80,113,443,10042 -PO --script all " 
+alias nmap_web_safe_osscan="sudo nmap -p 80,443 -O -v --osscan-guess --fuzzy "
+alias nmap_ping_scan="nmap -n -sP"
+
+alias loo=" | lolcat"
+
+
+alias findr='\fd'
+
+# Taken from the tmux plugin
+alias ta="tmux attach -t"
+alias ts="tmux new-session -s"
+alias tl="tmux list-sessions"
+ 
+mkcd(){
+  mkdir -p "$1"
+  cd "$1"
+}
+## Colorize the ls output ##
+alias ls='ls --color=auto'
+ 
+## Use a long listing format ##
+alias ll="ls --color=auto -la"
+ 
+## Show hidden files ##
+alias l.='ls -d .* --color=auto'
+
+alias lsport="sudo lsof -i"
+##Update Grub##
+alias update-grub="sudo grub-mkconfig -o /boot/grub/grub.cfg"
+##set editer to nano##
+alias {ed,emacs,nano,v,vi,vim}="nano"
+##easy exit##
+alias :q="exit"
+##set yay to trizen (personal prefferance)##
+alias {yaourt,yay}="trizen"
+##Open magic##
+alias open="xdg-open"
+
+# android related aliases
+alias aroot="adb shell su -c"
+alias admesg="adb shell su -c dmesg"
+alias alog="adb logcat"
+
+## Colorize the grep command output for ease of use (good for log files)##
+alias grep='grep --color=auto'
+alias egrep='egrep --color=auto'
+alias fgrep='fgrep --color=auto'
+
+##caculator with math support##
+alias bc='bc -l'
+
+##Generate sha1 digest
+alias sha1='openssl sha1'
+
+##Create parent directories on demand
+alias mkdir='mkdir -pv'
+
+##mount for humans
+alias mount='mount |column -t'
+
+# handy short cuts #
+alias h='history'
+alias j='jobs -l'
+
+alias path='echo -e ${PATH//:/\\n}'
+alias now='date +"%T"'
+alias nowtime=now
+alias nowdate='date +"%d-%m-%Y"'
+
+##open ports##
+alias ports='netstat -tulanp'
+
+#firewall
+## shortcut  for iptables and pass it via sudo#
+alias ipt='sudo /sbin/iptables'
+ 
+# display all rules #
+alias iptlist='sudo /sbin/iptables -L -n -v --line-numbers'
+alias iptlistin='sudo /sbin/iptables -L INPUT -n -v --line-numbers'
+alias iptlistout='sudo /sbin/iptables -L OUTPUT -n -v --line-numbers'
+alias iptlistfw='sudo /sbin/iptables -L FORWARD -n -v --line-numbers'
+alias firewall=iptlist
+
+##debug web server
+# get web server headers #
+alias header='curl -I'
+ 
+# find out if remote server supports gzip / mod_deflate or not #
+alias headerc='curl -I --compress'
+
+# become root #
+alias root='sudo -i'
+alias su='sudo -i'
+
+#power
+
+# reboot / halt / poweroff
+alias reboot='sudo /sbin/reboot'
+alias poweroff='sudo /sbin/poweroff'
+alias halt='sudo /sbin/halt'
+alias shutdown='sudo /sbin/shutdown'
+
+
+# Control web servers
+# also pass it via sudo so whoever is admin can reload it without calling you #
+alias nginxreload='sudo /usr/local/nginx/sbin/nginx -s reload'
+alias nginxtest='sudo /usr/local/nginx/sbin/nginx -t'
+alias lightyload='sudo /etc/init.d/lighttpd reload'
+alias lightytest='sudo /usr/sbin/lighttpd -f /etc/lighttpd/lighttpd.conf -t'
+alias httpdreload='sudo /usr/sbin/apachectl -k graceful'
+alias httpdtest='sudo /usr/sbin/apachectl -t && /usr/sbin/apachectl -t -D DUMP_VHOSTS'
+
+
+#Alias into our backup stuff
+# if cron fails or if you want backup on demand just run these commands #
+# again pass it via sudo so whoever is in admin group can start the job #
+# Backup scripts #
+alias backup='sudo /home/scripts/admin/scripts/backup/wrapper.backup.sh --type local --taget /raid1/backups'
+alias nasbackup='sudo /home/scripts/admin/scripts/backup/wrapper.backup.sh --type nas --target nas01'
+alias s3backup='sudo /home/scripts/admin/scripts/backup/wrapper.backup.sh --type nas --target nas01 --auth /home/scripts/admin/.authdata/amazon.keys'
+alias rsnapshothourly='sudo /home/scripts/admin/scripts/backup/wrapper.rsnapshot.sh --type remote --target nas03 --auth /home/scripts/admin/.authdata/ssh.keys --config /home/scripts/admin/scripts/backup/config/adsl.conf'
+alias rsnapshotdaily='sudo  /home/scripts/admin/scripts/backup/wrapper.rsnapshot.sh --type remote --target nas03 --auth /home/scripts/admin/.authdata/ssh.keys  --config /home/scripts/admin/scripts/backup/config/adsl.conf'
+alias rsnapshotweekly='sudo /home/scripts/admin/scripts/backup/wrapper.rsnapshot.sh --type remote --target nas03 --auth /home/scripts/admin/.authdata/ssh.keys  --config /home/scripts/admin/scripts/backup/config/adsl.conf'
+alias rsnapshotmonthly='sudo /home/scripts/admin/scripts/backup/wrapper.rsnapshot.sh --type remote --target nas03 --auth /home/scripts/admin/.authdata/ssh.keys  --config /home/scripts/admin/scripts/backup/config/adsl.conf'
+alias amazonbackup=s3backup
+
+## play video files in a current directory ##
+# cd ~/Download/movie-name
+# playavi or vlc
+alias playavi='mplayer *.avi'
+alias vlc='vlc *.avi'
+ 
+# play all music files from the current directory #
+alias playwave='for i in *.wav; do mplayer "$i"; done'
+alias playogg='for i in *.ogg; do mplayer "$i"; done'
+alias playmp3='for i in *.mp3; do mplayer "$i"; done'
+ 
+# play files from nas devices #
+alias nplaywave='for i in /nas/multimedia/wave/*.wav; do mplayer "$i"; done'
+alias nplayogg='for i in /nas/multimedia/ogg/*.ogg; do mplayer "$i"; done'
+alias nplaymp3='for i in /nas/multimedia/mp3/*.mp3; do mplayer "$i"; done'
+ 
+# shuffle mp3/ogg etc by default #
+alias music='mplayer --shuffle *'
+
+
+## All of our servers eth1 is connected to the Internets via vlan / router etc  ##
+alias dnstop='dnstop -l 5  eth1'
+alias vnstat='vnstat -i eth1'
+alias iftop='iftop -i eth1'
+alias tcpdump='tcpdump -i eth1'
+alias ethtool='ethtool eth1'
+ 
+# work on wlan0 by default #
+# Only useful for laptop as all servers are without wireless interface
+alias iwconfig='iwconfig wlan0'
+
+## pass options to free ##
+alias meminfo='free -m -l -t'
+ 
+## get top process eating memory
+alias psmem='ps auxf | sort -nr -k 4'
+alias psmem10='ps auxf | sort -nr -k 4 | head -10'
+ 
+## get top process eating cpu ##
+alias pscpu='ps auxf | sort -nr -k 3'
+alias pscpu10='ps auxf | sort -nr -k 3 | head -10'
+ 
+## Get server cpu info ##
+alias cpuinfo='lscpu'
+ 
+## older system use /proc/cpuinfo ##
+##alias cpuinfo='less /proc/cpuinfo' ##
+ 
+## get GPU ram on desktop / laptop##
+alias gpumeminfo='grep -i --color memory /var/log/Xorg.0.log'
+
+# Reboot my home Linksys WAG160N / WAG54 / WAG320 / WAG120N Router / Gateway from *nix.
+alias rebootlinksys="curl -u 'admin:my-super-password' 'http://192.168.1.2/setup.cgi?todo=reboot'"
+ 
+# Reboot tomato based Asus NT16 wireless bridge
+alias reboottomato="ssh admin@192.168.1.1 /sbin/reboot" 
+
+## this one saved by butt so many times ##
+alias wget='wget -c'
+
+## this one saved by butt so many times ##
+alias ff4='/opt/firefox4/firefox'
+alias ff13='/opt/firefox13/firefox'
+alias chrome='/opt/google/chrome/chrome'
+alias opera='/opt/opera/opera'
+ 
+#default ff
+alias ff=ff13
+ 
+#my default browser
+alias browser=google-chrome-stable
+
+## set some other defaults ##
+alias df='df -H'
+alias du='du -ch'
+ 
+# top is atop, just like vi is vim
+alias top='atop'
+ 
+## nfsrestart  - must be root  ##
+## refresh nfs mount / cache etc for Apache ##
+alias nfsrestart='sync && sleep 2 && /etc/init.d/httpd stop && umount netapp2:/exports/http && sleep 2 && mount -o rw,sync,rsize=32768,wsize=32768,intr,hard,proto=tcp,fsc natapp2:/exports /http/var/www/html &&  /etc/init.d/httpd start'
+ 
+## Memcached server status  ##
+alias mcdstats='/usr/bin/memcached-tool 10.10.27.11:11211 stats'
+alias mcdshow='/usr/bin/memcached-tool 10.10.27.11:11211 display'
+ 
+## quickly flush out memcached server ##
+alias flushmcd='echo "flush_all" | nc 10.10.27.11 11211'
+ 
+## Remove assets quickly from Akamai / Amazon cdn ##
+alias cdndel='/home/scripts/admin/cdn/purge_cdn_cache --profile akamai'
+alias amzcdndel='/home/scripts/admin/cdn/purge_cdn_cache --profile amazon'
+ 
+## supply list of urls via file or stdin
+alias cdnmdel='/home/scripts/admin/cdn/purge_cdn_cache --profile akamai --stdin'
+alias amzcdnmdel='/home/scripts/admin/cdn/purge_cdn_cache --profile amazon --stdin'
+
+#getnews () {
+#     curl https://newsapi.org/v2/top-headlines -s -G -d sources=$1 -d apiKey=YourAPIKeyNumber | jq -r '.articles[] | .title, .url, ""'
+#}
+
+extract() {
+    if [ -z ${1} ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+        echo "Usage: extract <archive> [directory]"
+        echo "Example: extract presentation.zip."
+        echo "Valid archive types are:"
+        echo "tar.bz2, tar.gz, tar.xz, tar, bz2, gz, tbz2,"
+        echo "tbz, tgz, lzo, rar, zip, 7z, xz, txz, lzma and tlz"
+    else
+        case "$1" in
+            *.tar.bz2|*.tbz2|*.tbz)         tar xvjf "$1" ;;
+            *.tgz)                          tar zxvf "$1" ;;
+            *.tar.gz)                       tar xvzf "$1" ;;
+            *.tar.xz)                       tar xvJf "$1" ;;
+            *.tar)                          tar xvf "$1" ;;
+            *.rar)                          7z x "$1" ;;
+            *.zip)                          unzip "$1" ;;
+            *.7z)                           7z x "$1" ;;
+            *.lzo)                          lzop -d  "$1" ;;
+            *.gz)                           gunzip "$1" ;;
+            *.bz2)                          bunzip2 "$1" ;;
+            *.Z)                            uncompress "$1" ;;
+            *.xz|*.txz|*.lzma|*.tlz)        xz -d "$1" ;;
+            *) echo "Sorry, '$1' could not be decompressed." ;;
+        esac
+    fi
+}
+
+
+##sudo last comand
+alias please="sudo !!"
+
+# Easier navigation: .., ..., ...., ....., ~ and -
+alias ..="cd .."
+alias ...="cd ../.."
+alias ....="cd ../../.."
+alias .....="cd ../../../.."
+alias ~="cd ~" # `cd` is probably faster to type though
+alias -- -="cd -"
+
+# Shortcuts
+alias d="cd ~/Documents/Dropbox"
+alias dl="cd ~/Downloads"
+alias dt="cd ~/Desktop"
+alias p="cd ~/projects"
+
+
+# List all files colorized in long format
+alias l="ls -lF ${colorflag}"
+
+# List all files colorized in long format, excluding . and ..
+alias la="ls -lAF ${colorflag}"
+
+# List only directories
+alias lsd="ls -lF ${colorflag} | grep --color=never '^d'"
+
+# Always use color output for `ls`
+alias ls="command ls ${colorflag}"
+
+# Always enable colored `grep` output
+# Note: `GREP_OPTIONS="--color=auto"` is deprecated, hence the alias usage.
+alias grep='grep --color=auto'
+alias fgrep='fgrep --color=auto'
+alias egrep='egrep --color=auto'
+
+# Enable aliases to be sudo’ed
+alias sudo='sudo '
+
+# Get week number
+alias week='date +%V'
+# chmod
+alias chx="chmod +x"
+
+# IP addresses
+alias ip="dig +short myip.opendns.com @resolver1.opendns.com"
+alias localip="ipconfig getifaddr en0"
+alias ips="ifconfig -a | grep -o 'inet6\? \(addr:\)\?\s\?\(\(\([0-9]\+\.\)\{3\}[0-9]\+\)\|[a-fA-F0-9:]\+\)' | awk '{ sub(/inet6? (addr:)? ?/, \"\"); print }'"
+
+# Show active network interfaces
+alias ifactive="ifconfig | pcregrep -M -o '^[^\t:]+:([^\n]|\n\t)*status: active'"
+
+# Kill all the tabs in Chrome to free up memory
+# [C] explained: http://www.commandlinefu.com/commands/view/402/exclude-grep-from-your-grepped-output-of-ps-alias-included-in-description
+alias chromekill="ps ux | grep '[C]hrome Helper --type=renderer' | grep -v extension-process | tr -s ' ' | cut -d ' ' -f2 | xargs kill"
+
+# Lock the screen (when going AFK)
+alias afk="/System/Library/CoreServices/Menu\ Extras/User.menu/Contents/Resources/CGSession -suspend"
+
+# Reload the shell (i.e. invoke as a login shell)
+alias reload="exec ${SHELL} -l"
+
+# Print each PATH entry on a separate line
+alias path='echo -e ${PATH//:/\\n}'
+
+alias stress='flatpak run com.leinardi.gst'
+alias teams='flatpak run com.microsoft.Teams'
+alias fmine='flatpak run com.mojang.Minecraft'
+alias sprite='flatpak run com.github.libresprite.LibreSprite'
+alias mtest='flatpak run net.minetest.Minetest'
+alias fskype='flatpak run com.skype.Client'
+alias ftele='flatpak run org.telegram.desktop'
+alias studio='flatpak run com.visualstudio.code'
+alias fzoom='flatpak run us.zoom.Zoom'
