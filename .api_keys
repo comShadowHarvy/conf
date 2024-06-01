@@ -1,0 +1,5 @@
+export OPENAI_API_KEY=sk-proj-tFP3HrCUMrTo5qaBAV67T3BlbkFJyNK6WcFmopratHgGblgY
+export GPT_FILES_PATH=~/gpt
+git config --global user.name comShadoHarvy
+git config --global user.email jimbob343@gmail.com
+

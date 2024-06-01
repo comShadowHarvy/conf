@@ -1,0 +1,72 @@
+#!/bin/bash
+
+# Define the URL to download LaZagne
+DOWNLOAD_URL="https://github.com/AlessandroZ/LaZagne/releases/download/2.4.3/lazagne.exe"
+
+# Define the location to save the output
+DESKTOP_PATH="$HOME/Desktop"
+OUTPUT_FILE="$DESKTOP_PATH/lazagne_output.txt"
+
+# Function to install dependencies on Debian/Ubuntu
+install_deps_debian() {
+    sudo apt-get update
+    sudo apt-get install -y wine curl python3
+}
+
+# Function to install dependencies on Fedora
+install_deps_fedora() {
+    sudo dnf install -y wine curl python3
+}
+
+# Function to install dependencies on Arch
+install_deps_arch() {
+    sudo pacman -Syu --noconfirm wine curl python
+}
+
+# Detect the operating system and install dependencies
+if [ -f /etc/debian_version ]; then
+    echo "Detected Debian-based distribution."
+    install_deps_debian
+elif [ -f /etc/fedora-release ]; then
+    echo "Detected Fedora-based distribution."
+    install_deps_fedora
+elif [ -f /etc/arch-release ]; then
+    echo "Detected Arch-based distribution."
+    install_deps_arch
+else
+    echo "Unsupported operating system. Please install Wine, curl, and Python3 manually."
+    exit 1
+fi
+
+# Download LaZagne to a temporary file
+TEMP_FILE=$(mktemp /tmp/lazagne.XXXXXX.exe)
+echo "Downloading LaZagne..."
+curl -L -o $TEMP_FILE $DOWNLOAD_URL
+
+# Run LaZagne and save the output to the Desktop
+echo "Running LaZagne..."
+python3 -c "
+import subprocess
+import tempfile
+
+# Create a temporary file to store the output
+with tempfile.NamedTemporaryFile(delete=False) as temp_output:
+    temp_output_path = temp_output.name
+
+# Run LaZagne and capture the output
+result = subprocess.run(['wine', '$TEMP_FILE', 'all'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+with open(temp_output_path, 'wb') as f:
+    f.write(result.stdout)
+
+# Copy the output to the Desktop
+with open(temp_output_path, 'rb') as f:
+    output = f.read()
+with open('$OUTPUT_FILE', 'wb') as f:
+    f.write(output)
+"
+
+# Clean up the temporary file
+rm -f $TEMP_FILE
+
+echo "Operation completed successfully. Output saved to $OUTPUT_FILE."
+
