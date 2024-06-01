@@ -149,17 +149,6 @@ sudo systemctl enable --now docker.service
 echo "Adding environment variables and Git configuration to ~/.zshrc if not already present..."
 loading_bar
 
-# Check and add OPENAI_API_KEY
-grep -qxF 'export OPENAI_API_KEY="sk-proj-tFP3HrCUMrTo5qaBAV67T3BlbkFJyNK6WcFmopratHgGblgY"' ~/.zshrc || echo 'export OPENAI_API_KEY="sk-proj-tFP3HrCUMrTo5qaBAV67T3BlbkFJyNK6WcFmopratHgGblgY"' >> ~/.zshrc
-
-# Check and add GPT_FILES_PATH
-grep -qxF 'export GPT_FILES_PATH=~/gpt' ~/.zshrc || echo 'export GPT_FILES_PATH=~/gpt' >> ~/.zshrc
-
-# Check and add git user.name
-grep -qxF 'git config --global user.name "comShadoHarvy"' ~/.zshrc || echo 'git config --global user.name "comShadoHarvy"' >> ~/.zshrc
-
-# Check and add git user.email
-grep -qxF 'git config --global user.email "jimbob343@gmail.com"' ~/.zshrc || echo 'git config --global user.email "jimbob343@gmail.com"' >> ~/.zshrc
 
 echo "Setup complete. All selected packages have been installed and configured."
 loading_bar
