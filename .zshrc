@@ -21,6 +21,7 @@ fi
 export PATH="$HOME/.local/bin:$PATH"
 eval "$(oh-my-posh init zsh --config ~/.poshthemes/devious-diamonds.omp.yaml)"
 if [ -f "/home/me/.config/fabric/fabric-bootstrap.inc" ]; then . "/home/me/.config/fabric/fabric-bootstrap.inc"; fi
+echo "source ${HOME}/.zgenom/zgenom.zsh" >> ~/.zshrc
 ### Added by Zinit's installer
 if [[ ! -f $HOME/.local/share/zinit/zinit.git/zinit.zsh ]]; then
     print -P "%F{33} %F{220}Installing %F{33}ZDHARMA-CONTINUUM%F{220} Initiative Plugin Manager (%F{33}zdharma-continuum/zinit%F{220})…%f"
@@ -43,3 +44,4 @@ zinit light-mode for \
     zdharma-continuum/zinit-annex-rust
 
 ### End of Zinit's installer chunk
+source /home/me/.zgenom/zgenom.zsh
