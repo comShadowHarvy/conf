@@ -1,47 +1,95 @@
-# Use powerline
-#USE_POWERLINE=true
-# Has weird character width
-# Example:
-#    is not a diamond
-HAS_WIDECHARS=false
-# Source manjaro-zsh-configuration
-if [[ -e /usr/share/zsh/manjaro-zsh-config ]]; then
-  source /usr/share/zsh/manjaro-zsh-config
-fi
-# Use manjaro zsh prompt
-if [[ -e /usr/share/zsh/manjaro-zsh-prompt ]]; then
-  source /usr/share/zsh/manjaro-zsh-prompt
+# -----------------
+# ZimFW Configuration
+# -----------------
+
+ZIM_HOME=${ZDOTDIR:-${HOME}}/.zim
+
+# Download zimfw plugin manager if missing
+if [[ ! -f ${ZIM_HOME}/zimfw.zsh ]]; then
+  curl -fsSL --create-dirs -o ${ZIM_HOME}/zimfw.zsh \
+      https://github.com/zimfw/zimfw/releases/latest/download/zimfw.zsh
 fi
 
+# Initialize ZimFW and install missing modules
+source ${ZIM_HOME}/zimfw.zsh init
 
-[ -f ~/.api_keys ] && source ~/.api_keys
+# -----------------
+# History Management
+# -----------------
+
+HISTFILE=${HOME}/.zsh_history
+HISTSIZE=100000
+SAVEHIST=100000
+setopt share_history hist_ignore_all_dups
+
+# -----------------
+# Keybindings
+# -----------------
+
+bindkey -e  # Emacs keybindings
+bindkey "${terminfo[kcuu1]}" history-substring-search-up
+bindkey "${terminfo[kcud1]}" history-substring-search-down
+
+# -----------------
+# Aliases and Custom Configurations
+# -----------------
+
+# Load personal aliases and functions
 [ -f ~/.aliases ] && source ~/.aliases
-[ -f ~/.zsh1 ] && source ~/.zsh1
-[ -f ~/antigen.zsh ] && source ~/antigen.zsh
+[ -f ~/.api_keys ] && source ~/.api_keys
+
+# -----------------
+# Paths
+# -----------------
+
 export PATH="$HOME/.local/bin:$PATH"
-eval "$(oh-my-posh init zsh --config ~/.poshthemes/devious-diamonds.omp.yaml)"
-if [ -f "/home/me/.config/fabric/fabric-bootstrap.inc" ]; then . "/home/me/.config/fabric/fabric-bootstrap.inc"; fi
-echo "source ${HOME}/.zgenom/zgenom.zsh" >> ~/.zshrc
-### Added by Zinit's installer
-if [[ ! -f $HOME/.local/share/zinit/zinit.git/zinit.zsh ]]; then
-    print -P "%F{33} %F{220}Installing %F{33}ZDHARMA-CONTINUUM%F{220} Initiative Plugin Manager (%F{33}zdharma-continuum/zinit%F{220})…%f"
-    command mkdir -p "$HOME/.local/share/zinit" && command chmod g-rwX "$HOME/.local/share/zinit"
-    command git clone https://github.com/zdharma-continuum/zinit "$HOME/.local/share/zinit/zinit.git" && \
-        print -P "%F{33} %F{34}Installation successful.%f%b" || \
-        print -P "%F{160} The clone has failed.%f%b"
+
+# -----------------
+# Oh My Posh Theme
+# -----------------
+
+#eval "$(oh-my-posh init zsh --config ~/.poshthemes/devious-diamonds.omp.yaml)"
+
+
+# ========================
+# Oh My Posh Configuration
+# ========================
+# Path to the theme file
+THEME_FILE="$HOME/.poshthemes/devious-diamonds.omp.yaml"
+
+# URL to download the theme
+THEME_URL="https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/devious-diamonds.omp.yaml"
+
+# Ensure the ~/.poshthemes directory exists
+mkdir -p ~/.poshthemes
+
+# Check if the theme file exists; if not, download it
+if [[ ! -f "$THEME_FILE" ]]; then
+  echo "Devious Diamonds theme not found. Downloading..."
+  curl -fsSL "$THEME_URL" -o "$THEME_FILE"
+  chmod u+rw "$THEME_FILE"
+  echo "Theme downloaded to $THEME_FILE"
 fi
 
-source "$HOME/.local/share/zinit/zinit.git/zinit.zsh"
-autoload -Uz _zinit
-(( ${+_comps} )) && _comps[zinit]=_zinit
+# Load Oh My Posh with the Devious Diamonds theme
+eval "$(oh-my-posh init zsh --config $THEME_FILE)"
 
-# Load a few important annexes, without Turbo
-# (this is currently required for annexes)
-zinit light-mode for \
-    zdharma-continuum/zinit-annex-as-monitor \
-    zdharma-continuum/zinit-annex-bin-gem-node \
-    zdharma-continuum/zinit-annex-patch-dl \
-    zdharma-continuum/zinit-annex-rust
 
-### End of Zinit's installer chunk
-source /home/me/.zgenom/zgenom.zsh
+
+# -----------------
+# Fabric Bootstrap (Optional)
+# -----------------
+
+# Check if Fabric bootstrap is present before sourcing
+if [[ -f "$HOME/.config/fabric/fabric-bootstrap.inc" ]]; then
+  echo "Loading Fabric Bootstrap..."
+  source "$HOME/.config/fabric/fabric-bootstrap.inc"
+else
+  echo "Fabric Bootstrap not found. Skipping."
+fi
+
+# -----------------
+# Cleanup & Final Notes
+# -----------------
+
+echo "Zsh configuration loaded successfully."
