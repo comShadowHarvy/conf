@@ -1,0 +1,88 @@
+# ========================
+# Powerline & Character Settings
+# ========================
+# Uncomment to enable Powerline (disabled by default)
+# USE_POWERLINE=true
+
+# Disable wide character support for specific symbols
+HAS_WIDECHARS=false
+
+# ========================
+# Load Manjaro-Specific Configurations
+# ========================
+if [[ -e /usr/share/zsh/manjaro-zsh-config ]]; then
+  source /usr/share/zsh/manjaro-zsh-config
+fi
+
+if [[ -e /usr/share/zsh/manjaro-zsh-prompt ]]; then
+  source /usr/share/zsh/manjaro-zsh-prompt
+fi
+
+# ========================
+# Source Personal Configurations
+# ========================
+[ -f ~/.api_keys ] && source ~/.api_keys      # API keys
+[ -f ~/.aliases ] && source ~/.aliases        # Aliases
+[ -f ~/.zsh1 ] && source ~/.zsh1              # Custom zsh functions/variables
+[ -f ~/antigen.zsh ] && source ~/antigen.zsh  # Antigen setup
+[ -f ~/.1antigen.zsh ] && source ~/.1antigen.zsh  # Antigen setup
+
+# ========================
+# Add Custom Paths
+# ========================
+export PATH="$HOME/.local/bin:$PATH"
+
+# ========================
+# Oh My Posh Configuration
+# ========================
+# Load Oh My Posh with the selected theme
+eval "$(oh-my-posh init zsh --config ~/.poshthemes/devious-diamonds.omp.yaml)"
+
+# ========================
+# Fabric Bootstrap (Optional)
+# ========================
+if [ -f "$HOME/.config/fabric/fabric-bootstrap.inc" ]; then
+  source "$HOME/.config/fabric/fabric-bootstrap.inc"
+fi
+
+# ========================
+# Zgenom Configuration
+# ========================
+if [[ -f "$HOME/.zgenom/zgenom.zsh" ]]; then
+  source "$HOME/.zgenom/zgenom.zsh"
+else
+  echo "Zgenom not found. Please install it: https://github.com/jandamm/zgenom"
+fi
+
+# ========================
+# Zinit Plugin Manager
+# ========================
+# Automatically install Zinit if not already installed
+if [[ ! -f "$HOME/.local/share/zinit/zinit.git/zinit.zsh" ]]; then
+  echo "Installing Zinit Plugin Manager..."
+  mkdir -p "$HOME/.local/share/zinit"
+  chmod g-rwX "$HOME/.local/share/zinit"
+  git clone https://github.com/zdharma-continuum/zinit "$HOME/.local/share/zinit/zinit.git" && \
+    echo "Zinit installed successfully." || \
+    echo "Zinit installation failed. Please check your internet connection."
+fi
+
+# Source Zinit
+source "$HOME/.local/share/zinit/zinit.git/zinit.zsh"
+
+# Set autocompletion for Zinit
+autoload -Uz _zinit
+(( ${+_comps} )) && _comps[zinit]=_zinit
+
+# Load important Zinit annexes
+zinit light-mode for \
+    zdharma-continuum/zinit-annex-as-monitor \
+    zdharma-continuum/zinit-annex-bin-gem-node \
+    zdharma-continuum/zinit-annex-patch-dl \
+    zdharma-continuum/zinit-annex-rust
+
+# ========================
+# Cleanup & Final Notes
+# ========================
+# Additional configurations can go here
+echo "Zsh configuration loaded successfully."

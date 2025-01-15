@@ -1,123 +1,94 @@
+# ===============================
+# Antigen Configuration
+# ===============================
 
-# Load the oh-my-zsh's library.
+# Load the oh-my-zsh library
 antigen use oh-my-zsh
-# Set the default plugin repo to be zsh-utils
+
+# Set default plugin repository
 antigen use belak/zsh-utils
-# Load various lib files
+
+# Load core libraries
 antigen bundle robbyrussell/oh-my-zsh lib/
-
-
-
-
-# Specify completions we want before the completion module
 antigen bundle zsh-users/zsh-completions
-#
-# Antigen Bundles
-#
-# Specify plugins we want
-#antigen bundle
-#antigen bundle
-#antigen bundle
-#antigen bundle
-#antigen bundle
-#antigen bundle
-#antigen bundle
-#antigen bundle
+
+# ===============================
+# Plugins
+# ===============================
+
+# General Utility Plugins
 antigen bundle bhayward93/Linus-rants-ZSH.git
 antigen bundle r3b311ion/caniuse-plugin-zsh-git
-antigen bundle zpm-zsh/autoenv
-antigen bundle jhwohlgemuth/oh-my-zsh-pentest-plugin
 antigen bundle dbkaplun/smart-cd
 antigen bundle "MichaelAquilina/zsh-you-should-use"
-antigen bundle katrinleinweber/oh-my-zsh-youtube-dl-aliases
-antigen bundle joow/youtube-dl
-antigen bundle zinit-zsh/z-a-man
-antigen bundle zinit-zsh/z-a-patch-dl
-#antigen bundle arlimus/zero.zsh
-antigen bundle zdharma/zui
-antigen bundle qoomon/zsh-lazyload
-antigen bundle junegunn/fzf
-antigen bundle "ytakahashi/igit"
-antigen bundle oldratlee/hacker-quotes
 antigen bundle cjayross/gsh
 antigen bundle tevren/gitfast-zsh-plugin
 antigen bundle viko16/gitcd.plugin.zsh
 antigen bundle caarlos0/zsh-git-sync
-antigen bundle seletskiy/zsh-git-smart-commands
-antigen bundle peterhurford/git-aliases.zsh
-antigen bundle twang817/zsh-clipboard
-antigen bundle rapgenic/zsh-git-complete-urls
-antigen bundle chrissicool/zsh-256color
-antigen bundle GetAmbush/deepx-zsh-plugin
+antigen bundle sorin-ionescu/prezto
+antigen bundle paulmelnikow/zsh-startup-timer
+
+# Productivity Plugins
 antigen bundle unixorn/bitbucket-git-helpers.plugin.zsh
 antigen bundle unixorn/autoupdate-antigen.zshplugin
 antigen bundle "MichaelAquilina/zsh-autoswitch-virtualenv"
-antigen bundle sorin-ionescu/prezto
-antigen bundle vladmrnv/statify
-antigen bundle paulmelnikow/zsh-startup-timer
-antigen bundle oldratlee/hacker-quotes
-antigen bundle rutchkiwi/copyzshell
-antigen bundle zpm-zsh/colorize
-antigen bundle "MichaelAquilina/zsh-autoswitch-virtualenv"
-#antigen bundle Valiev/almostontop
-antigen bundle StackExchange/blackbox
-angigen bundle nvie/gitflow
-antigen bundle bobthecow/git-flow-completion
-antigen bundle supercrabtree/k
+antigen bundle zpm-zsh/autoenv
 antigen bundle hlissner/zsh-autopair
 antigen bundle qoomon/zsh-lazyload
-antigen bundle editor
-antigen bundle history
-antigen bundle prompt
-antigen bundle utility
-antigen bundle completion
-#antigen bundle git
-antigen bundle tmuxinator
+
+# Git Plugins
+antigen bundle StackExchange/blackbox
+antigen bundle nvie/gitflow
+antigen bundle bobthecow/git-flow-completion
+antigen bundle seletskiy/zsh-git-smart-commands
+antigen bundle peterhurford/git-aliases.zsh
+antigen bundle rapgenic/zsh-git-complete-urls
+
+# Syntax and Colorization
 antigen bundle zsh-users/zsh-syntax-highlighting
-antigen bundle rupa/z
 antigen bundle zsh-users/zsh-autosuggestions
-antigen bundle fcambus/ansiweather
-antigen bundle lukechilds/zsh-nvm
+antigen bundle zdharma/fast-syntax-highlighting
+antigen bundle zpm-zsh/colorize
 antigen bundle chrissicool/zsh-256color
-antigen bundle unixorn/autoupdate-antigen.zshplugin
-#antigen bundle TamCore/autoupdate-oh-my-zsh-plugins
-antigen bundle zpm-zsh/background
-antigen bundle tevren/gitfast-zsh-plugin
-antigen bundle amstrad/oh-my-matrix
-antigen bundle jhwohlgemuth/oh-my-zsh-pentest-plugin
+
+# Command Enhancements
+antigen bundle rupa/z
 antigen bundle gko/ssh-connect
+antigen bundle tmuxinator
+antigen bundle fcambus/ansiweather
 antigen bundle nmap
+antigen bundle amstrad/oh-my-matrix
 antigen bundle archlinux
-antigen bundle jimbob343/zsh-potato/
-# Bundles from the default repo (robbyrussell's oh-my-zsh).
-#antigen bundle git
-antigen bundle heroku
-antigen bundle pip
-antigen bundle lein
-antigen bundle command-not-found
-antigen bundle git
-antigen bundle arch
-# For SSH, starting ssh-agent is annoying
-antigen bundle ssh-agent
-# Node Plugins
+
+# Language and Framework Plugins
+antigen bundle lukechilds/zsh-nvm
 antigen bundle coffee
 antigen bundle node
 antigen bundle npm
-
-# Python Plugins
 antigen bundle pip
 antigen bundle python
 antigen bundle virtualenv
 
+# Pentest Plugins
+antigen bundle jhwohlgemuth/oh-my-zsh-pentest-plugin
+
+# Miscellaneous Plugins
+antigen bundle GetAmbush/deepx-zsh-plugin
+antigen bundle oldratlee/hacker-quotes
+antigen bundle zinit-zsh/z-a-man
+antigen bundle zinit-zsh/z-a-patch-dl
 antigen bundle jdavis/zsh-files
-# Secret info
-#antigen bundle git@github.com:jdavis/secret.git
+antigen bundle zpm-zsh/background
 
-# Syntax highlighting bundle.
-antigen bundle zsh-users/zsh-syntax-highlighting
-#
-# Antigen Theme
-#antigen theme jdavis/zsh-files themes/jdavis
-#antigen theme romkatv/powerlevel10k
+# ===============================
+# Themes
+# ===============================
 
+# Uncomment one of the following to select a theme:
+# antigen theme jdavis/zsh-files themes/jdavis
+# antigen theme romkatv/powerlevel10k
+
+# ===============================
+# Apply Antigen Configuration
+# ===============================
 antigen apply
