@@ -1,8 +1,14 @@
 # ========================
 # General Functions
 # ========================
+
+# Create a directory and navigate to it
 mkcd() { mkdir -p "$1" && cd "$1"; }
-cdf() { cd *$1*/; } # Navigate to a directory matching a pattern
+
+# Navigate to a directory matching a pattern
+cdf() { cd *$1*/; }
+
+# Extract wisdom from YouTube transcripts (requires yt and fabric)
 ytt() {
   if [ -z "$1" ]; then
     echo "Usage: ytt <youtubelink>"
@@ -11,6 +17,8 @@ ytt() {
   yt_transcript_output=$(yt --transcript "$1")
   echo "$yt_transcript_output" | fabric --stream --pattern extract_wisdom
 }
+
+# Extract various archive formats
 extract() {
   if [[ -z "$1" || "$1" == "-h" || "$1" == "--help" ]]; then
     echo "Usage: extract <archive> [directory]"
@@ -34,31 +42,37 @@ extract() {
 # ========================
 # File Management
 # ========================
-alias cp="rsync -avhW --no-compress --progress" # Use rsync for copying files
-alias mkdir='mkdir -pv'                         # Create directories with parents
-alias ls="ls --color=auto"                      # Colorize `ls` output
-alias ll="ls -la --color=auto"                  # Detailed list with hidden files
-alias l.="ls -d .* --color=auto"                # List hidden files only
-alias findr='\fd'                               # Faster alternative to `find`
+
+# Enhanced file management aliases
+alias cp="rsync -avhW --no-compress --progress"  # Use rsync for copying
+alias mkdir='mkdir -pv'                          # Verbose mkdir with parent directories
+alias ls="ls --color=auto"                       # Colorize `ls` output
+alias ll="ls -la --color=auto"                   # Detailed list with hidden files
+alias l.="ls -d .* --color=auto"                 # List hidden files
+alias findr='\fd'                                # Faster alternative to `find`
 
 # ========================
 # System Management
 # ========================
+
+# System information and management aliases
 alias please="sudo !!"                           # Run the last command with sudo
 alias h="history"                                # Show command history
-alias j="jobs -l"                                # List jobs
+alias j="jobs -l"                                # List active jobs
 alias reload="exec ${SHELL} -l"                  # Reload the shell
-alias meminfo="free -m -l -t"                    # Show memory info
-alias psmem="ps auxf | sort -nr -k 4 | head -10" # Top 10 memory consumers
-alias pscpu="ps auxf | sort -nr -k 3 | head -10" # Top 10 CPU consumers
-alias cpuinfo="lscpu"                            # CPU information
+alias meminfo="free -m -l -t"                    # Show memory usage
+alias psmem="ps auxf | sort -nr -k 4 | head -10" # Top memory consumers
+alias pscpu="ps auxf | sort -nr -k 3 | head -10" # Top CPU consumers
+alias cpuinfo="lscpu"                            # Display CPU info
 alias ports="netstat -tulanp"                    # List open ports
 alias lsport="sudo lsof -i"                      # List processes using ports
-alias ip="dig +short myip.opendns.com @resolver1.opendns.com" # Public IP
+alias ip="dig +short myip.opendns.com @resolver1.opendns.com" # Get public IP
 
 # ========================
 # Networking
 # ========================
+
+# Nmap shortcuts
 alias nmap_open_ports="nmap --open"
 alias nmap_list_interfaces="nmap --iflist"
 alias nmap_slow="sudo nmap -sS -v -T1"
@@ -69,28 +83,34 @@ alias nmap_full="sudo nmap -sS -T4 -PE -PP -PS80,443 -PY -g 53 -A -p1-65535 -v"
 # ========================
 # Media & Downloads
 # ========================
-alias ytmp3="youtube-dl --extract-audio --audio-format"
-alias wget='wget --no-hsts'                      # Prevent `.wget-hsts` creation
-alias get='wget -m -np -c -R "index.html*"'      # Download a website recursively
-alias playmp3='for i in *.mp3; do mplayer "$i"; done' # Play MP3s in the current directory
-alias music="mplayer --shuffle *"                # Shuffle and play all media files
+
+# Media and download management aliases
+alias ytmp3="youtube-dl --extract-audio --audio-format mp3"
+alias wget='wget --no-hsts'                      # Prevent `.wget-hsts` file creation
+alias get='wget -m -np -c -R "index.html*"'      # Recursive website download
+alias playmp3='for i in *.mp3; do mplayer "$i"; done' # Play all MP3s in the directory
+alias music="mplayer --shuffle *"                # Shuffle and play media files
 
 # ========================
 # Navigation
 # ========================
+
+# Directory navigation shortcuts
 alias ..="cd .."
 alias ...="cd ../.."
 alias ....="cd ../../.."
-alias ~="cd ~" # `cd` is shorter but included for clarity
-alias dl="cd ~/Downloads"
-alias dt="cd ~/Desktop"
-alias p="cd ~/projects"
+alias ~="cd ~"                                   # Go to home directory
+alias dl="cd ~/Downloads"                        # Go to Downloads directory
+alias dt="cd ~/Desktop"                          # Go to Desktop directory
+alias p="cd ~/projects"                          # Go to projects directory
 
 # ========================
 # Git and Development
 # ========================
-alias code="flatpak run com.visualstudio.code"   # VS Code
-alias studio="flatpak run com.visualstudio.code" # Alias for the same
+
+# Git workflow shortcuts
+alias code="flatpak run com.visualstudio.code"   # Launch VS Code
+alias studio="flatpak run com.visualstudio.code" # Alias for VS Code
 alias gitstatus="git status -s"
 alias gita="git add -A"
 alias gitcm="git commit -m"
@@ -99,17 +119,20 @@ alias gitp="git push"
 # ========================
 # Fun and Miscellaneous
 # ========================
+
+# Fun aliases
 alias neofetch="neofetch | lolcat"
-alias lweather="ansiweather -l minto ontario"
-alias now="date +%T"                             # Show current time
-alias week="date +%V"                            # Show the current week number
-alias please="sudo !!"                           # Re-run last command with sudo
-alias :q="exit"                                  # Easy exit alias
+alias lweather="ansiweather -l minto ontario"    # Show weather for Minto, Ontario
+alias now="date +%T"                             # Display current time
+alias week="date +%V"                            # Display current week number
 alias chx="chmod +x"                             # Make a script executable
+alias :q="exit"                                  # Vim-style exit
 
 # ========================
 # Tmux Shortcuts
 # ========================
+
+# Tmux session management
 alias ta="tmux attach -t"
 alias ts="tmux new-session -s"
 alias tl="tmux list-sessions"
@@ -117,14 +140,18 @@ alias tl="tmux list-sessions"
 # ========================
 # Miscellaneous Tools
 # ========================
-alias bc="bc -l"                                 # Calculator
+
+# Utilities
+alias bc="bc -l"                                 # Launch calculator
 alias sha1="openssl sha1"                        # Generate SHA1 digest
 alias flushmcd='echo "flush_all" | nc 10.10.27.11 11211' # Flush Memcached
-alias vnstat="vnstat -i eth1"                    # Network usage stats
+alias vnstat="vnstat -i eth1"                    # Network usage statistics
 
 # ========================
 # Default Applications
 # ========================
+
+# Default applications
 alias browser="google-chrome-stable"
 alias vlc="vlc"
 alias spotify="flatpak run com.spotify.Client"
@@ -132,9 +159,21 @@ alias discord="flatpak run com.discordapp.Discord"
 alias teams="flatpak run com.microsoft.Teams"
 
 # ========================
-# Custom
+# Custom Commands
 # ========================
+
+# Custom and utility aliases
 alias loo=" | lolcat"                            # Pipe outputs to lolcat
 alias grep="grep --color=auto"                   # Colorize grep output
 alias quickgit='f() { git add . && git commit -m "$*" && git push; }; f'
-alias updateall='sudo pacman -Syu && flatpak update -y && sudo snap refresh && sudo oh-my-posh update'
+
+updateall() {
+    sudo pacman -Syu || return
+    flatpak update -y || return
+    sudo snap refresh || return
+    brew update || return
+    ZimFW update || return
+    sudo oh-my-posh update || return
+}
+
+alias zimupdate="zimfw update"

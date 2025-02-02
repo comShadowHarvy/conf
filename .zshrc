@@ -144,9 +144,9 @@ fi
 
 echo "Zsh configuration loaded successfully."
 eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-if type brew &>/dev/null; then
-FPATH=$(brew --prefix)/share/zsh-completions:$FPATH
+if command -v brew &>/dev/null; then
+  FPATH=$(brew --prefix)/share/zsh-completions:$FPATH
 
-autoload -Uz compinit
-compinit
+  autoload -U compinit
+  compinit
 fi
