@@ -10,33 +10,33 @@ cdf() { cd *$1*/; }
 
 # Extract wisdom from YouTube transcripts (requires yt and fabric)
 ytt() {
-  if [ -z "$1" ]; then
-    echo "Usage: ytt <youtubelink>"
-    return 1
-  fi
-  yt_transcript_output=$(yt --transcript "$1")
-  echo "$yt_transcript_output" | fabric --stream --pattern extract_wisdom
+    if [ -z "$1" ]; then
+        echo "Usage: ytt <youtubelink>"
+        return 1
+    fi
+    yt_transcript_output=$(yt --transcript "$1")
+    echo "$yt_transcript_output" | fabric --stream --pattern extract_wisdom
 }
 
 # Extract various archive formats
 extract() {
-  if [[ -z "$1" || "$1" == "-h" || "$1" == "--help" ]]; then
-    echo "Usage: extract <archive> [directory]"
-    echo "Supports: tar.bz2, tar.gz, tar.xz, bz2, gz, zip, 7z, etc."
-  else
-    case "$1" in
-      *.tar.bz2|*.tbz2|*.tbz) tar xvjf "$1" ;;
-      *.tar.gz|*.tgz) tar xvzf "$1" ;;
-      *.tar.xz) tar xvJf "$1" ;;
-      *.tar) tar xvf "$1" ;;
-      *.zip) unzip "$1" ;;
-      *.7z) 7z x "$1" ;;
-      *.gz) gunzip "$1" ;;
-      *.bz2) bunzip2 "$1" ;;
-      *.xz|*.txz|*.lzma|*.tlz) xz -d "$1" ;;
-      *) echo "Unsupported file type: $1" ;;
-    esac
-  fi
+    if [[ -z "$1" || "$1" == "-h" || "$1" == "--help" ]]; then
+        echo "Usage: extract <archive> [directory]"
+        echo "Supports: tar.bz2, tar.gz, tar.xz, bz2, gz, zip, 7z, etc."
+    else
+        case "$1" in
+            *.tar.bz2|*.tbz2|*.tbz) tar xvjf "$1" ;;
+            *.tar.gz|*.tgz) tar xvzf "$1" ;;
+            *.tar.xz) tar xvJf "$1" ;;
+            *.tar) tar xvf "$1" ;;
+            *.zip) unzip "$1" ;;
+            *.7z) 7z x "$1" ;;
+            *.gz) gunzip "$1" ;;
+            *.bz2) bunzip2 "$1" ;;
+            *.xz|*.txz|*.lzma|*.tlz) xz -d "$1" ;;
+            *) echo "Unsupported file type: $1" ;;
+        esac
+    fi
 }
 
 # ========================
@@ -168,7 +168,32 @@ alias grep="grep --color=auto"                   # Colorize grep output
 alias quickgit='f() { git add . && git commit -m "$*" && git push; }; f'
 
 updateall() {
-    sudo pacman -Syu || return
+    if [ -f /etc/os-release ]; then
+        distro=$(grep '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"')
+    else
+        distro="unknown"
+    fi
+    case "$distro" in
+        alpine)
+            sudo apk update && sudo apk upgrade
+            ;;
+        debian|ubuntu)
+            sudo apt update && sudo apt upgrade -y
+            ;;
+        fedora|rhel|centos)
+            if command -v dnf >/dev/null 2>&1; then
+                sudo dnf upgrade --refresh -y
+            else
+                sudo yum update -y
+            fi
+            ;;
+        arch)
+            sudo pacman -Syu || return
+            ;;
+        *)
+            sudo pacman -Syu || return
+            ;;
+    esac
     flatpak update -y || return
     sudo snap refresh || return
     brew update || return
