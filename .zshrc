@@ -3,6 +3,18 @@
 # =====================================================
 
 # -----------------
+# Paths
+# -----------------
+
+# Add local binaries to PATH
+export PATH="$HOME/.local/bin:$PATH"
+# If you come from bash you might have to change your $PATH.
+# export PATH=$HOME/bin:/usr/local/bin:$PATH
+
+export ZSH="$HOME/.oh-my-zsh"
+
+
+# -----------------
 # ZimFW Configuration
 # -----------------
 
@@ -89,12 +101,27 @@ bindkey "${terminfo[kcud1]}" history-substring-search-down
 [ -f ~/.aliases ] && source ~/.aliases
 [ -f ~/.api_keys ] && source ~/.api_keys
 
-# -----------------
-# Paths
-# -----------------
 
-# Add local binaries to PATH
-export PATH="$HOME/.local/bin:$PATH"
+#ZSH_THEME="funky"
+
+plugins=(
+    git
+    archlinux
+    zsh-autosuggestions
+    zsh-syntax-highlighting
+)
+
+source $ZSH/oh-my-zsh.sh
+
+# Check archlinux plugin commands here
+# https://github.com/ohmyzsh/ohmyzsh/tree/master/plugins/archlinux
+
+# Display Pokemon-colorscripts
+# Project page: https://gitlab.com/phoneybadger/pokemon-colorscripts#on-other-distros-and-macos
+pokemon-colorscripts --no-title -s -r
+
+# fastfetch. Will be disabled if above colorscript was chosen to install
+#fastfetch -c $HOME/.config/fastfetch/config-compact.jsonc
 
 # -----------------
 # Oh My Posh Theme
@@ -150,3 +177,5 @@ if command -v brew &>/dev/null; then
   autoload -U compinit
   compinit
 fi
+
+

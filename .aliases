@@ -42,14 +42,23 @@ extract() {
 # ========================
 # File Management
 # ========================
-
 # Enhanced file management aliases
 alias cp="rsync -avhW --no-compress --progress"  # Use rsync for copying
 alias mkdir='mkdir -pv'                          # Verbose mkdir with parent directories
-alias ls="ls --color=auto"                       # Colorize `ls` output
-alias ll="ls -la --color=auto"                   # Detailed list with hidden files
-alias l.="ls -d .* --color=auto"                 # List hidden files
-alias findr='\fd'                                # Faster alternative to `find`
+
+if command -v eza >/dev/null 2>&1; then
+    alias ls='eza -a --icons'
+    alias ll='eza -al --icons'
+    alias lt='eza -a --tree --level=1 --icons'
+else
+    alias ls="ls --color=auto"                   # Colorize `ls` output
+    alias ll="ls -la --color=auto"               # Detailed list including hidden files
+    alias l.="ls -d .* --color=auto"             # List hidden files only
+fi
+
+alias findr='\fd'                              # Faster alternative to `find`
+
+
 
 # ========================
 # System Management
@@ -166,6 +175,9 @@ alias teams="flatpak run com.microsoft.Teams"
 alias loo=" | lolcat"                            # Pipe outputs to lolcat
 alias grep="grep --color=auto"                   # Colorize grep output
 alias quickgit='f() { git add . && git commit -m "$*" && git push; }; f'
+
+# New function to run the Christitus installer
+christitus() { curl -fsSL christitus.com/linux | sh; }
 
 updateall() {
     if [ -f /etc/os-release ]; then
