@@ -170,12 +170,15 @@ fi
 # -----------------
 
 echo "Zsh configuration loaded successfully."
+if ! command -v brew &>/dev/null; then
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+fi
 eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 if command -v brew &>/dev/null; then
-  FPATH=$(brew --prefix)/share/zsh-completions:$FPATH
+    FPATH=$(brew --prefix)/share/zsh-completions:$FPATH
 
-  autoload -U compinit
-  compinit
+    autoload -U compinit
+    compinit
 fi
 
 
