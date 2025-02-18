@@ -170,15 +170,15 @@ fi
 # -----------------
 
 echo "Zsh configuration loaded successfully."
-if ! command -v brew &>/dev/null; then
+# Updated Brew detection:
+if ! command -v brew &>/dev/null && [ ! -x /home/linuxbrew/.linuxbrew/bin/brew ]; then
+    echo "Homebrew not found. Installing..."
     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 fi
-eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-if command -v brew &>/dev/null; then
-    FPATH=$(brew --prefix)/share/zsh-completions:$FPATH
-
-    autoload -U compinit
-    compinit
+if [ -x /home/linuxbrew/.linuxbrew/bin/brew ]; then
+    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+elif command -v brew &>/dev/null; then
+    eval "$(brew shellenv)"
 fi
 
 
