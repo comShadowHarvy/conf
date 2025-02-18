@@ -178,6 +178,7 @@ alias quickgit='f() { git add . && git commit -m "$*" && git push; }; f'
 
 # New function to run the Christitus installer
 christitus() { curl -fsSL christitus.com/linux | sh; }
+christitusdev() { curl -fsSL https://christitus.com/linuxdev | sh: }
 
 updateall() {
     if [ -f /etc/os-release ]; then
