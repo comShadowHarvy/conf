@@ -1,12 +1,12 @@
+# =====================================================
+# ZimFW Plugin Manager Configuration (zimrc)
+# This configuration manages modules and settings for your Zsh environment.
+# =====================================================
 # Start configuration added by Zim install {{{
-
-# ZimFW Plugin Manager Configuration
-# This section contains modules and settings for managing your Zsh environment.
 
 # ============================================================================
 # Core Modules
 # ============================================================================
-
 # Essential environment setup
 zmodule environment                 # Core Zsh settings
 zmodule input                       # Input handling
@@ -15,141 +15,80 @@ zmodule termtitle                   # Terminal title management
 # ========================
 # Shell Enhancements
 # ========================
-
-# Core utilities and experience
 zmodule utility                     # Basic shell utilities
 zmodule magic-enter                 # Smart Enter key
-zmodule prompt-pwd                  # Working directory in prompt
-zmodule duration-info --no-submodules # Command duration display
+zmodule prompt-pwd                  # Show working directory in prompt
+zmodule duration-info --no-submodules   # Command duration display
 
 # ========================
 # Development Tools
 # ========================
-
-# Package and environment management
-zmodule direnv                      # Directory environments
+zmodule direnv                      # Directory-specific environments
 zmodule pacman                      # Package management
-
-# Conditional module loading
-(( $+commands[brew] )) && zmodule homebrew
-(( $+commands[ruby] )) && zmodule ruby
-(( $+commands[python] )) && zmodule pvenv
+(( $+commands[brew] )) && zmodule homebrew   # Load Homebrew module if brew is available
+(( $+commands[ruby] )) && zmodule ruby         # Load Ruby module if available
+(( $+commands[python] )) && zmodule pvenv       # Load Python virtualenv module if available
 
 # ========================
 # System Tools
 # ========================
-
-# Security and system utilities
-zmodule ssh --no-submodules        # SSH management
-
-# Load completion system
-zmodule completion --no-submodules
+zmodule ssh --no-submodules         # SSH management
+zmodule completion --no-submodules  # Load completion system
 
 # ============================================================================
 # Prompt Configuration
 # ============================================================================
-
-# Exposes timing and Git status information to the prompt.
-zmodule git-info
-# ASCII-only, lightweight prompt inspired by Spaceship/Starship.
-zmodule asciiship
+zmodule git-info                  # Expose Git status and timing in the prompt
+zmodule asciiship                 # Lightweight ASCII prompt (inspired by Spaceship/Starship)
 
 # ============================================================================
 # Completion Configuration
 # ============================================================================
-
-# Adds additional completion definitions for Zsh.
-zmodule zsh-users/zsh-completions --fpath src
+zmodule zsh-users/zsh-completions --fpath src   # Additional completions
 
 # ============================================================================
 # Final Initialization Modules
 # ============================================================================
-
-# Fish-like syntax highlighting. Load after completion.
-zmodule zsh-users/zsh-syntax-highlighting
-# Fish-like history search (up arrow). Load after syntax highlighting.
-zmodule zsh-users/zsh-history-substring-search
-# Fish-like autosuggestions based on command history.
-zmodule zsh-users/zsh-autosuggestions
+zmodule zsh-users/zsh-syntax-highlighting         # Syntax highlighting (load after completions)
+zmodule zsh-users/zsh-history-substring-search    # History substring search (binds up/down arrows)
+zmodule zsh-users/zsh-autosuggestions              # Command autosuggestions based on history
 
 # ============================================================================
 # Additional Modules
 # ============================================================================
-
-# Advanced syntax highlighting for Zsh scripts.
-zmodule zdharma-continuum/fast-syntax-highlighting
-
-# Extra utilities and functions.
-
-zmodule ael-code/zsh-colored-man-pages
-zmodule zpm-zsh/colorize
+zmodule zdharma-continuum/fast-syntax-highlighting  # Advanced syntax highlighting for Zsh scripts
+zmodule ael-code/zsh-colored-man-pages             # Colorized man pages
+zmodule zpm-zsh/colorize                           # Additional colorization
 
 # ========================
 # Completion and Navigation Enhancements
 # ========================
-
-# Dynamic completion generator - creates completion scripts for commands
-zmodule RobSis/zsh-completion-generator
-
-# DeepX - Enhanced directory navigation with bookmarks
-zmodule GetAmbush/deepx-zsh-plugin
-
-# Docker aliases and shortcuts for container management
-zmodule webyneter/docker-aliases
+zmodule RobSis/zsh-completion-generator            # Dynamic generation of completions
+zmodule GetAmbush/deepx-zsh-plugin                   # Enhanced directory navigation with bookmarks
+zmodule webyneter/docker-aliases                   # Docker aliases and shortcuts
 
 # ========================
 # Python Development Tools
 # ========================
-
-# Auto-switching for Python virtual environments
-# Automatically activates/deactivates virtualenv when entering/leaving directories
-zmodule MichaelAquilina/zsh-autoswitch-virtualenv
+zmodule MichaelAquilina/zsh-autoswitch-virtualenv    # Auto-switch Python virtualenv on directory change
 
 # ========================
 # Productivity Enhancements
 # ========================
-
-# Desktop notifications for long-running commands
-# Notifies when commands taking more than 30s complete
-zmodule MichaelAquilina/zsh-auto-notify
-
-# Auto-ls: Automatically list directory contents
-# Triggers after cd and other directory-changing commands
-zmodule aikow/zsh-auto-ls
-
-# AUR helper - Simplifies AUR package installation
-# Provides shortcuts for common AUR operations
-zmodule redxtech/zsh-aur-install
-
-# Colorized ls output with intelligent color schemes
-zmodule gretzky/auto-color-ls
-
-# TheFuck integration - Command correction utility
-# Suggests corrections for mistyped commands
-zmodule laggardkernel/zsh-thefuck
-
-# YADM (Yet Another Dotfiles Manager) integration
-zmodule juanrgon/yadm-zsh
-
-# Fun insults for command mistakes (optional)
-zmodule ahmubashshir/zinsults
-
-# Command alias tips and reminders
-# Shows available aliases when using the full command
-zmodule djui/alias-tips
-
-# Fuzzy finder - Advanced file/history search
-zmodule junegunn/fzf
-
-# Zoxide integration - Smarter cd command
-# Learns your most frequent directories
-zmodule kiesman99/zim-zoxide
+zmodule MichaelAquilina/zsh-auto-notify              # Desktop notifications for long-running commands
+zmodule aikow/zsh-auto-ls                           # Auto-list directory contents after cd
+zmodule redxtech/zsh-aur-install                    # AUR package installation helper
+zmodule gretzky/auto-color-ls                       # Intelligent, colorized ls output
+zmodule laggardkernel/zsh-thefuck                   # Command correction utility
+zmodule juanrgon/yadm-zsh                           # YADM (Yet Another Dotfiles Manager) integration
+zmodule ahmubashshir/zinsults                       # Fun insults for command mistakes
+zmodule djui/alias-tips                            # Command alias tips and reminders
+zmodule junegunn/fzf                               # Fuzzy finder for files and history
+zmodule kiesman99/zim-zoxide                       # Smart cd integration based on usage
 
 # ========================
 # Extra Utilities
 # ========================
-
-# Additional functions and aliases collection
 zmodule PatTheMav/zimfw-extras \
     --source 'aliases.zsh' \
     --source 'functions/gif2mp4' \
@@ -159,8 +98,6 @@ zmodule PatTheMav/zimfw-extras \
 # ============================================================================
 # Oh My Zsh Plugins
 # ============================================================================
-
-# Base Oh My Zsh functionality and additional plugins.
 zmodule ohmyzsh/ohmyzsh \
     --source 'oh-my-zsh.sh' \
     --source 'plugins/git/git.plugin.zsh' \
@@ -178,7 +115,7 @@ zmodule rupa/z --source 'z.sh'
 # ============================================================================
 if type brew &>/dev/null; then
     echo "Zim brew: $(brew --prefix)"
-    # Add Homebrew-specific completions and site functions only if they exist.
+    # Add Homebrew-specific completions and site functions if available.
     if [ -d "$(brew --prefix)/completions/zsh" ]; then
         zmodule "$(brew --prefix)/completions/zsh" --fpath .
     fi
