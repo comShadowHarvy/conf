@@ -1,21 +1,47 @@
+#!/usr/bin/env bash
 # ========================
 # General Functions
 # ========================
 
 # Create a directory and navigate to it
-mkcd() { mkdir -p "$1" && cd "$1"; }
+mkcd() {
+    if [ -z "$1" ]; then
+        echo "Usage: mkcd <directory>"
+        return 1
+    fi
+    mkdir -p "$1" && cd "$1"
+}
 
 # Navigate to a directory matching a pattern
-cdf() { cd *$1*/; }
+cdf() {
+    if [ -z "$1" ]; then
+        echo "Usage: cdf <pattern>"
+        return 1
+    fi
+    local dir
+    dir=$(find . -maxdepth 1 -type d -name "*$1*" | head -n 1)
+    if [ -n "$dir" ]; then
+        cd "$dir" || return 1
+    else
+        echo "No directory matching pattern '$1' found."
+        return 1
+    fi
+}
 
 # Extract wisdom from YouTube transcripts (requires yt and fabric)
 ytt() {
     if [ -z "$1" ]; then
-        echo "Usage: ytt <youtubelink>"
+        echo "Usage: ytt <youtube_link>"
         return 1
     fi
-    yt_transcript_output=$(yt --transcript "$1")
-    echo "$yt_transcript_output" | fabric --stream --pattern extract_wisdom
+    # Check if required commands are installed
+    if ! command -v yt &>/dev/null || ! command -v fabric &>/dev/null; then
+        echo "Error: Both 'yt' and 'fabric' must be installed."
+        return 1
+    fi
+    local transcript
+    transcript=$(yt --transcript "$1")
+    echo "$transcript" | fabric --stream --pattern extract_wisdom
 }
 
 # Extract various archive formats
@@ -23,48 +49,52 @@ extract() {
     if [[ -z "$1" || "$1" == "-h" || "$1" == "--help" ]]; then
         echo "Usage: extract <archive> [directory]"
         echo "Supports: tar.bz2, tar.gz, tar.xz, bz2, gz, zip, 7z, etc."
-    else
-        case "$1" in
-            *.tar.bz2|*.tbz2|*.tbz) tar xvjf "$1" ;;
-            *.tar.gz|*.tgz) tar xvzf "$1" ;;
-            *.tar.xz) tar xvJf "$1" ;;
-            *.tar) tar xvf "$1" ;;
-            *.zip) unzip "$1" ;;
-            *.7z) 7z x "$1" ;;
-            *.gz) gunzip "$1" ;;
-            *.bz2) bunzip2 "$1" ;;
-            *.xz|*.txz|*.lzma|*.tlz) xz -d "$1" ;;
-            *) echo "Unsupported file type: $1" ;;
-        esac
+        return 0
     fi
+
+    if [ ! -f "$1" ]; then
+        echo "File '$1' not found."
+        return 1
+    fi
+
+    case "$1" in
+        *.tar.bz2|*.tbz2|*.tbz) tar xvjf "$1" ;;
+        *.tar.gz|*.tgz) tar xvzf "$1" ;;
+        *.tar.xz) tar xvJf "$1" ;;
+        *.tar) tar xvf "$1" ;;
+        *.zip) unzip "$1" ;;
+        *.7z) 7z x "$1" ;;
+        *.gz) gunzip "$1" ;;
+        *.bz2) bunzip2 "$1" ;;
+        *.xz|*.txz|*.lzma|*.tlz) xz -d "$1" ;;
+        *) echo "Unsupported file type: $1" ;;
+    esac
 }
 
 # ========================
 # File Management
 # ========================
+
 # Enhanced file management aliases
 alias cp="rsync -avhW --no-compress --progress"  # Use rsync for copying
-alias mkdir='mkdir -pv'                          # Verbose mkdir with parent directories
+alias mkdir='mkdir -pv'                           # Verbose mkdir with parent directories
 
 if command -v eza >/dev/null 2>&1; then
     alias ls='eza -a --icons'
     alias ll='eza -al --icons'
     alias lt='eza -a --tree --level=1 --icons'
 else
-    alias ls="ls --color=auto"                   # Colorize `ls` output
-    alias ll="ls -la --color=auto"               # Detailed list including hidden files
-    alias l.="ls -d .* --color=auto"             # List hidden files only
+    alias ls="ls --color=auto"      # Colorize ls output
+    alias ll="ls -la --color=auto"  # Detailed list including hidden files
+    alias l.="ls -d .* --color=auto" # List hidden files only
 fi
 
-alias findr='\fd'                              # Faster alternative to `find`
-
-
+alias findr='fd'  # Using fd as a faster alternative to find
 
 # ========================
 # System Management
 # ========================
 
-# System information and management aliases
 alias please="sudo !!"                           # Run the last command with sudo
 alias h="history"                                # Show command history
 alias j="jobs -l"                                # List active jobs
@@ -81,7 +111,6 @@ alias ip="dig +short myip.opendns.com @resolver1.opendns.com" # Get public IP
 # Networking
 # ========================
 
-# Nmap shortcuts
 alias nmap_open_ports="nmap --open"
 alias nmap_list_interfaces="nmap --iflist"
 alias nmap_slow="sudo nmap -sS -v -T1"
@@ -93,33 +122,30 @@ alias nmap_full="sudo nmap -sS -T4 -PE -PP -PS80,443 -PY -g 53 -A -p1-65535 -v"
 # Media & Downloads
 # ========================
 
-# Media and download management aliases
 alias ytmp3="youtube-dl --extract-audio --audio-format mp3"
-alias wget='wget --no-hsts'                      # Prevent `.wget-hsts` file creation
-alias get='wget -m -np -c -R "index.html*"'      # Recursive website download
+alias wget='wget --no-hsts'                    # Prevent .wget-hsts file creation
+alias get='wget -m -np -c -R "index.html*"'    # Recursive website download
 alias playmp3='for i in *.mp3; do mplayer "$i"; done' # Play all MP3s in the directory
-alias music="mplayer --shuffle *"                # Shuffle and play media files
+alias music="mplayer --shuffle *"              # Shuffle and play media files
 
 # ========================
 # Navigation
 # ========================
 
-# Directory navigation shortcuts
 alias ..="cd .."
 alias ...="cd ../.."
 alias ....="cd ../../.."
-alias ~="cd ~"                                   # Go to home directory
-alias dl="cd ~/Downloads"                        # Go to Downloads directory
-alias dt="cd ~/Desktop"                          # Go to Desktop directory
-alias p="cd ~/projects"                          # Go to projects directory
+alias ~="cd ~"           # Go to home directory
+alias dl="cd ~/Downloads" # Go to Downloads directory
+alias dt="cd ~/Desktop"   # Go to Desktop directory
+alias p="cd ~/projects"   # Go to projects directory
 
 # ========================
 # Git and Development
 # ========================
 
-# Git workflow shortcuts
-alias code="flatpak run com.visualstudio.code"   # Launch VS Code
-alias studio="flatpak run com.visualstudio.code" # Alias for VS Code
+alias code="flatpak run com.visualstudio.code"  # Launch VS Code
+alias studio="flatpak run com.visualstudio.code"# Alias for VS Code
 alias gitstatus="git status -s"
 alias gita="git add -A"
 alias gitcm="git commit -m"
@@ -129,19 +155,17 @@ alias gitp="git push"
 # Fun and Miscellaneous
 # ========================
 
-# Fun aliases
 alias neofetch="neofetch | lolcat"
-alias lweather="ansiweather -l minto ontario"    # Show weather for Minto, Ontario
-alias now="date +%T"                             # Display current time
-alias week="date +%V"                            # Display current week number
-alias chx="chmod +x"                             # Make a script executable
-alias :q="exit"                                  # Vim-style exit
+alias lweather="ansiweather -l minto ontario"  # Weather for Minto, Ontario
+alias now="date +%T"                           # Display current time
+alias week="date +%V"                          # Display current week number
+alias chx="chmod +x"                           # Make a script executable
+alias :q="exit"                                # Vim-style exit
 
 # ========================
 # Tmux Shortcuts
 # ========================
 
-# Tmux session management
 alias ta="tmux attach -t"
 alias ts="tmux new-session -s"
 alias tl="tmux list-sessions"
@@ -150,17 +174,15 @@ alias tl="tmux list-sessions"
 # Miscellaneous Tools
 # ========================
 
-# Utilities
-alias bc="bc -l"                                 # Launch calculator
-alias sha1="openssl sha1"                        # Generate SHA1 digest
-alias flushmcd='echo "flush_all" | nc 10.10.27.11 11211' # Flush Memcached
-alias vnstat="vnstat -i eth1"                    # Network usage statistics
+alias bc="bc -l"                               # Calculator
+alias sha1="openssl sha1"                      # Generate SHA1 digest
+alias flushmcd='echo "flush_all" | nc 10.10.27.11 11211'  # Flush Memcached
+alias vnstat="vnstat -i eth1"                  # Network usage statistics
 
 # ========================
 # Default Applications
 # ========================
 
-# Default applications
 alias browser="google-chrome-stable"
 alias vlc="vlc"
 alias spotify="flatpak run com.spotify.Client"
@@ -171,21 +193,27 @@ alias teams="flatpak run com.microsoft.Teams"
 # Custom Commands
 # ========================
 
-# Custom and utility aliases
-alias loo=" | lolcat"                            # Pipe outputs to lolcat
-alias grep="grep --color=auto"                   # Colorize grep output
+alias loo="| lolcat"           # Pipe outputs to lolcat
+alias grep="grep --color=auto" # Colorize grep output
 alias quickgit='f() { git add . && git commit -m "$*" && git push; }; f'
 
-# New function to run the Christitus installer
-christitus() { curl -fsSL christitus.com/linux | sh; }
-christitusdev() { curl -fsSL https://christitus.com/linuxdev | sh: }
+# New functions to run the Christitus installer
+christitus() {
+    curl -fsSL christitus.com/linux | sh
+}
+
+christitusdev() {
+    curl -fsSL https://christitus.com/linuxdev | sh
+}
 
 updateall() {
+    local distro
     if [ -f /etc/os-release ]; then
         distro=$(grep '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"')
     else
         distro="unknown"
     fi
+
     case "$distro" in
         alpine)
             sudo apk update && sudo apk upgrade
@@ -201,17 +229,18 @@ updateall() {
             fi
             ;;
         arch)
-            sudo pacman -Syu || return
+            sudo pacman -Syu || return 1
             ;;
         *)
-            sudo pacman -Syu || return
+            sudo pacman -Syu || return 1
             ;;
     esac
-    flatpak update -y || return
-    sudo snap refresh || return
-    brew update || return
-    ZimFW update || return
-    sudo oh-my-posh update || return
+
+    flatpak update -y || return 1
+    sudo snap refresh || return 1
+    brew update || return 1
+    zimfw update || return 1
+    sudo oh-my-posh update || return 1
 }
 
 alias zimupdate="zimfw update"
