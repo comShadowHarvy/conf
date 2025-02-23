@@ -193,3 +193,25 @@ if command -v fastfetch > /dev/null 2>&1 && command -v pokemon-colorscripts > /d
     pokemon-colorscripts --no-title -s -r | fastfetch -c "$HOME/.config/fastfetch/config-pokemon.jsonc" \
       --logo-type file-raw --logo-height 10 --logo-width 5 --logo -
 fi
+
+# Check if luarocks is installed; if not, install it along with luasocket
+if ! command -v luarocks &>/dev/null; then
+  echo "luarocks not found. Installing luarocks and luasocket..."
+
+  # Download luarocks
+  wget -O /tmp/luarocks-3.11.1.tar.gz https://luarocks.org/releases/luarocks-3.11.1.tar.gz
+
+  # Extract and change to the directory
+  tar zxpf /tmp/luarocks-3.11.1.tar.gz -C /tmp
+  cd /tmp/luarocks-3.11.1
+
+  # Configure, compile, and install luarocks
+  ./configure && make && sudo make install
+
+  # Install the luasocket module via luarocks
+  sudo luarocks install luasocket
+
+  echo "Installation complete."
+else
+  echo "luarocks is already installed."
+fi
