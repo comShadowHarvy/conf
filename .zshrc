@@ -189,6 +189,18 @@ elif command -v brew &>/dev/null; then
     eval "$(brew shellenv)"
 fi
 
+# Install ripgrep if missing
+if ! command -v rg &>/dev/null; then
+    echo "ripgrep not found. Installing via Homebrew..."
+    brew install ripgrep
+fi
+
+# Install node if missing
+if ! command -v node &>/dev/null; then
+    echo "node not found. Installing via Homebrew..."
+    brew install node
+fi
+
 # If fastfetch is installed, run the combined Pokémon Colorscripts and fastfetch command
 if command -v fastfetch > /dev/null 2>&1 && command -v pokemon-colorscripts > /dev/null 2>&1; then
     pokemon-colorscripts --no-title -s -r | fastfetch -c "$HOME/.config/fastfetch/config-pokemon.jsonc" \
