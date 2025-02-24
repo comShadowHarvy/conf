@@ -1,9 +1,9 @@
-{
+return {
     "echasnovski/mini.nvim",
-    version = false, -- use 'false' to always get the latest commit; you can also pin to a specific commit or tag
+    version = false,  -- Use 'false' to always get the latest commit, or pin a specific commit/tag
     config = function()
       require("mini").setup({
-        -- Add your custom configuration options here if needed
+        -- Add your custom options here if needed
       })
     end,
   }
