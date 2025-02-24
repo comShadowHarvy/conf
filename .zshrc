@@ -286,10 +286,10 @@ fi
 # --- New: Auto-install neovim and yazi using install.sh ---
 if ! command -v nvim &>/dev/null; then
     echo "neovim not found. Installing..."
-    /home/me/conf/install.sh neovim
+    ~/install.sh neovim
 fi
 
 if ! command -v yazi &>/dev/null; then
     echo "yazi not found. Installing..."
-    /home/me/conf/install.sh yazi
+    ~/install.sh yazi
 fi
