@@ -1,8 +1,10 @@
-return {
-  "echasnovski/mini.nvim",
-  --event = { "BufReadPre", "BufNewFile" },
-  version = "false", -- Use for stability; omit to use `main` branch for the latest features
-  config = function()
-    require("mini").setup()
-  end,
-}
+{
+    "echasnovski/mini.nvim",
+    version = false, -- use 'false' to always get the latest commit; you can also pin to a specific commit or tag
+    config = function()
+      require("mini").setup({
+        -- Add your custom configuration options here if needed
+      })
+    end,
+  }
+  
