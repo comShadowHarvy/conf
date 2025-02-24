@@ -2,6 +2,8 @@
 # Zsh Configuration with ZimFW and Custom Enhancements
 # =====================================================
 
+
+
 # -----------------
 # Paths
 # -----------------
