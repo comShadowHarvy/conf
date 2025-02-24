@@ -215,3 +215,55 @@ if ! command -v luarocks &>/dev/null; then
 else
   echo "luarocks is already installed."
 fi
+declare -a fonts=(
+    BitstreamVeraSansMono
+    CodeNewRoman
+    DroidSansMono
+    FiraCode
+    FiraMono
+    Go-Mono
+    Hack
+    Hermit
+    JetBrainsMono
+    Meslo
+    Noto
+    Overpass
+    ProggyClean
+    RobotoMono
+    SourceCodePro
+    SpaceMono
+    Ubuntu
+    UbuntuMono
+)
+
+version='2.1.0'
+fonts_dir="${HOME}/.local/share/fonts"
+
+if [[ ! -d "$fonts_dir" ]]; then
+    echo "Creating fonts directory: $fonts_dir"
+    mkdir -p "$fonts_dir"
+
+    for font in "${fonts[@]}"; do
+        zip_file="${font}.zip"
+        download_url="https://github.com/ryanoasis/nerd-fonts/releases/download/v${version}/${zip_file}"
+        echo "Downloading $download_url"
+
+        if wget -q "$download_url"; then
+            echo "Download successful."
+            if unzip -q "$zip_file" -d "$fonts_dir"; then
+                echo "Unzip successful."
+                rm "$zip_file"
+            else
+                echo "Unzip failed for $zip_file"
+            fi
+        else
+            echo "Download failed for $download_url"
+        fi
+    done
+
+    find "$fonts_dir" -name '*Windows Compatible*' -delete
+
+    fc-cache -fv
+else
+    echo "Fonts directory already exists: $fonts_dir. Skipping download and installation."
+fi
