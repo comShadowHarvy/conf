@@ -77,6 +77,7 @@ fi
 
 # Configure Zsh history
 HISTFILE="$HOME/.zsh_history"
+[ ! -f "$HISTFILE" ] && touch "$HISTFILE"  # create the history file if it doesn't exist
 HISTSIZE=100000
 SAVEHIST=100000
 setopt share_history          # Share history across all sessions
