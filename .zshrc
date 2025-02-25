@@ -18,7 +18,7 @@ INSTALL_MISSING_TOOLS=true     # Auto-install missing tools
 SHOW_POKEMON=true              # Show Pokémon on startup
 SHOW_WELCOME_MESSAGE=true      # Show welcome message
 USE_OHMYPOSH=true              # Use Oh My Posh prompt
-AUTO_CHECK_UPDATES=false       # Auto-check for updates on startup
+AUTO_CHECK_UPDATES=true       # Auto-check for updates on startup
 
 # -----------------
 # Helper Functions
