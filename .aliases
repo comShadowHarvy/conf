@@ -1,9 +1,3 @@
-#!/bin/bash
-# Steps to update your configuration
-
-# 1. Update your .aliases file
-echo "Updating .aliases file..."
-cat > ~/.aliases <<'EOL'
 #!/usr/bin/env bash
 # ========================
 # General Functions
@@ -129,20 +123,30 @@ function ycd() {
 # ========================
 
 # Enhanced file management aliases
-alias cp="rsync -avhW --no-compress --progress"  # Use rsync for copying
-alias mkdir='mkdir -pv'                           # Verbose mkdir with parent directories
+alias cp="rsync -avhW --no-compress --progress"  # Use rsync for copying with progress
+alias mkdir='mkdir -pv'                          # Verbose mkdir with parent directories
 
+# Use eza if available, otherwise fall back to ls with color
 if command -v eza >/dev/null 2>&1; then
     alias ls='eza -a --icons'
     alias ll='eza -al --icons'
     alias lt='eza -a --tree --level=1 --icons'
+    alias la='eza -la --icons'
+    alias lm='eza -la --sort=modified --icons'
+    alias lS='eza -la --sort=size --icons'
 else
     alias ls="ls --color=auto"      # Colorize ls output
     alias ll="ls -la --color=auto"  # Detailed list including hidden files
     alias l.="ls -d .* --color=auto" # List hidden files only
+    alias la="ls -la --color=auto"  # List all files
+    alias lm="ls -la --color=auto -t" # List by modified time
+    alias lS="ls -la --color=auto -S" # List by size
 fi
 
-alias findr='fd'  # Using fd as a faster alternative to find
+# Use fd instead of find if available
+if command -v fd >/dev/null 2>&1; then
+    alias findr='fd'  # Using fd as a faster alternative to find
+fi
 
 # Function to search files for text (combining find and grep)
 ftext() {
@@ -190,6 +194,7 @@ alias cpuinfo="lscpu"                            # Display CPU info
 alias ports="netstat -tulanp"                    # List open ports
 alias lsport="sudo lsof -i"                      # List processes using ports
 alias ip="dig +short myip.opendns.com @resolver1.opendns.com" # Get public IP
+alias localip="hostname -I | awk '{print \$1}'"  # Get local IP
 
 # Add a function to generate summaries of a directory
 dirsummary() {
@@ -240,9 +245,14 @@ share() {
         return 1
     fi
     
+    # Get local IP for easier sharing
+    local ip
+    ip=$(hostname -I | awk '{print $1}')
+    
     # Check if path is a directory
     if [ -d "$1" ]; then
         # For directories, serve the whole directory
+        echo "Sharing directory at http://$ip:$port/"
         (cd "$1" && python3 -m http.server "$port")
     else
         # For files, create a temporary directory
@@ -250,7 +260,7 @@ share() {
         local filename=$(basename "$1")
         cp "$1" "$temp_dir"
         
-        echo "Sharing $filename at http://localhost:$port/$filename"
+        echo "Sharing $filename at http://$ip:$port/$filename"
         (cd "$temp_dir" && python3 -m http.server "$port")
         
         # Clean up when done
@@ -263,10 +273,11 @@ share() {
 # ========================
 
 alias ytmp3="youtube-dl --extract-audio --audio-format mp3"
-alias wget='wget --no-hsts'                    # Prevent .wget-hsts file creation
-alias get='wget -m -np -c -R "index.html*"'    # Recursive website download
+alias ytmp4="youtube-dl -f 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4'"
+alias wget='wget --no-hsts -c'                   # Continue downloads and prevent .wget-hsts file creation
+alias get='wget -m -np -c -R "index.html*"'      # Recursive website download
 alias playmp3='for i in *.mp3; do mplayer "$i"; done' # Play all MP3s in the directory
-alias music="mplayer --shuffle *"              # Shuffle and play media files
+alias music="mplayer --shuffle *"                # Shuffle and play media files
 
 # ========================
 # Navigation
@@ -275,10 +286,12 @@ alias music="mplayer --shuffle *"              # Shuffle and play media files
 alias ..="cd .."
 alias ...="cd ../.."
 alias ....="cd ../../.."
+alias .....="cd ../../../.."
 alias ~="cd ~"           # Go to home directory
 alias dl="cd ~/Downloads" # Go to Downloads directory
 alias dt="cd ~/Desktop"   # Go to Desktop directory
 alias p="cd ~/projects"   # Go to projects directory
+alias doc="cd ~/Documents" # Go to Documents directory
 
 # ========================
 # Git and Development
@@ -286,12 +299,22 @@ alias p="cd ~/projects"   # Go to projects directory
 
 alias code="flatpak run com.visualstudio.code"  # Launch VS Code
 alias studio="flatpak run com.visualstudio.code"# Alias for VS Code
+
+# Git aliases with improved functionality
 alias gitstatus="git status -s"
 alias gita="git add -A"
 alias gitcm="git commit -m"
 alias gitp="git push"
-alias gri="git rebase -i"                       # Interactive rebase
+alias gitpl="git pull"
+alias gitf="git fetch"
+alias gits="git stash"
+alias gitsp="git stash pop"
+alias gitb="git branch"
+alias gitco="git checkout"
+alias gitcb="git checkout -b"    # Create and checkout a new branch
+alias gri="git rebase -i"        # Interactive rebase
 alias glog="git log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit" # Better git log
+alias gitclean="git clean -fd"   # Remove untracked files and directories
 
 # Improved quickgit function with commit message verification
 quickgit() {
@@ -310,9 +333,50 @@ quickgit() {
     echo "Committing with message: $*"
     git commit -m "$*"
     
-    # Push to the remote repository
-    echo "Pushing to remote..."
-    git push
+    # Check if there's a remote repository
+    if git remote | grep -q .; then
+        # Push to the remote repository
+        echo "Pushing to remote..."
+        git push
+    else
+        echo "No remote repository configured. Skipping push."
+    fi
+}
+
+# Git workflow - update branch with latest from upstream
+gitupdate() {
+    local current_branch
+    current_branch=$(git rev-parse --abbrev-ref HEAD)
+    
+    echo "Updating branch: $current_branch"
+    
+    # Stash any changes
+    if ! git diff --quiet; then
+        echo "Stashing local changes..."
+        git stash
+        local stashed=true
+    fi
+    
+    # Fetch updates
+    echo "Fetching latest changes..."
+    git fetch
+    
+    # Check if there are upstream changes for the current branch
+    if git rev-parse --verify origin/$current_branch >/dev/null 2>&1; then
+        # Rebase on top of upstream changes
+        echo "Rebasing on origin/$current_branch..."
+        git rebase origin/$current_branch
+    else
+        echo "No upstream branch found for $current_branch"
+    fi
+    
+    # Pop stashed changes if any
+    if [ "$stashed" = true ]; then
+        echo "Applying stashed changes..."
+        git stash pop
+    fi
+    
+    echo "Update complete!"
 }
 
 # Function to create a new script, make it executable, and open it in your editor
@@ -331,8 +395,14 @@ mkscript() {
     echo '# Created on: '"$(date)" >> "$FILE"
     echo '# Description: ' >> "$FILE"
     echo '' >> "$FILE"
-    echo '# Main script body' >> "$FILE"
+    echo 'set -euo pipefail  # Exit on error, undefined vars, and pipe failures' >> "$FILE"
     echo '' >> "$FILE"
+    echo '# Main script body' >> "$FILE"
+    echo 'main() {' >> "$FILE"
+    echo '    echo "Hello, World!"' >> "$FILE"
+    echo '}' >> "$FILE"
+    echo '' >> "$FILE"
+    echo 'main "$@"' >> "$FILE"
     
     # Make it executable
     chmod +x "$FILE"
@@ -357,6 +427,7 @@ alias now="date +%T"                           # Display current time
 alias week="date +%V"                          # Display current week number
 alias chx="chmod +x"                           # Make a script executable
 alias :q="exit"                                # Vim-style exit
+alias today='date "+%Y-%m-%d"'                # Show today's date in ISO format
 
 # ========================
 # Tmux Shortcuts
@@ -367,22 +438,27 @@ alias ts="tmux new-session -s"
 alias tl="tmux list-sessions"
 alias tk="tmux kill-session -t"                # Kill a tmux session
 alias tn="tmux new -s"                         # Create a new session with name
+alias tsw="tmux switch-client -t"              # Switch client to session
 
 # ========================
 # Miscellaneous Tools
 # ========================
 
-alias bc="bc -l"                               # Calculator
+alias bc="bc -l"                               # Calculator with math lib
 alias sha1="openssl sha1"                      # Generate SHA1 digest
+alias sha256="openssl sha256"                  # Generate SHA256 digest
+alias md5="openssl md5"                        # Generate MD5 digest
 alias flushmcd='echo "flush_all" | nc 10.10.27.11 11211'  # Flush Memcached
 alias vnstat="vnstat -i eth1"                  # Network usage statistics
+alias df="df -h"                               # Human-readable disk usage
+alias du="du -h"                               # Human-readable directory size
 
 # ========================
 # Default Applications
 # ========================
 
 alias browser="google-chrome-stable"
-alias vlc="vlc"
+alias vlc="flatpak run org.videolan.VLC"
 alias spotify="flatpak run com.spotify.Client"
 alias discord="flatpak run com.discordapp.Discord"
 alias teams="flatpak run com.microsoft.Teams"
@@ -396,89 +472,160 @@ alias grep="grep --color=auto" # Colorize grep output
 alias fd="fd --color=auto"     # Colorize fd output
 alias diff="diff --color=auto" # Colorize diff output
 
-# Fixed updateall function
+# Improved updateall function with error handling and progress tracking
 updateall() {
-    echo "🔄 Starting system update..."
+    echo "🚀 Starting comprehensive system update..."
+    
+    # Track overall success
+    local success=true
+    local failed_managers=()
+    
+    # Function to handle updating with proper error handling
+    update_with() {
+        local manager=$1
+        local cmd=$2
+        local description=$3
+        
+        echo ""
+        echo "📦 Updating $description..."
+        echo "Running: $cmd"
+        
+        if eval "$cmd"; then
+            echo "✅ Successfully updated $description"
+        else
+            echo "❌ Failed to update $description"
+            success=false
+            failed_managers+=("$description")
+        fi
+    }
     
     # Determine Linux distribution
-    local distro
+    local distro=""
     if [ -f /etc/os-release ]; then
-        distro=$(grep '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"')
-    else
-        distro="unknown"
+        distro=$(grep -oP '(?<=^ID=).+' /etc/os-release | tr -d '"')
     fi
-
-    # Update system packages based on distribution
-    echo "📦 Updating system packages for $distro..."
+    
+    echo "🖥️ Detected distribution: $distro"
+    
+    # System package manager updates
     case "$distro" in
         alpine)
-            echo "Running: sudo apk update"
-            sudo apk update
-            echo "Running: sudo apk upgrade"
-            sudo apk upgrade
+            update_with "apk" "sudo apk update && sudo apk upgrade" "Alpine packages"
             ;;
-        debian|ubuntu)
-            echo "Running: sudo apt update"
-            sudo apt update
-            echo "Running: sudo apt upgrade -y"
-            sudo apt upgrade -y
+        debian|ubuntu|pop|mint|kali|elementary|zorin)
+            update_with "apt" "sudo apt update && sudo apt upgrade -y" "Debian/Ubuntu packages"
+            # Check for dist-upgrade capabilities
+            if apt --help 2>&1 | grep -q dist-upgrade; then
+                update_with "apt" "sudo apt dist-upgrade -y" "Distribution packages"
+            fi
+            # Clean up
+            update_with "apt" "sudo apt autoremove -y && sudo apt autoclean" "package cleanup"
             ;;
-        fedora|rhel|centos)
+        fedora|rhel|centos|rocky|alma)
             if command -v dnf >/dev/null 2>&1; then
-                echo "Running: sudo dnf upgrade --refresh -y"
-                sudo dnf upgrade --refresh -y
+                update_with "dnf" "sudo dnf upgrade --refresh -y" "DNF packages"
+                update_with "dnf" "sudo dnf autoremove -y" "DNF cleanup"
             else
-                echo "Running: sudo yum update -y"
-                sudo yum update -y
+                update_with "yum" "sudo yum update -y" "YUM packages"
+                update_with "yum" "sudo yum autoremove -y" "YUM cleanup"
             fi
             ;;
-        arch|manjaro|endeavouros)
-            echo "Running: sudo pacman -Syu"
-            sudo pacman -Syu
+        arch|manjaro|endeavouros|garuda)
+            update_with "pacman" "sudo pacman -Syu --noconfirm" "Arch packages"
+            # Clean package cache but keep the most recent version
+            update_with "pacman" "sudo paccache -rk1" "Arch package cache"
+            ;;
+        opensuse*|suse*)
+            update_with "zypper" "sudo zypper refresh && sudo zypper update -y" "openSUSE packages"
             ;;
         *)
-            # Default to pacman if distribution couldn't be identified
+            # Try to detect package manager if distribution couldn't be identified
             if command -v pacman >/dev/null 2>&1; then
-                echo "Running: sudo pacman -Syu"
-                sudo pacman -Syu
+                update_with "pacman" "sudo pacman -Syu --noconfirm" "Arch packages"
+            elif command -v apt >/dev/null 2>&1; then
+                update_with "apt" "sudo apt update && sudo apt upgrade -y" "Debian/Ubuntu packages"
+            elif command -v dnf >/dev/null 2>&1; then
+                update_with "dnf" "sudo dnf upgrade --refresh -y" "DNF packages"
+            elif command -v zypper >/dev/null 2>&1; then
+                update_with "zypper" "sudo zypper refresh && sudo zypper update -y" "openSUSE packages"
+            elif command -v apk >/dev/null 2>&1; then
+                update_with "apk" "sudo apk update && sudo apk upgrade" "Alpine packages"
             else
-                echo "⚠️ Unknown distribution. No system update performed."
+                echo "⚠️ Unknown distribution and no recognized package manager found."
             fi
             ;;
     esac
-
-    # Update flatpak if available
+    
+    # Alternative package managers
+    
+    # Update AUR packages if yay is installed
+    if command -v yay >/dev/null 2>&1; then
+        update_with "yay" "yay -Syu --noconfirm" "AUR packages"
+    fi
+    
+    # Update Flatpak if available
     if command -v flatpak >/dev/null 2>&1; then
-        echo "📦 Updating Flatpak packages..."
-        flatpak update -y
+        update_with "flatpak" "flatpak update -y" "Flatpak packages"
     fi
-
-    # Update snap if available
+    
+    # Update Snap if available
     if command -v snap >/dev/null 2>&1; then
-        echo "📦 Updating Snap packages..."
-        sudo snap refresh
+        update_with "snap" "sudo snap refresh" "Snap packages"
     fi
-
+    
     # Update Homebrew if available
     if command -v brew >/dev/null 2>&1; then
-        echo "📦 Updating Homebrew packages..."
-        brew update
-        brew upgrade
+        update_with "brew" "brew update && brew upgrade && brew cleanup" "Homebrew packages"
     fi
     
     # Update ZimFW if available
     if command -v zimfw >/dev/null 2>&1; then
-        echo "🛠️ Updating ZimFW..."
-        zimfw update
+        update_with "zimfw" "zimfw update" "ZimFW"
     fi
     
     # Update Oh My Posh if available
     if command -v oh-my-posh >/dev/null 2>&1; then
-        echo "🛠️ Updating Oh My Posh..."
-        sudo oh-my-posh update
+        update_with "oh-my-posh" "sudo oh-my-posh update" "Oh My Posh"
     fi
     
-    echo "🎉 System update complete!"
+    # Update Rust if installed
+    if command -v rustup >/dev/null 2>&1; then
+        update_with "rustup" "rustup update" "Rust"
+    fi
+    
+    # Update npm global packages if available
+    if command -v npm >/dev/null 2>&1; then
+        update_with "npm" "npm update -g" "npm global packages"
+    fi
+    
+    # Update pip packages if available (user-installed only)
+    if command -v pip >/dev/null 2>&1; then
+        update_with "pip" "pip list --outdated --format=freeze | grep -v '^\-e' | cut -d = -f 1 | xargs -r pip install -U --user" "pip user packages"
+    fi
+    
+    # Final report
+    echo ""
+    if [ "$success" = true ]; then
+        echo "🎉 All updates completed successfully!"
+    else
+        echo "⚠️ Some updates failed. The following managers had issues:"
+        for manager in "${failed_managers[@]}"; do
+            echo "  - $manager"
+        done
+        echo "You may want to run those updates manually."
+    fi
+    
+    # Show system information
+    echo ""
+    echo "📊 System Information:"
+    echo "  - Kernel: $(uname -r)"
+    echo "  - Uptime: $(uptime -p)"
+    if command -v free >/dev/null 2>&1; then
+        echo "  - Memory: $(free -h | awk '/^Mem:/ {print $3 " used of " $2 " total"}')"
+    fi
+    if command -v df >/dev/null 2>&1; then
+        echo "  - Disk: $(df -h / | awk 'NR==2 {print $3 " used of " $2 " total (" $5 " used)"}')"
+    fi
 }
 
 # New functions for Christitus installers
@@ -510,152 +657,39 @@ pkg-install() {
         return 1
     fi
 }
-EOL
 
-# 2. Update your install.sh file
-echo "Updating install.sh file..."
-cat > ~/install.sh <<'EOL'
-#!/bin/bash
-
-# Check if package name is provided
-if [ -z "$1" ]; then
-  echo "Usage: $0 <package> [--verbose]"
-  echo "Example: $0 neovim"
-  echo "Example: $0 yazi --verbose"
-  exit 1
-fi
-
-PACKAGE="$1"
-VERBOSE=0
-installed=0
-
-# Check for verbose flag
-if [ "$2" = "--verbose" ]; then
-  VERBOSE=1
-fi
-
-# Function to log messages if verbose is enabled
-log() {
-  if [ $VERBOSE -eq 1 ]; then
-    echo "$1"
-  fi
+# Quick temperature check for systems with sensors
+tempcheck() {
+    if command -v sensors >/dev/null 2>&1; then
+        sensors | grep -E 'Core|CPU'
+    else
+        echo "The 'sensors' command is not available. Try installing lm-sensors package."
+    fi
 }
 
-# Function to map package names for different package managers
-map_package_name() {
-  local pkg="$1"
-  local manager="$2"
-  
-  case "$pkg:$manager" in
-    "neovim:apt-get") echo "neovim" ;;
-    "neovim:pacman") echo "neovim" ;;
-    "neovim:brew") echo "neovim" ;;
-    "yazi:cargo") echo "yazi" ;;
-    # Add more mappings as needed
-    *) echo "$pkg" ;;  # Default to the original name
-  esac
+# Generate a secure password
+genpass() {
+    local length=${1:-16}
+    if [[ ! "$length" =~ ^[0-9]+$ ]] || [ "$length" -lt 8 ]; then
+        echo "Please specify a valid password length (minimum 8)"
+        return 1
+    fi
+    
+    if command -v openssl >/dev/null 2>&1; then
+        openssl rand -base64 48 | cut -c1-"$length"
+    else
+        tr -dc 'A-Za-z0-9!@#$%^&*()-_=+' < /dev/urandom | head -c "$length"; echo
+    fi
 }
 
-# Function to try a command and mark success if it runs successfully
-try_install() {
-  local manager="$1"
-  local cmd="$2"
-  local pkg=$(map_package_name "$PACKAGE" "$manager")
-  
-  echo "Trying: $cmd $pkg"
-  if [ $VERBOSE -eq 1 ]; then
-    $cmd "$pkg" && installed=1 && return 0
-  else
-    $cmd "$pkg" >/dev/null 2>&1 && installed=1 && return 0
-  fi
-  return 1
-}
+# Watch system resources (refresh every 2 seconds)
+alias syswatch='watch -n2 "free -h; echo; df -h -T /"'
 
-# Handle special cases for certain packages
-handle_special_cases() {
-  case "$PACKAGE" in
-    "yazi")
-      # For Yazi, try cargo installation as fallback
-      if command -v cargo >/dev/null 2>&1; then
-        echo "Trying cargo installation for Yazi..."
-        cargo install --locked yazi-fm && installed=1 && return 0
-      fi
-      ;;
-  esac
-  return 1
-}
-
-# Attempt installation using available package managers in order
-if command -v pacman >/dev/null 2>&1; then
-  try_install "pacman" "sudo pacman -S --noconfirm"
-  [ $installed -eq 1 ] && echo "✅ Successfully installed $PACKAGE using pacman" && exit 0
+# Enhanced man pages with colors if batcat is available
+if command -v batcat >/dev/null 2>&1; then
+    export MANPAGER="sh -c 'col -bx | batcat -l man -p'"
+    alias man='MANPAGER="sh -c \"col -bx | batcat -l man -p\"" man'
+elif command -v bat >/dev/null 2>&1; then
+    export MANPAGER="sh -c 'col -bx | bat -l man -p'"
+    alias man='MANPAGER="sh -c \"col -bx | bat -l man -p\"" man'
 fi
-
-if command -v yay >/dev/null 2>&1; then
-  try_install "yay" "yay -S --noconfirm"
-  [ $installed -eq 1 ] && echo "✅ Successfully installed $PACKAGE using yay" && exit 0
-fi
-
-if command -v apt-get >/dev/null 2>&1; then
-  # Update package lists first
-  log "Updating apt package lists..."
-  sudo apt-get update >/dev/null 2>&1
-  try_install "apt-get" "sudo apt-get install -y"
-  [ $installed -eq 1 ] && echo "✅ Successfully installed $PACKAGE using apt-get" && exit 0
-fi
-
-if command -v dnf >/dev/null 2>&1; then
-  try_install "dnf" "sudo dnf install -y"
-  [ $installed -eq 1 ] && echo "✅ Successfully installed $PACKAGE using dnf" && exit 0
-fi
-
-if command -v zypper >/dev/null 2>&1; then
-  try_install "zypper" "sudo zypper install -y"
-  [ $installed -eq 1 ] && echo "✅ Successfully installed $PACKAGE using zypper" && exit 0
-fi
-
-if command -v apk >/dev/null 2>&1; then
-  try_install "apk" "sudo apk add"
-  [ $installed -eq 1 ] && echo "✅ Successfully installed $PACKAGE using apk" && exit 0
-fi
-
-if command -v brew >/dev/null 2>&1; then
-  try_install "brew" "brew install"
-  [ $installed -eq 1 ] && echo "✅ Successfully installed $PACKAGE using brew" && exit 0
-fi
-
-# Try cargo for Rust packages
-if command -v cargo >/dev/null 2>&1; then
-  case "$PACKAGE" in
-    "yazi"|"yazi-fm")
-      try_install "cargo" "cargo install --locked"
-      [ $installed -eq 1 ] && echo "✅ Successfully installed $PACKAGE using cargo" && exit 0
-      ;;
-  esac
-fi
-
-# Try handling special cases as a last resort
-handle_special_cases
-[ $installed -eq 1 ] && echo "✅ Successfully installed $PACKAGE using special handling" && exit 0
-
-echo "❌ No supported package manager found or installation failed for $PACKAGE."
-echo "You may need to install it manually or check the package name."
-exit 1
-EOL
-
-# Make install.sh executable
-chmod +x ~/install.sh
-
-# 3. Make the files executable
-chmod +x ~/.aliases
-
-# 4. Source the updated aliases
-echo "Applying changes..."
-source ~/.aliases
-
-echo "✅ Setup complete! Your improved shell configuration is now ready."
-echo "   You can now use commands like:"
-echo "   - updateall    - Update your system packages"
-echo "   - y            - Launch Yazi file manager"
-echo "   - ycd          - Launch Yazi with directory tracking"
-echo "   - pkg-install  - Install packages using your improved script"
