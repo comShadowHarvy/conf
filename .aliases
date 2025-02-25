@@ -48,7 +48,7 @@ ytt() {
 extract() {
     if [[ -z "$1" || "$1" == "-h" || "$1" == "--help" ]]; then
         echo "Usage: extract <archive> [directory]"
-        echo "Supports: tar.bz2, tar.gz, tar.xz, bz2, gz, zip, 7z, etc."
+        echo "Supports: tar.bz2, tar.gz, tar.xz, bz2, gz, zip, rar, 7z, etc."
         return 0
     fi
 
@@ -57,18 +57,65 @@ extract() {
         return 1
     fi
 
+    # If a destination directory is provided
+    if [[ -n "$2" ]]; then
+        mkdir -p "$2"
+        cd "$2" || return 1
+    fi
+
     case "$1" in
         *.tar.bz2|*.tbz2|*.tbz) tar xvjf "$1" ;;
         *.tar.gz|*.tgz) tar xvzf "$1" ;;
         *.tar.xz) tar xvJf "$1" ;;
         *.tar) tar xvf "$1" ;;
         *.zip) unzip "$1" ;;
+        *.rar) unrar x "$1" ;;
         *.7z) 7z x "$1" ;;
         *.gz) gunzip "$1" ;;
         *.bz2) bunzip2 "$1" ;;
         *.xz|*.txz|*.lzma|*.tlz) xz -d "$1" ;;
         *) echo "Unsupported file type: $1" ;;
     esac
+
+    # Return to original directory if a destination was provided
+    if [[ -n "$2" ]]; then
+        cd - || return 1
+    fi
+}
+
+# ========================
+# Yazi File Manager
+# ========================
+
+# Main alias for yazi file manager
+alias y='yazi'
+
+# Open yazi in the current directory
+alias ya='yazi .'
+
+# Open yazi and navigate to home directory
+alias yh='yazi ~'
+
+# Open yazi in downloads folder
+alias yd='yazi ~/Downloads'
+
+# Function to navigate to a directory and then open yazi
+cdz() {
+    if [ -z "$1" ]; then
+        yazi .
+    else
+        cd "$1" && yazi .
+    fi
+}
+
+# Function to open yazi in a directory, and cd to that directory when exiting yazi
+function ycd() {
+    tmp="$(mktemp -t "yazi-cwd.XXXXX")"
+    yazi --cwd-file="$tmp" "$@"
+    if cwd="$(cat -- "$tmp")" && [ -n "$cwd" ] && [ "$cwd" != "$PWD" ]; then
+        cd -- "$cwd"
+    fi
+    rm -f -- "$tmp"
 }
 
 # ========================
@@ -91,6 +138,37 @@ fi
 
 alias findr='fd'  # Using fd as a faster alternative to find
 
+# Function to search files for text (combining find and grep)
+ftext() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: ftext <search_pattern> [path]"
+        return 1
+    fi
+    
+    local pattern=$1
+    local path=${2:-.}
+    
+    # Check if ripgrep is available
+    if command -v rg &>/dev/null; then
+        rg --color=always --line-number --smart-case "$pattern" "$path"
+    else
+        grep -r --color=always -n "$pattern" "$path"
+    fi
+}
+
+# Function to find directories by name pattern
+fdir() {
+    if [ -z "$1" ]; then
+        echo "Usage: fdir <pattern> [max_depth]"
+        return 1
+    fi
+    
+    local pattern=$1
+    local depth=${2:-3}  # Default depth is 3 levels
+    
+    find . -maxdepth "$depth" -type d -name "*$pattern*" | sort
+}
+
 # ========================
 # System Management
 # ========================
@@ -107,6 +185,28 @@ alias ports="netstat -tulanp"                    # List open ports
 alias lsport="sudo lsof -i"                      # List processes using ports
 alias ip="dig +short myip.opendns.com @resolver1.opendns.com" # Get public IP
 
+# Add a function to generate summaries of a directory
+dirsummary() {
+    local dir=${1:-.}
+    
+    echo "📂 Directory Summary for: $(realpath "$dir")"
+    echo "───────────────────────────────────────"
+    echo "📊 Stats:"
+    echo "  Total items: $(find "$dir" -type f -o -type d | wc -l)"
+    echo "  Files: $(find "$dir" -type f | wc -l)"
+    echo "  Directories: $(find "$dir" -type d | wc -l)"
+    echo "  Total size: $(du -sh "$dir" | cut -f1)"
+    
+    echo -e "\n📑 File types:"
+    find "$dir" -type f | grep -v "^\." | grep -o "\.[^\.]*$" | sort | uniq -c | sort -rn | head -10
+    
+    echo -e "\n🕒 Recently modified files:"
+    find "$dir" -type f -mtime -7 | head -5
+    
+    echo -e "\n📁 Largest subdirectories:"
+    du -h --max-depth=1 "$dir" | sort -hr | head -5
+}
+
 # ========================
 # Networking
 # ========================
@@ -117,6 +217,40 @@ alias nmap_slow="sudo nmap -sS -v -T1"
 alias nmap_fin="sudo nmap -sF -v"
 alias nmap_fast="nmap -F -T5 --version-light --top-ports 300"
 alias nmap_full="sudo nmap -sS -T4 -PE -PP -PS80,443 -PY -g 53 -A -p1-65535 -v"
+
+# Function to quickly share a file or directory via HTTP
+share() {
+    local port=${2:-8000}  # Default port 8000
+    
+    if [ -z "$1" ]; then
+        echo "Usage: share <file_or_directory> [port]"
+        echo "Starts a simple HTTP server to share a file or directory."
+        return 1
+    fi
+    
+    # Check if the path exists
+    if [ ! -e "$1" ]; then
+        echo "Error: $1 does not exist."
+        return 1
+    fi
+    
+    # Check if path is a directory
+    if [ -d "$1" ]; then
+        # For directories, serve the whole directory
+        (cd "$1" && python3 -m http.server "$port")
+    else
+        # For files, create a temporary directory
+        local temp_dir=$(mktemp -d)
+        local filename=$(basename "$1")
+        cp "$1" "$temp_dir"
+        
+        echo "Sharing $filename at http://localhost:$port/$filename"
+        (cd "$temp_dir" && python3 -m http.server "$port")
+        
+        # Clean up when done
+        rm -rf "$temp_dir"
+    fi
+}
 
 # ========================
 # Media & Downloads
@@ -150,6 +284,62 @@ alias gitstatus="git status -s"
 alias gita="git add -A"
 alias gitcm="git commit -m"
 alias gitp="git push"
+alias gri="git rebase -i"                       # Interactive rebase
+alias glog="git log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit" # Better git log
+
+# Improved quickgit function with commit message verification
+quickgit() {
+    if [ -z "$1" ]; then
+        echo "Usage: quickgit <commit message>"
+        echo "Stages all changes, commits with the provided message, and pushes to the remote repository."
+        return 1
+    fi
+    
+    # Show what's being staged
+    git status -s
+    echo "Staging all changes..."
+    git add .
+    
+    # Commit with the provided message
+    echo "Committing with message: $*"
+    git commit -m "$*"
+    
+    # Push to the remote repository
+    echo "Pushing to remote..."
+    git push
+}
+
+# Function to create a new script, make it executable, and open it in your editor
+mkscript() {
+    if [ -z "$1" ]; then
+        echo "Usage: mkscript <script_name>"
+        return 1
+    fi
+    
+    # Add .sh extension if not provided
+    [[ "$1" != *.* ]] && FILE="$1.sh" || FILE="$1"
+    
+    # Create the file with a bash shebang
+    echo '#!/usr/bin/env bash' > "$FILE"
+    echo '' >> "$FILE"
+    echo '# Created on: '"$(date)" >> "$FILE"
+    echo '# Description: ' >> "$FILE"
+    echo '' >> "$FILE"
+    echo '# Main script body' >> "$FILE"
+    echo '' >> "$FILE"
+    
+    # Make it executable
+    chmod +x "$FILE"
+    
+    # Open in preferred editor (using nvim if available, else fallback)
+    if command -v nvim &>/dev/null; then
+        nvim "$FILE"
+    elif command -v code &>/dev/null; then
+        code "$FILE"
+    else
+        $EDITOR "$FILE"
+    fi
+}
 
 # ========================
 # Fun and Miscellaneous
@@ -169,6 +359,8 @@ alias :q="exit"                                # Vim-style exit
 alias ta="tmux attach -t"
 alias ts="tmux new-session -s"
 alias tl="tmux list-sessions"
+alias tk="tmux kill-session -t"                # Kill a tmux session
+alias tn="tmux new -s"                         # Create a new session with name
 
 # ========================
 # Miscellaneous Tools
@@ -195,9 +387,70 @@ alias teams="flatpak run com.microsoft.Teams"
 
 alias loo="| lolcat"           # Pipe outputs to lolcat
 alias grep="grep --color=auto" # Colorize grep output
-alias quickgit='f() { git add . && git commit -m "$*" && git push; }; f'
+alias fd="fd --color=auto"     # Colorize fd output
+alias diff="diff --color=auto" # Colorize diff output
 
-# New functions to run the Christitus installer
+# Improved updateall function with success/failure reporting
+updateall() {
+    echo "🔄 Starting system update..."
+    
+    local distro
+    if [ -f /etc/os-release ]; then
+        distro=$(grep '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"')
+    else
+        distro="unknown"
+    fi
+
+    # Create a function to handle execution and reporting
+    run_update() {
+        echo "🔹 Running: $*"
+        if "$@"; then
+            echo "✅ Success: $1 update completed"
+            return 0
+        else
+            echo "❌ Failed: $1 update failed"
+            return 1
+        fi
+    }
+
+    # Update package managers based on distribution
+    echo "📦 Updating system packages..."
+    case "$distro" in
+        alpine)
+            run_update sudo apk update && run_update sudo apk upgrade
+            ;;
+        debian|ubuntu)
+            run_update sudo apt update && run_update sudo apt upgrade -y
+            ;;
+        fedora|rhel|centos)
+            if command -v dnf >/dev/null 2>&1; then
+                run_update sudo dnf upgrade --refresh -y
+            else
+                run_update sudo yum update -y
+            fi
+            ;;
+        arch)
+            run_update sudo pacman -Syu
+            ;;
+        *)
+            # Default to pacman if distribution couldn't be identified
+            command -v pacman >/dev/null 2>&1 && run_update sudo pacman -Syu
+            ;;
+    esac
+
+    # Update other package managers if available
+    command -v flatpak >/dev/null 2>&1 && echo "📦 Updating Flatpak packages..." && run_update flatpak update -y
+    command -v snap >/dev/null 2>&1 && echo "📦 Updating Snap packages..." && run_update sudo snap refresh
+    command -v brew >/dev/null 2>&1 && echo "📦 Updating Homebrew packages..." && run_update brew update && run_update brew upgrade
+    
+    # Update framework and tools
+    command -v zimfw >/dev/null 2>&1 && echo "🛠️ Updating ZimFW..." && run_update zimfw update
+    command -v oh-my-posh >/dev/null 2>&1 && echo "🛠️ Updating Oh My Posh..." && run_update sudo oh-my-posh update
+    
+    echo "🎉 System update complete!"
+}
+
+# New functions for Christitus installers
 christitus() {
     curl -fsSL christitus.com/linux | sh
 }
@@ -206,102 +459,23 @@ christitusdev() {
     curl -fsSL https://christitus.com/linuxdev | sh
 }
 
-updateall() {
-    local distro
-    if [ -f /etc/os-release ]; then
-        distro=$(grep '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"')
-    else
-        distro="unknown"
-    fi
-
-    case "$distro" in
-        alpine)
-            sudo apk update && sudo apk upgrade
-            ;;
-        debian|ubuntu)
-            sudo apt update && sudo apt upgrade -y
-            ;;
-        fedora|rhel|centos)
-            if command -v dnf >/dev/null 2>&1; then
-                sudo dnf upgrade --refresh -y
-            else
-                sudo yum update -y
-            fi
-            ;;
-        arch)
-            sudo pacman -Syu || return 1
-            ;;
-        *)
-            sudo pacman -Syu || return 1
-            ;;
-    esac
-
-    flatpak update -y || return 1
-    sudo snap refresh || return 1
-    brew update || return 1
-    zimfw update || return 1
-    sudo oh-my-posh update || return 1
-}
-
+# Shell management
 alias zimupdate="zimfw update"
-
-
 alias reload-zsh="source ~/.zshrc"
 alias edit-zsh="nvim ~/.zshrc"
+alias edit-aliases="nvim ~/.aliases"
 
-
-# Open Yazi in the current directory
-alias y="yazi"
-
-# Open Yazi in the home directory
-alias yh="yazi ~"
-
-# Open Yazi with hidden files visible by default
-alias yah="yazi --show-hidden"
-
-# Open Yazi in a specific directory
-alias yd="yazi ~/Downloads"
-alias ydox="yazi ~/Documents"
-alias yp="yazi ~/Pictures"
-alias ym="yazi ~/Music"
-
-# Open Yazi in sudo mode (useful for managing system files)
-alias ys="sudo yazi"
-
-# Open Yazi and navigate to a specified path
-alias ygo="yazi $(fd --type d | fzf)"
-
-# Open Yazi in a different layout
-alias yv="yazi --layout=vertical"
-alias yh="yazi --layout=horizontal"
-
-# Use Yazi instead of `cd`
-alias cd="yazi"
-
-# Use Yazi to move to a selected directory and exit back to the shell
-function ycd() {
-    local dir
-    dir=$(yazi --cwd-on-exit)
-    if [ -d "$dir" ]; then
-        cd "$dir"
+# Install a package using the custom install script
+pkg-install() {
+    if [ -z "$1" ]; then
+        echo "Usage: pkg-install <package> [--verbose]"
+        return 1
+    fi
+    
+    if [ -f ~/install.sh ]; then
+        ~/install.sh "$@"
+    else
+        echo "Error: install.sh script not found in home directory."
+        return 1
     fi
 }
-alias yx="ycd"
-
-# Quickly edit Yazi config
-alias yedit="nvim ~/.config/yazi/yazi.toml"
-
-# Reload Yazi config
-alias yreload="kill -SIGUSR1 $(pgrep yazi)"
-
-# Preview files using Yazi
-alias yp="yazi --preview"
-
-# Open a file with the default application after selecting it in Yazi
-alias yo="yazi --choose-file | xargs xdg-open"
-
-# List directories with Yazi and select one to navigate to
-alias ydl="yazi $(find . -type d | fzf)"
-
-# Open Yazi in the directory of the currently running terminal
-alias yhere="yazi $(pwd)"
