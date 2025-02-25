@@ -250,3 +250,58 @@ alias reload-zsh="source ~/.zshrc"
 alias edit-zsh="nvim ~/.zshrc"
 
 
+# Open Yazi in the current directory
+alias y="yazi"
+
+# Open Yazi in the home directory
+alias yh="yazi ~"
+
+# Open Yazi with hidden files visible by default
+alias yah="yazi --show-hidden"
+
+# Open Yazi in a specific directory
+alias yd="yazi ~/Downloads"
+alias ydox="yazi ~/Documents"
+alias yp="yazi ~/Pictures"
+alias ym="yazi ~/Music"
+
+# Open Yazi in sudo mode (useful for managing system files)
+alias ys="sudo yazi"
+
+# Open Yazi and navigate to a specified path
+alias ygo="yazi $(fd --type d | fzf)"
+
+# Open Yazi in a different layout
+alias yv="yazi --layout=vertical"
+alias yh="yazi --layout=horizontal"
+
+# Use Yazi instead of `cd`
+alias cd="yazi"
+
+# Use Yazi to move to a selected directory and exit back to the shell
+function ycd() {
+    local dir
+    dir=$(yazi --cwd-on-exit)
+    if [ -d "$dir" ]; then
+        cd "$dir"
+    fi
+}
+alias yx="ycd"
+
+# Quickly edit Yazi config
+alias yedit="nvim ~/.config/yazi/yazi.toml"
+
+# Reload Yazi config
+alias yreload="kill -SIGUSR1 $(pgrep yazi)"
+
+# Preview files using Yazi
+alias yp="yazi --preview"
+
+# Open a file with the default application after selecting it in Yazi
+alias yo="yazi --choose-file | xargs xdg-open"
+
+# List directories with Yazi and select one to navigate to
+alias ydl="yazi $(find . -type d | fzf)"
+
+# Open Yazi in the directory of the currently running terminal
+alias yhere="yazi $(pwd)"
