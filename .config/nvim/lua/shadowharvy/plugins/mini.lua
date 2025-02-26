@@ -1,53 +1,117 @@
 return {
     "echasnovski/mini.nvim",
-    version = false,  -- Use 'false' to always get the latest commit, or pin a specific commit/tag
+    version = false, -- Use 'false' to always get the latest commit, or pin a specific commit/tag
     config = function()
-        local mini = require("mini")
+        -- Setup each module individually without requiring 'mini' directly.
 
-        -- Example of using all modules (you might want to customize this)
-        -- NOTE: Not all modules have a setup function. Those that don't
-        -- are usually simple functions that are used directly.
-        -- Modules that do not have a .setup() function will be loaded but
-        -- won't be configured.
+        -- Modules with setup function
+        local status_ok, animate = pcall(require, "mini.animate")
+        if status_ok then
+            animate.setup()
+        end
 
-        -- Set up modules that have a setup function.
-        require("mini.animate").setup() -- Example
-        require("mini.basics").setup()  -- Example
-        require("mini.bracketed").setup()
-        require("mini.clue").setup() -- Example
-        require("mini.colors").setup()
-        require("mini.comment").setup()
-        require("mini.cursorword").setup()
-        require("mini.files").setup() -- Example
-        require("mini.jump").setup() -- Example
-        require("mini.map").setup() -- Example
-        require("mini.move").setup()
-        require("mini.operators").setup()
-        require("mini.pairs").setup() -- Example
-        require("mini.pick").setup()
-        require("mini.sessions").setup()
-        require("mini.surround").setup()
-        require("mini.tabline").setup()
-        require("mini.trailspace").setup()
-        require("mini.ai").setup()
+        local status_ok, basics = pcall(require, "mini.basics")
+        if status_ok then
+            basics.setup()
+        end
 
-        -- Optionally use modules that don't have a setup:
-        -- These usually export simple functions.
-        -- local mini_misc = require("mini.misc")
-        -- Example usage:
-        -- mini_misc.is_string("hello") -- Returns true
-        -- ... other functions from mini.misc ...
+        local status_ok, bracketed = pcall(require, "mini.bracketed")
+        if status_ok then
+            bracketed.setup()
+        end
+        
+        local status_ok, clue = pcall(require, "mini.clue")
+        if status_ok then
+            clue.setup()
+        end
 
-        -- Similarly for mini.bufremove etc.
-        -- You can check the documentation for what functions each modules expose
+        local status_ok, colors = pcall(require, "mini.colors")
+        if status_ok then
+            colors.setup()
+        end
 
-        -- Example of configuring a module more specifically
-        -- require("mini.cursorword").setup({
-        --   use_global_status = true,
-        --   cursorword_style = "undercurl",
-        -- })
-        -- End of optional setup
+        local status_ok, comment = pcall(require, "mini.comment")
+        if status_ok then
+            comment.setup()
+        end
+
+        local status_ok, cursorword = pcall(require, "mini.cursorword")
+        if status_ok then
+            cursorword.setup()
+        end
+
+        local status_ok, files = pcall(require, "mini.files")
+        if status_ok then
+            files.setup()
+        end
+
+        local status_ok, jump = pcall(require, "mini.jump")
+        if status_ok then
+            jump.setup()
+        end
+
+        local status_ok, map = pcall(require, "mini.map")
+        if status_ok then
+            map.setup()
+        end
+
+        local status_ok, move = pcall(require, "mini.move")
+        if status_ok then
+            move.setup()
+        end
+
+        local status_ok, operators = pcall(require, "mini.operators")
+        if status_ok then
+            operators.setup()
+        end
+
+        local status_ok, pairs = pcall(require, "mini.pairs")
+        if status_ok then
+            pairs.setup()
+        end
+
+        local status_ok, pick = pcall(require, "mini.pick")
+        if status_ok then
+            pick.setup()
+        end
+
+        local status_ok, sessions = pcall(require, "mini.sessions")
+        if status_ok then
+            sessions.setup()
+        end
+
+        local status_ok, surround = pcall(require, "mini.surround")
+        if status_ok then
+            surround.setup()
+        end
+
+        local status_ok, tabline = pcall(require, "mini.tabline")
+        if status_ok then
+            tabline.setup()
+        end
+
+        local status_ok, trailspace = pcall(require, "mini.trailspace")
+        if status_ok then
+            trailspace.setup()
+        end
+        
+        local status_ok, ai = pcall(require, "mini.ai")
+        if status_ok then
+            ai.setup()
+        end
+
+        -- Modules without a setup function:
+        -- You would access these directly as needed.
+        -- Example:
+        -- local status_ok, misc = pcall(require, "mini.misc")
+        -- if status_ok then
+        --     -- use misc.is_string, or other exported functions.
+        --     if misc.is_string("hello") then
+        --         print("It's a string!")
+        --     end
+        -- end
+        -- You can also add these in the same pattern, like above.
+        -- This is for all the other modules without a setup() function.
         print("All Mini modules loaded!")
-
     end,
 }
