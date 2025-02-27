@@ -7,6 +7,7 @@ return {
     
     -- Set up modules that have a setup function
     require("mini.animate").setup()
+    require('mini.deps').setup({})
     require("mini.basics").setup()
     require("mini.bracketed").setup()
     require("mini.clue").setup()
