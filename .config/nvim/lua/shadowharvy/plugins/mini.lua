@@ -26,7 +26,7 @@ return {
     require("mini.tabline").setup()
     require("mini.trailspace").setup()
     require("mini.ai").setup()
-    
+    require('mini.extra').setup({})
     print("All Mini modules loaded!")
   end,
 }
