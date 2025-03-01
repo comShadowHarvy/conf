@@ -727,14 +727,13 @@ updateall() {
     fi
     
     # Show system information more efficiently
-    {
-        echo ""
-        echo "📊 System Information:"
-        echo "  - Kernel: $(uname -r)"
-        echo "  - Uptime: $(uptime -p)"
-        command -v free >/dev/null 2>&1 && echo "  - Memory: $(free -h | awk '/^Mem:/ {print $3 " used of " $2 " total"}')"
-        command -v df >/dev/null 2>&1 && echo "  - Disk: $(df -h / | awk 'NR==2 {print $3 " used of " $2 " total (" $5 " used)"}')"
-    }
+    echo ""
+    echo "📊 System Information:"
+    echo "  - Kernel: $(uname -r)"
+    echo "  - Uptime: $(uptime -p)"
+    command -v free >/dev/null 2>&1 && echo "  - Memory: $(free -h | awk '/^Mem:/ {print $3 " used of " $2 " total"}')"
+    command -v df >/dev/null 2>&1 && echo "  - Disk: $(df -h / | awk 'NR==2 {print $3 " used of " $2 " total (" $5 " used)"}')"
+}
 }
 
 # Installer shortcuts
