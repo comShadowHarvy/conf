@@ -18,7 +18,7 @@ INSTALL_MISSING_TOOLS=true     # Auto-install missing tools
 SHOW_POKEMON=true              # Show Pokémon on startup
 SHOW_WELCOME_MESSAGE=true      # Show welcome message
 USE_OHMYPOSH=true              # Use Oh My Posh prompt
-AUTO_CHECK_UPDATES=false       # Auto-check for updates on startup
+AUTO_CHECK_UPDATES=true       # Auto-check for updates on startup
 
 # Define trusted Git directories for auto-updates
 TRUSTED_GIT_DIRS=("$HOME/projects" "$HOME/work" "$HOME/personal" "$HOME/dev")
@@ -294,6 +294,25 @@ check_git_updates_and_ls() {
 # Hook to run check_git_updates_and_ls whenever the directory changes
 autoload -U add-zsh-hook
 add-zsh-hook chpwd check_git_updates_and_ls
+# Debug function
+debug_git_check() {
+  echo "Current dir: $(pwd)"
+  echo "Is Git repo: $(if [[ -d ".git" ]] || git rev-parse --git-dir > /dev/null 2>&1; then echo "Yes"; else echo "No"; fi)"
+  echo "AUTO_CHECK_UPDATES: $AUTO_CHECK_UPDATES"
+  echo "Trusted dirs: ${TRUSTED_GIT_DIRS[*]}"
+  
+  # Check if current directory is trusted
+  local current_dir=$(pwd)
+  local is_trusted=0
+  for dir in "${TRUSTED_GIT_DIRS[@]}"; do
+    if [[ "$current_dir" == "$dir"* ]]; then
+      is_trusted=1
+      break
+    fi
+  done
+  echo "Is trusted: $(if [[ $is_trusted -eq 1 ]]; then echo "Yes"; else echo "No"; fi)"
+}
+alias debug-git="debug_git_check"
 
 # -----------------
 # Tool Installation & Configuration
