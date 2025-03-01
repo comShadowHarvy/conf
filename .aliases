@@ -622,117 +622,17 @@ alias grep="grep --color=auto"
 command -v fd >/dev/null 2>&1 && alias fd="fd --color=auto"
 alias diff="diff --color=auto"
 
-# Highly optimized updateall function
-updateall() {
-    echo "🚀 Starting comprehensive system update..."
-    
-    # Track overall success
-    local success=true
-    local failed_managers=()
-    
-    # Function to handle updating with proper error handling
-    update_with() {
-        local manager=$1
-        local cmd=$2
-        local description=$3
-        
-        echo -e "\n📦 Updating $description..."
-        echo "Running: $cmd"
-        
-        # Execute in a subshell to avoid script termination on error
-        if (eval "$cmd"); then
-            echo "✅ Successfully updated $description"
-            return 0
-        else
-            echo "❌ Failed to update $description"
-            success=false
-            failed_managers+=("$description")
-            return 1
-        fi
-    }
-    
-    # Detect distribution more efficiently
-    local distro=""
-    if [[ -f /etc/os-release ]]; then
-        distro=$(source /etc/os-release && echo "$ID")
-    fi
-    
-    echo "🖥️ Detected distribution: $distro"
-    
-    # System package manager updates
-    case "$distro" in
-        alpine)
-            update_with "apk" "sudo apk update && sudo apk upgrade" "Alpine packages"
-            ;;
-        debian|ubuntu|pop|mint|kali|elementary|zorin)
-            # Run all apt commands in one update_with to minimize sudo prompts
-            update_with "apt" "sudo apt update && sudo apt upgrade -y && sudo apt dist-upgrade -y && sudo apt autoremove -y && sudo apt autoclean" "Debian/Ubuntu packages"
-            ;;
-        fedora|rhel|centos|rocky|alma)
-            if command -v dnf >/dev/null 2>&1; then
-                update_with "dnf" "sudo dnf upgrade --refresh -y && sudo dnf autoremove -y" "DNF packages"
-            else
-                update_with "yum" "sudo yum update -y && sudo yum autoremove -y" "YUM packages"
-            fi
-            ;;
-        arch|manjaro|endeavouros|garuda)
-            update_with "pacman" "sudo pacman -Syu --noconfirm && sudo paccache -rk1" "Arch packages"
-            ;;
-        opensuse*|suse*)
-            update_with "zypper" "sudo zypper refresh && sudo zypper update -y" "openSUSE packages"
-            ;;
-        *)
-            # Try to detect package manager if distribution couldn't be identified
-            if command -v pacman >/dev/null 2>&1; then
-                update_with "pacman" "sudo pacman -Syu --noconfirm" "Arch packages"
-            elif command -v apt >/dev/null 2>&1; then
-                update_with "apt" "sudo apt update && sudo apt upgrade -y" "Debian/Ubuntu packages"
-            elif command -v dnf >/dev/null 2>&1; then
-                update_with "dnf" "sudo dnf upgrade --refresh -y" "DNF packages"
-            elif command -v zypper >/dev/null 2>&1; then
-                update_with "zypper" "sudo zypper refresh && sudo zypper update -y" "openSUSE packages"
-            elif command -v apk >/dev/null 2>&1; then
-                update_with "apk" "sudo apk update && sudo apk upgrade" "Alpine packages"
-            else
-                echo "⚠️ Unknown distribution and no recognized package manager found."
-            fi
-            ;;
-    esac
-    
-    # Update alternative package managers only if they exist
-    command -v yay >/dev/null 2>&1 && update_with "yay" "yay -Syu --noconfirm" "AUR packages"
-    command -v flatpak >/dev/null 2>&1 && update_with "flatpak" "flatpak update -y" "Flatpak packages"
-    command -v snap >/dev/null 2>&1 && update_with "snap" "sudo snap refresh" "Snap packages"
-    command -v brew >/dev/null 2>&1 && update_with "brew" "brew update && brew upgrade && brew cleanup" "Homebrew packages"
-    command -v zimfw >/dev/null 2>&1 && update_with "zimfw" "zimfw update" "ZimFW"
-    command -v oh-my-posh >/dev/null 2>&1 && update_with "oh-my-posh" "sudo oh-my-posh update" "Oh My Posh"
-    command -v rustup >/dev/null 2>&1 && update_with "rustup" "rustup update" "Rust"
-    command -v npm >/dev/null 2>&1 && update_with "npm" "npm update -g" "npm global packages"
-    
-    # Update pip packages if available (more efficient)
-    if command -v pip >/dev/null 2>&1; then
-        update_with "pip" "pip list --outdated --format=json | python3 -c \"import json, sys; print(' '.join([x['name'] for x in json.load(sys.stdin)]))\" | xargs -r pip install -U --user" "pip user packages"
-    fi
-    
-    # Final report
-    echo ""
-    if [[ "$success" = true ]]; then
-        echo "🎉 All updates completed successfully!"
-    else
-        echo "⚠️ Some updates failed. The following managers had issues:"
-        for manager in "${failed_managers[@]}"; do
-            echo "  - $manager"
-        done
-        echo "You may want to run those updates manually."
-    fi
-    
-    # Show system information more efficiently
-    echo ""
+# System update information functions
+sysinfo() {
     echo "📊 System Information:"
     echo "  - Kernel: $(uname -r)"
     echo "  - Uptime: $(uptime -p)"
-    command -v free >/dev/null 2>&1 && echo "  - Memory: $(free -h | awk '/^Mem:/ {print $3 " used of " $2 " total"}')"
-    command -v df >/dev/null 2>&1 && echo "  - Disk: $(df -h / | awk 'NR==2 {print $3 " used of " $2 " total (" $5 " used)"}')"
+    if command -v free >/dev/null 2>&1; then
+        echo "  - Memory: $(free -h | awk '/^Mem:/ {print $3 " used of " $2 " total"}')"
+    fi
+    if command -v df >/dev/null 2>&1; then
+        echo "  - Disk: $(df -h / | awk 'NR==2 {print $3 " used of " $2 " total (" $5 " used)"}')"
+    fi
 }
 }
 
