@@ -87,16 +87,32 @@ zmodule PatTheMav/zimfw-extras \
 # Oh My Zsh Plugin Integration
 # ============================================================================
 
-# Selectively load Oh My Zsh plugins
-if (( ${+commands[git]} || ${+commands[kubectl]} || ${+commands[docker]} || ${+commands[mvn]} )); then
-    zmodule ohmyzsh/ohmyzsh \
-        --source 'oh-my-zsh.sh' \
-        ${${+commands[git]}:+--source 'plugins/git/git.plugin.zsh' --source 'plugins/git-auto-fetch/git-auto-fetch.plugin.zsh'} \
-        ${${+commands[kubectl]}:+--source 'plugins/kubectl/kubectl.plugin.zsh'} \
-        ${${+commands[docker]}:+--source 'plugins/docker/docker.plugin.zsh' --fpath 'plugins/docker'} \
-        ${${+commands[mvn]}:+--source 'plugins/mvn/mvn.plugin.zsh'} \
-        --source 'plugins/sudo/sudo.plugin.zsh'
+# Load Oh My Zsh core
+zmodule ohmyzsh/ohmyzsh --source 'oh-my-zsh.sh'
+
+# Load Git plugins if git is available
+if (( ${+commands[git]} )); then
+    zmodule ohmyzsh/ohmyzsh --source 'plugins/git/git.plugin.zsh'
+    zmodule ohmyzsh/ohmyzsh --source 'plugins/git-auto-fetch/git-auto-fetch.plugin.zsh'
 fi
+
+# Load kubectl plugin if available
+if (( ${+commands[kubectl]} )); then
+    zmodule ohmyzsh/ohmyzsh --source 'plugins/kubectl/kubectl.plugin.zsh'
+fi
+
+# Load Docker plugin if available
+if (( ${+commands[docker]} )); then
+    zmodule ohmyzsh/ohmyzsh --source 'plugins/docker/docker.plugin.zsh' --fpath 'plugins/docker'
+fi
+
+# Load Maven plugin if available
+if (( ${+commands[mvn]} )); then
+    zmodule ohmyzsh/ohmyzsh --source 'plugins/mvn/mvn.plugin.zsh'
+fi
+
+# Always load sudo plugin (very lightweight)
+zmodule ohmyzsh/ohmyzsh --source 'plugins/sudo/sudo.plugin.zsh'
 
 # ============================================================================
 # Homebrew Integration (Silent Operation)
