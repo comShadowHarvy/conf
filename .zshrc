@@ -21,7 +21,8 @@ USE_OHMYPOSH=true              # Use Oh My Posh prompt
 AUTO_CHECK_UPDATES=true       # Auto-check for updates on startup
 
 # Define trusted Git directories for auto-updates
-TRUSTED_GIT_DIRS=("$HOME/projects" "$HOME/work" "$HOME/personal" "$HOME/dev")
+TRUSTED_GIT_DIRS=("$HOME/git" "$HOME/projects" "$HOME/work" "$HOME/personal" "$HOME/dev")
+
 
 # Define which plugins to enable (true) or disable (false)
 declare -A plugins
