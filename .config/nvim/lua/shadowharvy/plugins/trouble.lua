@@ -1,5 +1,6 @@
 return {
   "folke/trouble.nvim",
+  priority = 100,
   dependencies = { "nvim-tree/nvim-web-devicons", "folke/todo-comments.nvim" },
   opts = {
     focus = true,
