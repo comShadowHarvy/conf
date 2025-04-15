@@ -32,12 +32,34 @@ plugins=(
   [archlinux]=true
 )
 
+# Function to set terminal title
+set_term_title() {
+  # Adjust format as desired - this matches DT's format
+  print -Pn "\e]0;${USER}@${HOSTNAME%%.*}:${PWD/#$HOME/\~}\a"
+}
+# Register function to run before each prompt
+autoload -U add-zsh-hook
+add-zsh-hook precmd set_term_title
+
+
 # -----------------
 # Paths (Set early, minimal)
 # -----------------
 typeset -U path
-path=("$HOME/.local/bin" "$HOME/bin" $path)
+path=("$HOME/app" "$HOME/.local/bin" "$HOME/bin" $path)
 export ZSH="$HOME/.oh-my-zsh"
+export EDITOR="nvim"
+export VISUAL="nvim" # Or 'neovide', 'gvim' etc. if you prefer a GUI for VISUAL
+if [ -z "$XDG_CONFIG_HOME" ] ; then
+    export XDG_CONFIG_HOME="$HOME/.config"
+fi
+if [ -z "$XDG_DATA_HOME" ] ; then
+    export XDG_DATA_HOME="$HOME/.local/share"
+fi
+if [ -z "$XDG_CACHE_HOME" ] ; then
+    export XDG_CACHE_HOME="$HOME/.cache"
+fi
+export FZF_DEFAULT_OPTS="--layout=reverse --exact --border=bold --border=rounded --margin=3% --color=dark"
 
 # -----------------
 # Core Zsh Options (Critical for Startup)
@@ -54,7 +76,9 @@ setopt hist_expire_dups_first hist_ignore_all_dups hist_ignore_space
 setopt hist_reduce_blanks hist_verify inc_append_history share_history
 setopt auto_cd auto_pushd pushd_ignore_dups pushdminus extended_glob
 setopt glob_dots no_beep interactive_comments multios correct complete_in_word
+export HISTORY_IGNORE="(ls|cd|pwd|exit|sudo reboot|history|cd -|cd ..)"
 
+#
 # -----------------
 # Helper Functions
 # -----------------
@@ -530,6 +554,35 @@ fi
 
 # Run initial ls command
 ls --color=auto
+
+# Set up tmux config directory if it doesn't exist
+if [ ! -d "$HOME/.config/tmux" ]; then
+  log_message "INFO" "Setting up tmux configuration..."
+  # Create the directory structure
+  mkdir -p "$HOME/.config/tmux"
+  
+  # Copy the .tmux.conf file if it exists in home directory
+  if [ -f "$HOME/.tmux.conf" ]; then
+    cp "$HOME/.tmux.conf" "$HOME/.config/tmux/tmux.conf"
+  # Otherwise download the Oh My Tmux configuration
+  else
+    curl -fsSL https://raw.githubusercontent.com/gpakosz/.tmux/master/.tmux.conf -o "$HOME/.config/tmux/tmux.conf"
+    curl -fsSL https://raw.githubusercontent.com/gpakosz/.tmux/master/.tmux.conf.local -o "$HOME/.config/tmux/tmux.conf.local"
+  fi
+  
+  # Create symlinks to the home directory
+  ln -sf "$HOME/.config/tmux/tmux.conf" "$HOME/.tmux.conf"
+  ln -sf "$HOME/.config/tmux/tmux.conf.local" "$HOME/.tmux.conf.local"
+  
+  log_message "INFO" "Tmux configuration set up successfully!"
+fi
+
+# Launch tmux automatically
+if command -v tmux &> /dev/null && [ -n "$PS1" ] && [[ ! "$TERM" =~ screen ]] && [[ ! "$TERM" =~ tmux ]] && [ -z "$TMUX" ]; then
+  exec tmux
+fi
+
+
 
 # Uncomment to show startup time
 # ZSHRC_END_TIME=$(date +%s.%N)
