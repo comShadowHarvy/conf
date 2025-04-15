@@ -1,11 +1,16 @@
 # Repository Backup File
-# Created: Sun Apr 13 12:16:17 AM UTC 2025
+# Created: Tue Apr 15 07:56:31 PM UTC 2025
 # Format: repository_url,directory_name
 
 https://github.com/Next-Flip/Momentum-Firmware.git,Momentum-Firmware
 https://github.com/tmux-plugins/tpm,tpm
 http://github.com/comShadowHarvy/conf,conf
+https://github.com/tmux-plugins/tpm,tpm
 https://github.com/Annex-Engineering/klipper_estimator,klipper_estimator
+https://github.com/JaKooLit/Arch-Hyprland.git,Arch-Hyprland
+https://github.com/JaKooLit/Hyprland-Dots,Hyprland-Dots
+https://github.com/JaKooLit/GTK-themes-icons.git,GTK-themes-icons
+https://github.com/JaKooLit/ags_v1.9.0.git,ags_v1.9.0
 https://github.com/tmux-plugins/tmux-sensible,tmux-sensible
 https://github.com/ztwAdmin/ZTW-2025,ZTW-2025
 https://github.com/gpakosz/.tmux,.tmux
