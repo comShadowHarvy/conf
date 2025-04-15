@@ -1,0 +1,22 @@
+# Repository Backup File
+# Created: Tue Apr 15 07:51:33 PM UTC 2025
+# Format: repository_url,directory_name
+
+https://github.com/Next-Flip/Momentum-Firmware.git,Momentum-Firmware
+https://github.com/tmux-plugins/tpm,tpm
+http://github.com/comShadowHarvy/conf,conf
+https://github.com/tmux-plugins/tpm,tpm
+https://github.com/Annex-Engineering/klipper_estimator,klipper_estimator
+https://github.com/tmux-plugins/tmux-sensible,tmux-sensible
+https://github.com/ztwAdmin/ZTW-2025,ZTW-2025
+https://github.com/gpakosz/.tmux,.tmux
+https://github.com/Significant-Gravitas/AutoGPT,AutoGPT
+https://github.com/baskerville/xdo,xdo
+https://github.com/giacomo-b/rust-stakeholder.git,rust-stakeholder
+https://github.com/rothgar/awesome-tmux,awesome-tmux
+https://github.com/square/maximum-awesome,maximum-awesome
+https://gitlab.com/dwt1/dotfiles,dtdot
+https://github.com/loxsmoke/stakeholder.git,stakeholder
+http://github.com/comShadowHarvy/betterstrap,betterstrap
+https://github.com/salman-abedin/devour/,devour
+https://github.com/deepseek-ai/DeepSeek-Coder,DeepSeek-Coder

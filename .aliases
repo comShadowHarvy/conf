@@ -5,59 +5,113 @@
 
 # Create a directory and navigate to it
 mkcd() {
-    [[ -z "$1" ]] && { echo "Usage: mkcd <directory>"; return 1; }
-    mkdir -p "$1" && cd "$1" || return 1
+  [[ -z "$1" ]] && {
+    echo "Usage: mkcd <directory>"
+    return 1
+  }
+  mkdir -p "$1" && cd "$1" || return 1
 }
 
 # Navigate to a directory matching a pattern
 cdf() {
-    [[ -z "$1" ]] && { echo "Usage: cdf <pattern>"; return 1; }
-    local dir
-    dir=$(find . -maxdepth 1 -type d -name "*$1*" | head -n 1)
-    [[ -n "$dir" ]] && cd "$dir" || { echo "No directory matching pattern '$1' found."; return 1; }
+  [[ -z "$1" ]] && {
+    echo "Usage: cdf <pattern>"
+    return 1
+  }
+  local dir
+  dir=$(find . -maxdepth 1 -type d -name "*$1*" | head -n 1)
+  [[ -n "$dir" ]] && cd "$dir" || {
+    echo "No directory matching pattern '$1' found."
+    return 1
+  }
 }
 
 # Extract wisdom from YouTube transcripts (requires yt and fabric)
 ytt() {
-    [[ -z "$1" ]] && { echo "Usage: ytt <youtube_link>"; return 1; }
-    command -v yt &>/dev/null && command -v fabric &>/dev/null || { echo "Error: Both 'yt' and 'fabric' must be installed."; return 1; }
-    yt --transcript "$1" | fabric --stream --pattern extract_wisdom
+  [[ -z "$1" ]] && {
+    echo "Usage: ytt <youtube_link>"
+    return 1
+  }
+  command -v yt &>/dev/null && command -v fabric &>/dev/null || {
+    echo "Error: Both 'yt' and 'fabric' must be installed."
+    return 1
+  }
+  yt --transcript "$1" | fabric --stream --pattern extract_wisdom
 }
 
 # Extract various archive formats
+# Extract various archive formats (enhanced with more types)
 extract() {
-    if [[ -z "$1" || "$1" == "-h" || "$1" == "--help" ]]; then
-        echo "Usage: extract <archive> [directory]"
-        echo "Supports: tar.bz2, tar.gz, tar.xz, bz2, gz, zip, rar, 7z, etc."
-        return 0
-    fi
+  if [[ -z "$1" || "$1" == "-h" || "$1" == "--help" ]]; then
+    echo "Usage: extract <archive> [directory]"
+    echo "Extracts a wide variety of archive formats."
+    echo "Supported formats include: tar, tar.gz, tar.bz2, tar.xz, zip, rar, 7z, gz, bz2, xz, lzma, Z, deb, rpm, iso, exe, and more."
+    return 0
+  fi
 
-    [[ ! -f "$1" ]] && { echo "File '$1' not found."; return 1; }
+  local archive_file="$1"
+  local dest_dir="$2"
+  local full_archive_path
 
-    # If a destination directory is provided
-    local original_dir=""
-    if [[ -n "$2" ]]; then
-        mkdir -p "$2"
-        original_dir=$(pwd)
-        cd "$2" || return 1
-    fi
+  # Get absolute path for source file if not already absolute
+  [[ "$archive_file" = /* ]] && full_archive_path="$archive_file" || full_archive_path="$(pwd)/$archive_file"
 
-    case "$1" in
-        *.tar.bz2|*.tbz2|*.tbz) tar xjf "$1" ;;
-        *.tar.gz|*.tgz) tar xzf "$1" ;;
-        *.tar.xz) tar xJf "$1" ;;
-        *.tar) tar xf "$1" ;;
-        *.zip) unzip "$1" ;;
-        *.rar) unrar x "$1" ;;
-        *.7z) 7z x "$1" ;;
-        *.gz) gunzip "$1" ;;
-        *.bz2) bunzip2 "$1" ;;
-        *.xz|*.txz|*.lzma|*.tlz) xz -d "$1" ;;
-        *) echo "Unsupported file type: $1" ;;
-    esac
+  [[ ! -f "$full_archive_path" ]] && {
+    echo "File '$archive_file' not found."
+    return 1
+  }
 
-    # Return to original directory if needed
-    [[ -n "$original_dir" ]] && cd "$original_dir" || true
+  # Prepare destination directory if provided
+  local original_dir=""
+  if [[ -n "$dest_dir" ]]; then
+    mkdir -p "$dest_dir" || return 1
+    original_dir=$(pwd)
+    cd "$dest_dir" || return 1
+    # Use the absolute path now that we might have changed directory
+    archive_file="$full_archive_path"
+  fi
+
+  echo "Extracting '$archive_file'..."
+
+  # Use case statement based on file extension
+  # Note: Using the potentially updated archive_file variable which holds the absolute path if we cd'd
+  case "$archive_file" in
+  *.tar.bz2 | *.tbz2 | *.tbz) tar xjf "$archive_file" ;;
+  *.tar.gz | *.tgz) tar xzf "$archive_file" ;;
+  *.tar.xz | *.txz) tar xJf "$archive_file" ;;
+  *.tar | *.cbt) tar xf "$archive_file" ;;         # Added .cbt
+  *.zip | *.cbz | *.epub) unzip "$archive_file" ;; # Added .cbz, .epub
+  *.rar | *.cbr) unrar x "$archive_file" ;;        # Added .cbr
+  *.7z | *.arj | *.cab | *.cb7 | *.chm | *.deb | *.dmg | *.iso | *.lzh | *.msi | *.pkg | *.rpm | *.udf | *.wim | *.xar)
+    7z x "$archive_file"
+    ;; # Added many formats
+  *.gz) gunzip "$archive_file" ;;
+  *.bz2) bunzip2 "$archive_file" ;;
+  *.xz | *.tlz) xz -d "$archive_file" ;;    # Kept user's .tlz
+  *.lzma) unlzma "$archive_file" ;;         # Added .lzma specific
+  *.Z) uncompress "$archive_file" ;;        # Added .Z
+  *.exe) cabextract "$archive_file" ;;      # Added .exe
+  *.cpio) cpio -id <"$archive_file" ;;      # Added .cpio
+  *.cba | *.ace) unace x "$archive_file" ;; # Added .cba, .ace
+  *)
+    echo "Error: Unsupported file type or unknown extension: '$archive_file'"
+    # Return to original directory even on error if we changed
+    [[ -n "$original_dir" ]] && cd "$original_dir"
+    return 1
+    ;;
+  esac
+
+  local exit_status=$?
+  if [[ $exit_status -eq 0 ]]; then
+    echo "Successfully extracted '$archive_file'."
+  else
+    echo "Error extracting '$archive_file' (exit code: $exit_status)."
+  fi
+
+  # Return to original directory if needed
+  [[ -n "$original_dir" ]] && cd "$original_dir"
+
+  return $exit_status
 }
 
 # ========================
@@ -75,14 +129,14 @@ cdz() { [[ -z "$1" ]] && yazi . || (cd "$1" && yazi .); }
 
 # Function to open yazi in a directory, and cd to that directory when exiting yazi
 ycd() {
-    local tmp cwd
-    tmp="$(mktemp -t "yazi-cwd.XXXXX")"
-    yazi --cwd-file="$tmp" "$@"
-    
-    if cwd="$(cat -- "$tmp")" && [[ -n "$cwd" && "$cwd" != "$PWD" ]]; then
-        cd -- "$cwd" || return 1
-    fi
-    rm -f -- "$tmp"
+  local tmp cwd
+  tmp="$(mktemp -t "yazi-cwd.XXXXX")"
+  yazi --cwd-file="$tmp" "$@"
+
+  if cwd="$(cat -- "$tmp")" && [[ -n "$cwd" && "$cwd" != "$PWD" ]]; then
+    cd -- "$cwd" || return 1
+  fi
+  rm -f -- "$tmp"
 }
 
 # ========================
@@ -95,20 +149,20 @@ alias mkdir='mkdir -pv'
 
 # File listing utilities - Use eza if available
 if command -v eza >/dev/null 2>&1; then
-    alias ls='eza -a --icons'
-    alias ll='eza -al --icons'
-    alias lt='eza -a --tree --level=1 --icons'
-    alias la='eza -la --icons'
-    alias lm='eza -la --sort=modified --icons'
-    alias lS='eza -la --sort=size --icons'
+  alias ls='eza -a --icons'
+  alias ll='eza -al --icons'
+  alias lt='eza -a --tree --level=1 --icons'
+  alias la='eza -la --icons'
+  alias lm='eza -la --sort=modified --icons'
+  alias lS='eza -la --sort=size --icons'
 else
-    # Colorized ls fallbacks
-    alias ls="ls --color=auto"
-    alias ll="ls -la --color=auto"
-    alias l.="ls -d .* --color=auto"
-    alias la="ls -la --color=auto"
-    alias lm="ls -la --color=auto -t"
-    alias lS="ls -la --color=auto -S"
+  # Colorized ls fallbacks
+  alias ls="ls --color=auto"
+  alias ll="ls -la --color=auto"
+  alias l.="ls -d .* --color=auto"
+  alias la="ls -la --color=auto"
+  alias lm="ls -la --color=auto -t"
+  alias lS="ls -la --color=auto -S"
 fi
 
 # Use fd instead of find if available
@@ -116,36 +170,43 @@ command -v fd >/dev/null 2>&1 && alias findr='fd'
 
 # Combined search function with optimal tool selection
 ftext() {
-    [[ $# -eq 0 ]] && { echo "Usage: ftext <search_pattern> [path]"; return 1; }
-    
-    local pattern=$1
-    local path=${2:-.}
-    
-    if command -v rg &>/dev/null; then
-        rg --color=always --line-number --smart-case "$pattern" "$path"
-    else
-        grep -r --color=always -n "$pattern" "$path"
-    fi
+  [[ $# -eq 0 ]] && {
+    echo "Usage: ftext <search_pattern> [path]"
+    return 1
+  }
+
+  local pattern=$1
+  local path=${2:-.}
+
+  if command -v rg &>/dev/null; then
+    rg --color=always --line-number --smart-case "$pattern" "$path"
+  else
+    grep -r --color=always -n "$pattern" "$path"
+  fi
 }
 
 # Optimized directory finder
 fdir() {
-    [[ -z "$1" ]] && { echo "Usage: fdir <pattern> [max_depth]"; return 1; }
-    
-    local pattern=$1
-    local depth=${2:-3}
-    
-    if command -v fd &>/dev/null; then
-        fd --type d --max-depth "$depth" "$pattern"
-    else
-        find . -maxdepth "$depth" -type d -name "*$pattern*" | sort
-    fi
+  [[ -z "$1" ]] && {
+    echo "Usage: fdir <pattern> [max_depth]"
+    return 1
+  }
+
+  local pattern=$1
+  local depth=${2:-3}
+
+  if command -v fd &>/dev/null; then
+    fd --type d --max-depth "$depth" "$pattern"
+  else
+    find . -maxdepth "$depth" -type d -name "*$pattern*" | sort
+  fi
 }
 
 # ========================
 # System Management
 # ========================
-
+alias psa="ps auxf"
+alias psgrep="ps aux | grep -v grep | grep -i -e VSZ -e"
 alias please="sudo !!"
 alias h="history"
 alias j="jobs -l"
@@ -161,40 +222,40 @@ alias localip="hostname -I | awk '{print \$1}'"
 
 # Optimized directory summary with parallel execution if available
 dirsummary() {
-    local dir=${1:-.}
-    
-    echo "📂 Directory Summary for: $(realpath "$dir")"
-    echo "───────────────────────────────────────"
-    
-    # Run find operations in background if possible
-    local total_items files dirs
-    {
-        total_items=$(find "$dir" -type f -o -type d | wc -l)
-        files=$(find "$dir" -type f | wc -l)
-        dirs=$(find "$dir" -type d | wc -l)
-    } &
-    
-    # Get size in the meantime
-    local size
-    size=$(du -sh "$dir" | cut -f1)
-    
-    # Wait for background jobs to complete
-    wait
-    
-    echo "📊 Stats:"
-    echo "  Total items: $total_items"
-    echo "  Files: $files"
-    echo "  Directories: $dirs"
-    echo "  Total size: $size"
-    
-    echo -e "\n📑 File types:"
-    find "$dir" -type f | grep -v "^\." | grep -o "\.[^\.]*$" | sort | uniq -c | sort -rn | head -10
-    
-    echo -e "\n🕒 Recently modified files:"
-    find "$dir" -type f -mtime -7 | head -5
-    
-    echo -e "\n📁 Largest subdirectories:"
-    du -h --max-depth=1 "$dir" | sort -hr | head -5
+  local dir=${1:-.}
+
+  echo "📂 Directory Summary for: $(realpath "$dir")"
+  echo "───────────────────────────────────────"
+
+  # Run find operations in background if possible
+  local total_items files dirs
+  {
+    total_items=$(find "$dir" -type f -o -type d | wc -l)
+    files=$(find "$dir" -type f | wc -l)
+    dirs=$(find "$dir" -type d | wc -l)
+  } &
+
+  # Get size in the meantime
+  local size
+  size=$(du -sh "$dir" | cut -f1)
+
+  # Wait for background jobs to complete
+  wait
+
+  echo "📊 Stats:"
+  echo "  Total items: $total_items"
+  echo "  Files: $files"
+  echo "  Directories: $dirs"
+  echo "  Total size: $size"
+
+  echo -e "\n📑 File types:"
+  find "$dir" -type f | grep -v "^\." | grep -o "\.[^\.]*$" | sort | uniq -c | sort -rn | head -10
+
+  echo -e "\n🕒 Recently modified files:"
+  find "$dir" -type f -mtime -7 | head -5
+
+  echo -e "\n📁 Largest subdirectories:"
+  du -h --max-depth=1 "$dir" | sort -hr | head -5
 }
 
 # ========================
@@ -211,41 +272,44 @@ alias nmap_full="sudo nmap -sS -T4 -PE -PP -PS80,443 -PY -g 53 -A -p1-65535 -v"
 
 # Improved file sharing function with better cleanup
 share() {
-    local port=${2:-8000}
-    
-    [[ -z "$1" ]] && { 
-        echo "Usage: share <file_or_directory> [port]"
-        echo "Starts a simple HTTP server to share a file or directory."
-        return 1
-    }
-    
-    [[ ! -e "$1" ]] && { echo "Error: $1 does not exist."; return 1; }
-    
-    local ip
-    ip=$(hostname -I | awk '{print $1}')
-    
-    # Trap for cleanup
-    local temp_dir=""
-    
-    # Function to handle cleanup
-    cleanup() {
-        [[ -n "$temp_dir" && -d "$temp_dir" ]] && rm -rf "$temp_dir"
-        echo -e "\nServer stopped."
-    }
-    
-    trap cleanup INT TERM EXIT
-    
-    if [[ -d "$1" ]]; then
-        echo "Sharing directory at http://$ip:$port/"
-        (cd "$1" && python3 -m http.server "$port")
-    else
-        temp_dir=$(mktemp -d)
-        local filename=$(basename "$1")
-        cp "$1" "$temp_dir"
-        
-        echo "Sharing $filename at http://$ip:$port/$filename"
-        (cd "$temp_dir" && python3 -m http.server "$port")
-    fi
+  local port=${2:-8000}
+
+  [[ -z "$1" ]] && {
+    echo "Usage: share <file_or_directory> [port]"
+    echo "Starts a simple HTTP server to share a file or directory."
+    return 1
+  }
+
+  [[ ! -e "$1" ]] && {
+    echo "Error: $1 does not exist."
+    return 1
+  }
+
+  local ip
+  ip=$(hostname -I | awk '{print $1}')
+
+  # Trap for cleanup
+  local temp_dir=""
+
+  # Function to handle cleanup
+  cleanup() {
+    [[ -n "$temp_dir" && -d "$temp_dir" ]] && rm -rf "$temp_dir"
+    echo -e "\nServer stopped."
+  }
+
+  trap cleanup INT TERM EXIT
+
+  if [[ -d "$1" ]]; then
+    echo "Sharing directory at http://$ip:$port/"
+    (cd "$1" && python3 -m http.server "$port")
+  else
+    temp_dir=$(mktemp -d)
+    local filename=$(basename "$1")
+    cp "$1" "$temp_dir"
+
+    echo "Sharing $filename at http://$ip:$port/$filename"
+    (cd "$temp_dir" && python3 -m http.server "$port")
+  fi
 }
 
 # ========================
@@ -272,6 +336,13 @@ alias dl="cd ~/Downloads"
 alias dt="cd ~/Desktop"
 alias p="cd ~/projects"
 alias doc="cd ~/Documents"
+up() {
+  local d=""
+  local limit="${1:-1}"           # Default to 1 if no argument
+  [[ "$limit" -le 0 ]] && limit=1 # Ensure limit is positive
+  for ((i = 1; i <= limit; i++)); do d="../$d"; done
+  cd "$d" || echo "Error: Couldn't go up $limit level(s)."
+}
 
 # ========================
 # Git and Development
@@ -300,109 +371,118 @@ alias gc="git clone"
 
 # Git clone and cd into the cloned directory
 gcc() {
-    [[ -z "$1" ]] && { echo "Usage: gcc <repository_url> [directory]"; return 1; }
-    
-    local repo_url="$1"
-    local dir_name
-    
-    # If second argument is provided, use it as the directory name
-    if [[ -n "$2" ]]; then
-        dir_name="$2"
-        git clone "$repo_url" "$dir_name" && cd "$dir_name" || return 1
-    else
-        # Extract directory name from repo URL (remove .git extension if present)
-        dir_name=$(basename "$repo_url" .git)
-        git clone "$repo_url" && cd "$dir_name" || return 1
-    fi
+  [[ -z "$1" ]] && {
+    echo "Usage: gcc <repository_url> [directory]"
+    return 1
+  }
+
+  local repo_url="$1"
+  local dir_name
+
+  # If second argument is provided, use it as the directory name
+  if [[ -n "$2" ]]; then
+    dir_name="$2"
+    git clone "$repo_url" "$dir_name" && cd "$dir_name" || return 1
+  else
+    # Extract directory name from repo URL (remove .git extension if present)
+    dir_name=$(basename "$repo_url" .git)
+    git clone "$repo_url" && cd "$dir_name" || return 1
+  fi
 }
 
 # Improved quickgit with better error handling
 quickgit() {
-    [[ -z "$1" ]] && { 
-        echo "Usage: quickgit <commit message>"
-        echo "Stages all changes, commits with the provided message, and pushes to the remote repository."
-        return 1
-    }
-    
-    # Check if in a git repository
-    git rev-parse --is-inside-work-tree &>/dev/null || { 
-        echo "Error: Not in a git repository."
-        return 1
-    }
-    
-    # Show what's being staged
-    git status -s
-    echo "Staging all changes..."
-    git add . || { echo "Error staging changes."; return 1; }
-    
-    # Commit with the provided message
-    echo "Committing with message: $*"
-    git commit -m "$*" || { echo "Error committing changes."; return 1; }
-    
-    # Check if there's a remote repository and push
-    if git remote | grep -q .; then
-        echo "Pushing to remote..."
-        git push || echo "Warning: Push failed, but commit was successful."
-    else
-        echo "No remote repository configured. Skipping push."
-    fi
+  [[ -z "$1" ]] && {
+    echo "Usage: quickgit <commit message>"
+    echo "Stages all changes, commits with the provided message, and pushes to the remote repository."
+    return 1
+  }
+
+  # Check if in a git repository
+  git rev-parse --is-inside-work-tree &>/dev/null || {
+    echo "Error: Not in a git repository."
+    return 1
+  }
+
+  # Show what's being staged
+  git status -s
+  echo "Staging all changes..."
+  git add . || {
+    echo "Error staging changes."
+    return 1
+  }
+
+  # Commit with the provided message
+  echo "Committing with message: $*"
+  git commit -m "$*" || {
+    echo "Error committing changes."
+    return 1
+  }
+
+  # Check if there's a remote repository and push
+  if git remote | grep -q .; then
+    echo "Pushing to remote..."
+    git push || echo "Warning: Push failed, but commit was successful."
+  else
+    echo "No remote repository configured. Skipping push."
+  fi
 }
 
 # Optimized git update function
 gitupdate() {
-    # Check if in a git repository
-    git rev-parse --is-inside-work-tree &>/dev/null || { 
-        echo "Error: Not in a git repository."
-        return 1
+  # Check if in a git repository
+  git rev-parse --is-inside-work-tree &>/dev/null || {
+    echo "Error: Not in a git repository."
+    return 1
+  }
+
+  local current_branch
+  current_branch=$(git rev-parse --abbrev-ref HEAD)
+
+  echo "Updating branch: $current_branch"
+
+  # Stash any changes if needed
+  local stashed=false
+  if ! git diff --quiet; then
+    echo "Stashing local changes..."
+    git stash && stashed=true || {
+      echo "Error: Failed to stash changes."
+      return 1
     }
-    
-    local current_branch
-    current_branch=$(git rev-parse --abbrev-ref HEAD)
-    
-    echo "Updating branch: $current_branch"
-    
-    # Stash any changes if needed
-    local stashed=false
-    if ! git diff --quiet; then
-        echo "Stashing local changes..."
-        git stash && stashed=true || {
-            echo "Error: Failed to stash changes."
-            return 1
-        }
+  fi
+
+  # Define cleanup function to ensure stash is applied on exit
+  cleanup() {
+    if [[ "$stashed" == true ]]; then
+      echo "Applying stashed changes..."
+      git stash pop || echo "Warning: Failed to apply stashed changes."
     fi
-    
-    # Define cleanup function to ensure stash is applied on exit
-    cleanup() {
-        if [[ "$stashed" == true ]]; then
-            echo "Applying stashed changes..."
-            git stash pop || echo "Warning: Failed to apply stashed changes."
-        fi
+  }
+
+  # Set up trap to ensure cleanup runs on error or exit
+  trap cleanup ERR EXIT
+
+  # Fetch updates
+  echo "Fetching latest changes..."
+  git fetch || {
+    echo "Error: Failed to fetch changes."
+    return 1
+  }
+
+  # Check if there are upstream changes for the current branch
+  if git rev-parse --verify origin/$current_branch >/dev/null 2>&1; then
+    # Rebase on top of upstream changes
+    echo "Rebasing on origin/$current_branch..."
+    git rebase origin/$current_branch || {
+      echo "Error: Rebase failed. Resolving conflicts may be required."
+      return 1
     }
-    
-    # Set up trap to ensure cleanup runs on error or exit
-    trap cleanup ERR EXIT
-    
-    # Fetch updates
-    echo "Fetching latest changes..."
-    git fetch || {
-        echo "Error: Failed to fetch changes."
-        return 1
-    }
-    
-    # Check if there are upstream changes for the current branch
-    if git rev-parse --verify origin/$current_branch >/dev/null 2>&1; then
-        # Rebase on top of upstream changes
-        echo "Rebasing on origin/$current_branch..."
-        git rebase origin/$current_branch || {
-            echo "Error: Rebase failed. Resolving conflicts may be required."
-            return 1
-        }
-    else
-        echo "No upstream branch found for $current_branch"
-    fi
-    
-    echo "Update complete!"
-    # Trap will handle applying stashed changes
+  else
+    echo "No upstream branch found for $current_branch"
+  fi
+
+  echo "Update complete!"
+  # Trap will handle applying stashed changes
 }
 
 # ========================
@@ -447,10 +527,10 @@ alias du="du -h"
 
 alias browser="google-chrome-stable"
 command -v flatpak >/dev/null 2>&1 && {
-    alias vlc="flatpak run org.videolan.VLC"
-    alias spotify="flatpak run com.spotify.Client"
-    alias discord="flatpak run com.discordapp.Discord"
-    alias teams="flatpak run com.microsoft.Teams"
+  alias vlc="flatpak run org.videolan.VLC"
+  alias spotify="flatpak run com.spotify.Client"
+  alias discord="flatpak run com.discordapp.Discord"
+  alias teams="flatpak run com.microsoft.Teams"
 }
 
 # ========================
@@ -464,15 +544,15 @@ alias diff="diff --color=auto"
 
 # System update information functions
 sysinfo() {
-    echo "📊 System Information:"
-    echo "  - Kernel: $(uname -r)"
-    echo "  - Uptime: $(uptime -p)"
-    if command -v free >/dev/null 2>&1; then
-        echo "  - Memory: $(free -h | awk '/^Mem:/ {print $3 " used of " $2 " total"}')"
-    fi
-    if command -v df >/dev/null 2>&1; then
-        echo "  - Disk: $(df -h / | awk 'NR==2 {print $3 " used of " $2 " total (" $5 " used)"}')"
-    fi
+  echo "📊 System Information:"
+  echo "  - Kernel: $(uname -r)"
+  echo "  - Uptime: $(uptime -p)"
+  if command -v free >/dev/null 2>&1; then
+    echo "  - Memory: $(free -h | awk '/^Mem:/ {print $3 " used of " $2 " total"}')"
+  fi
+  if command -v df >/dev/null 2>&1; then
+    echo "  - Disk: $(df -h / | awk 'NR==2 {print $3 " used of " $2 " total (" $5 " used)"}')"
+  fi
 }
 
 # Installer shortcuts
@@ -487,32 +567,40 @@ alias edit-aliases="nvim ~/.aliases"
 
 # Package installer helper
 pkg-install() {
-    [[ -z "$1" ]] && { echo "Usage: pkg-install <package> [--verbose]"; return 1; }
-    [[ -f ~/install.sh ]] && ~/install.sh "$@" || { echo "Error: install.sh script not found in home directory."; return 1; }
+  [[ -z "$1" ]] && {
+    echo "Usage: pkg-install <package> [--verbose]"
+    return 1
+  }
+  [[ -f ~/install.sh ]] && ~/install.sh "$@" || {
+    echo "Error: install.sh script not found in home directory."
+    return 1
+  }
 }
 
 # Quick temperature check
 tempcheck() {
-    if command -v sensors >/dev/null 2>&1; then
-        sensors | grep -E 'Core|CPU'
-    else
-        echo "The 'sensors' command is not available. Try installing lm-sensors package."
-    fi
+  if command -v sensors >/dev/null 2>&1; then
+    sensors | grep -E 'Core|CPU'
+  else
+    echo "The 'sensors' command is not available. Try installing lm-sensors package."
+  fi
 }
 
 # Improved password generator
 genpass() {
-    local length=${1:-16}
-    if [[ ! "$length" =~ ^[0-9]+$ ]] || [[ "$length" -lt 8 ]]; then
-        echo "Please specify a valid password length (minimum 8)"
-        return 1
-    fi
-    
-    if command -v openssl >/dev/null 2>&1; then
-        openssl rand -base64 48 | tr -dc 'A-Za-z0-9!@#$%^&*()-_=+' | head -c "$length"; echo
-    else
-        tr -dc 'A-Za-z0-9!@#$%^&*()-_=+' < /dev/urandom | head -c "$length"; echo
-    fi
+  local length=${1:-16}
+  if [[ ! "$length" =~ ^[0-9]+$ ]] || [[ "$length" -lt 8 ]]; then
+    echo "Please specify a valid password length (minimum 8)"
+    return 1
+  fi
+
+  if command -v openssl >/dev/null 2>&1; then
+    openssl rand -base64 48 | tr -dc 'A-Za-z0-9!@#$%^&*()-_=+' | head -c "$length"
+    echo
+  else
+    tr -dc 'A-Za-z0-9!@#$%^&*()-_=+' </dev/urandom | head -c "$length"
+    echo
+  fi
 }
 
 # System monitoring alias
@@ -520,9 +608,56 @@ alias syswatch='watch -n2 "free -h; echo; df -h -T /"'
 
 # Enhanced man pages with colors
 if command -v batcat >/dev/null 2>&1; then
-    export MANPAGER="sh -c 'col -bx | batcat -l man -p'"
-    alias man='MANPAGER="sh -c \"col -bx | batcat -l man -p\"" man'
+  export MANPAGER="sh -c 'col -bx | batcat -l man -p'"
+  alias man='MANPAGER="sh -c \"col -bx | batcat -l man -p\"" man'
 elif command -v bat >/dev/null 2>&1; then
-    export MANPAGER="sh -c 'col -bx | bat -l man -p'"
-    alias man='MANPAGER="sh -c \"col -bx | bat -l man -p\"" man'
+  export MANPAGER="sh -c 'col -bx | bat -l man -p'"
+  alias man='MANPAGER="sh -c \"col -bx | bat -l man -p\"" man'
 fi
+
+alias jctl="journalctl -p 3 -xb"
+alias gpg-check="gpg2 --keyserver-options auto-key-retrieve --verify"
+alias gpg-retrieve="gpg2 --keyserver-options auto-key-retrieve --receive-keys"
+alias config="/usr/bin/git --git-dir=$HOME/dotfiles --work-tree=$HOME"
+alias tb="nc termbin.com 9999"
+
+# ========================
+# Arch Linux Package Management
+# ========================
+
+# Pacman aliases
+alias pacsyu='sudo pacman -Syu'                   # Update standard pkgs (stable)
+alias pacsyyu='sudo pacman -Syyu'                 # Force refresh pkglist & update standard pkgs
+alias pacs='sudo pacman -S'                       # Install specific package(s)
+alias pacr='sudo pacman -Rns'                     # Remove package(s) and dependencies
+alias pacq='pacman -Q'                            # List installed packages
+alias pacqs='pacman -Qs'                          # Search installed packages
+alias pacss='pacman -Ss'                          # Search remote repositories
+alias pacsi='pacman -Si'                          # Show package info (remote)
+alias pacqi='pacman -Qi'                          # Show package info (local)
+alias pacqo='pacman -Qo'                          # Find which package owns a file
+alias pacmanlock='sudo rm /var/lib/pacman/db.lck' # Remove pacman lock file (use with caution!)
+alias paccleancache='sudo pacman -Sc'             # Clean package cache (remove old versions)
+alias paccleancacheall='sudo pacman -Scc'         # Clean package cache completely (use with caution!)
+
+# Paru (AUR Helper) aliases (install 'paru' package first)
+# If you use a different AUR helper (like 'yay'), adjust accordingly
+alias parsua='paru -Sua --noconfirm' # Update only AUR pkgs (paru)
+alias parsyu='paru -Syu --noconfirm' # Update standard pkgs and AUR pkgs (paru)
+alias pars='paru -S'                 # Install package(s) (incl. AUR)
+alias parr='paru -Rns'               # Remove package(s) (incl. AUR)
+alias parq='paru -Q'                 # List installed packages (incl. AUR)
+alias parqs='paru -Qs'               # Search installed packages (incl. AUR)
+alias parss='paru -Ss'               # Search remote & AUR repositories
+alias parsi='paru -Si'               # Show package info (remote & AUR)
+alias parqi='paru -Qi'               # Show package info (local & AUR)
+
+# Orphan package removal (use with caution!)
+alias orphan='sudo pacman -Rns $(pacman -Qtdq)' # List and remove orphaned packages
+alias listorphan='pacman -Qtdq'                 # List orphaned packages without removing
+
+# Reflector (Mirrorlist management) aliases (install 'reflector' package first)
+alias mirror="sudo reflector --country Canada --country US --age 6 --sort rate --save /etc/pacman.d/mirrorlist" # Default: Rate-sorted Canadian/US mirrors updated in last 6 hours
+alias mirrord="sudo reflector --latest 50 --number 20 --sort delay --save /etc/pacman.d/mirrorlist"             # Sort by delay
+alias mirrors="sudo reflector --latest 50 --number 20 --sort score --save /etc/pacman.d/mirrorlist"             # Sort by score
+alias mirrora="sudo reflector --latest 50 --number 20 --sort age --save /etc/pacman.d/mirrorlist"               # Sort by age
