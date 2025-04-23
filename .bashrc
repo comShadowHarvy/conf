@@ -233,3 +233,6 @@ unset use_color safe_term match_lhs
 # Final Message
 # --------------------------------------------------
 echo "Bash configuration loaded successfully."
+
+. "$HOME/.local/share/../bin/env"
+alias activate-python-env="source /home/me/python_packages_env/bin/activate"

@@ -32,6 +32,7 @@ plugins=(
   [archlinux]=true
 )
 
+source $HOME/.local/share/../bin/env
 # Function to set terminal title
 set_term_title() {
   # Adjust format as desired - this matches DT's format
@@ -589,3 +590,6 @@ fi
 # ZSHRC_ELAPSED=$(echo "$ZSHRC_END_TIME - $ZSHRC_START_TIME" | bc)
 # log_message "INFO" "Zsh initialized in $ZSHRC_ELAPSED seconds"
 # zprof  # End profiling
+
+. "$HOME/.local/share/../bin/env"
+alias activate-python-env="source /home/me/python_packages_env/bin/activate"
