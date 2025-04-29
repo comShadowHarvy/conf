@@ -264,7 +264,7 @@ if [[ ! -f "$ZIM_HOME/zimfw.zsh" ]]; then
   fi
 fi
 # Initialize ZimFW if the file exists
-[[ -f "$ZIM_HOME/zimfw.zsh" ]] && source "$ZIM_HOME/zimfw.zsh"
+[[ -f "$ZIM_HOME/.zimrc" ]] && source "$ZIM_HOME/zimrc"
 
 # --- Configure Zim Modules (Plugins/Themes) ---
 # Define modules to be managed by ZimFW based on our zplugins array
