@@ -1,0 +1,80 @@
+// ~/.config/fastfetch/config.jsonc
+{
+  "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+  // Catppuccin Mocha Colors (hex codes)
+  "display": {
+    "separator": " › ",
+    "color": {
+      // Apply colors to keys (icons) based on Catppuccin palette
+      // Example: Use different colors for different categories
+      "title": "blue", // Changed to a valid color
+      "separator": "blue", // Replaced 'surface2' with a valid color
+      "os": "default", // Replaced invalid property with a valid default color
+      "host": "default", // Replaced invalid property with a valid default color
+      "kernel": "default", // Replaced invalid property with a valid default color
+      "uptime": "default", // Replaced invalid property with a valid default color
+      "packages": "default", // Replaced invalid property with a valid default color
+      "shell": "default", // Replaced invalid property with a valid default color
+      "display": "default", // Replaced invalid property with a valid default color
+      "de": "default", // Replaced invalid property with a valid default color
+      "wm": "default", // Replaced invalid property with a valid default color
+      "theme": "default", // Replaced invalid property with a valid default color
+      "icons": "default", // Replaced invalid property with a valid default color
+      "font": "default", // Replaced invalid property with a valid default color
+      "terminal": "default", // Replaced invalid property with a valid default color
+      "terminalfont": "default", // Replaced invalid property with a valid default color
+      "cpu": "default", // Replaced invalid property with a valid default color
+      "gpu": "default", // Replaced invalid property with a valid default color
+      "memory": "default", // Replaced invalid property with a valid default color
+      "disk": "default", // Replaced invalid property with a valid default color
+      "localip": "default", // Replaced invalid property with a valid default color
+      "publicip": "default", // Replaced invalid property with a valid default color
+      "weather": "default", // Replaced invalid property with a valid default color
+      "player": "default", // Replaced invalid property with a valid default color
+      "song": "default", // Replaced invalid property with a valid default color
+      "colors": "default" // Replaced invalid property with a valid default color
+    },
+    "key": {
+      "width": 3 // Updated to use the new property name 'key.width'
+    }
+  },
+  "logo": {
+    "type": "auto",
+    "padding": { "top": 1, "right": 3 },
+    "color": {
+      "1": "blue", // Changed to a valid color
+      "2": "blue",  // Changed to a valid color
+      "3": "blue"  // Changed to a valid color
+    }
+  },
+  "modules": [
+    // Define modules using objects to assign specific key colors easily
+    { "type": "title", "key": "", "keyColor": "lavender", "format": "{user}@{host}" },
+    "separator",
+    { "type": "os", "key": "󰣇", "keyColor": "peach", "format": "{name} {version} ({architecture})" },
+    { "type": "host", "key": "󰌢", "keyColor": "peach" },
+    { "type": "kernel", "key": "󰌽", "keyColor": "peach" },
+    { "type": "uptime", "key": "󰥔", "keyColor": "yellow" },
+    { "type": "packages", "key": "󰏓", "keyColor": "yellow" }, // Slow module
+    { "type": "shell", "key": "", "keyColor": "green", "format": "{name} {version}" },
+    "separator",
+    { "type": "display", "key": "󰍹", "keyColor": "blue", "compactType": "original" },
+    { "type": "de", "key": "󰖲", "keyColor": "blue", "format": "{name} {version}" },
+    { "type": "wm", "key": "󰖲", "keyColor": "blue" },
+    { "type": "theme", "key": "󰃟", "keyColor": "pink" },
+    { "type": "icons", "key": "icons", "keyColor": "pink" },
+    { "type": "font", "key": "", "keyColor": "teal" },
+    { "type": "terminal", "key": "", "keyColor": "green", "format": "{name} {version}" },
+    { "type": "terminalfont", "key": "", "keyColor": "teal" },
+    "separator",
+    { "type": "cpu", "key": "", "keyColor": "red", "format": "{name} ({cores}C/{threads}T) @ {freq}" },
+    { "type": "gpu", "key": "󰍛", "keyColor": "red" },
+    { "type": "memory", "key": "󰍛", "keyColor": "blue", "format": "{used} / {total} ({percentage}%)" },
+    { "type": "disk", "key": "󰋊", "keyColor": "red" },
+    "separator",
+    { "type": "localip", "key": "󰩟", "keyColor": "blue" },
+    { "type": "publicip", "key": "󰖈", "keyColor": "sapphire", "format": "{ip} ({location})" }, // Slow module
+    "break",
+    "colors"
+  ]
+}
