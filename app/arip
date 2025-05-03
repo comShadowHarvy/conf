@@ -1,0 +1,89 @@
+#!/bin/bash
+
+# --- Configuration ---
+# List of directories required by the ARM Docker container
+# Using ~ will expand to the current user's home directory
+required_dirs=(
+  "~/arm"
+  "~/Music"
+  "~/logs"
+  "~/media"
+  "~/config"
+)
+
+# Docker command to run (copied from previous context)
+docker_command="docker run -d \
+  -p \"2323:8080\" \
+  -e ARM_UID=\"$(id -u)\" \
+  -e ARM_GID=\"$(id -g)\" \
+  -v \"~/arm:/home/arm\" \
+  -v \"~/Music:/home/arm/Music\" \
+  -v \"~/logs:/home/arm/logs\" \
+  -v \"~/media:/home/arm/media\" \
+  -v \"~/config:/etc/arm/config\" \
+  --device=/dev/sr0:/dev/sr0 \
+  --device=/dev/sr1:/dev/sr1 \
+  --device=/dev/sr2:/dev/sr2 \
+  --device=/dev/sr3:/dev/sr3 \
+  --privileged \
+  --restart \"always\" \
+  --name \"arm-rippers\" \
+  automaticrippingmachine/automatic-ripping-machine:latest"
+
+# --- Directory Check & Creation ---
+echo "Checking if required directories exist... because apparently, I have to do everything."
+
+# Expand ~ to the actual home directory path for checks
+for dir_tilde in "${required_dirs[@]}"; do
+  # Use eval to correctly expand the tilde (~)
+  eval dir_expanded="$dir_tilde"
+  if [ ! -d "$dir_expanded" ]; then
+    echo "Directory '$dir_expanded' not found. Creating it for you. You're welcome."
+    # Create the directory, -p ensures parent directories are also created if needed
+    mkdir -p "$dir_expanded"
+  else
+    echo "Directory '$dir_expanded' already exists. Good job, I guess."
+  fi
+done
+
+echo "Directory check complete. Shocking."
+echo
+
+# --- Fake Loading Screen of Sarcasm ---
+echo "Initiating highly complex pre-Docker launch sequence..."
+sleep 1
+echo "Recalibrating the quantum flux capacitor... (Just kidding, I'm checking for coffee.)"
+sleep 2
+echo "Waking up the hamsters that power the server..."
+echo "[▓▓▓▓                    ] 20% ... They're slow today."
+sleep 2
+echo "Consulting the ancient Docker scrolls..."
+echo "[▓▓▓▓▓▓▓▓▓▓▓▓            ] 60% ... Yep, still confusing."
+sleep 2
+echo "Ensuring the bits and bytes are properly aligned..."
+echo "[▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓    ] 90% ... Almost there, don't get impatient."
+sleep 1
+echo "Polishing the container... It likes to look shiny."
+echo "[▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓] 100% ... Fine, fine, I'll start it."
+echo
+echo "Okay, enough messing around. Starting the ARM Ripper container..."
+echo
+
+# --- Run the Docker Command ---
+# Use eval to correctly handle the ~ expansion within the docker command's volume paths
+eval $docker_command
+
+# Check the exit status of the docker command
+if [ $? -eq 0 ]; then
+  echo
+  echo "Docker container 'arm-rippers' should be starting up in the background."
+  echo "You can check its status with 'docker ps' or logs with 'docker logs arm-rippers'."
+  echo "Don't mess it up."
+else
+  echo
+  echo "Uh oh. Something went wrong trying to start the Docker container."
+  echo "Check the output above for error messages. Good luck."
+  exit 1
+fi
+
+exit 0
