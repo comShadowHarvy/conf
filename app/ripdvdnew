@@ -1,0 +1,58 @@
+##!/bin/bash
+
+# Simple script to convert a DVD ISO image to an MP4 file using ffmpeg.
+
+# --- Argument Check ---
+# Check if exactly two arguments (input file and output file) were provided.
+if [ "$#" -ne 2 ]; then
+  # If not, print the correct usage instructions to standard error.
+  echo "Usage: $0 <input.iso> <output.mp4>" >&2 # Use $0 for script name, redirect echo to stderr
+  # Exit the script with a non-zero status code indicating an error.
+  exit 1
+fi
+
+# --- Variable Assignment ---
+# Assign the first argument to the 'input' variable.
+input="$1"
+# Assign the second argument to the 'output' variable.
+output="$2"
+
+# --- Input File Check ---
+# Check if the specified input file exists and is a regular file.
+if [ ! -f "$input" ]; then
+  echo "Error: Input file '$input' not found or is not a regular file." >&2
+  exit 1
+fi
+
+# --- FFmpeg Execution ---
+echo "Starting conversion from '$input' to '$output'..."
+echo "This might take a while depending on the video length and your system."
+
+# Run ffmpeg with the specified input and output files and encoding options.
+# -i "$input": Specifies the input file (the .iso image).
+# -c:v libx264: Sets the video codec to H.264 (a widely compatible and efficient codec).
+# -crf 23: Sets the Constant Rate Factor. Controls quality vs. file size.
+#          Lower values mean better quality and larger files (18-28 is a common range). 23 is a good balance.
+# -preset medium: Affects encoding speed vs. compression efficiency.
+#                 Options range from 'ultrafast' to 'veryslow'. 'medium' is a good default.
+# -c:a aac: Sets the audio codec to AAC (Advanced Audio Coding), common for MP4.
+# -b:a 192k: Sets the audio bitrate to 192 kilobits per second. Higher means better audio quality.
+# -ac 2: Sets the number of audio channels to 2 (stereo).
+# "$output": Specifies the name and path for the output MP4 file.
+ffmpeg -i "$input" -c:v libx264 -crf 23 -preset medium -c:a aac -b:a 192k -ac 2 "$output"
+
+# --- Completion Check ---
+# Check the exit status of the ffmpeg command.
+# $? holds the exit status of the last executed command. 0 typically means success.
+if [ $? -eq 0 ]; then
+  echo "Conversion completed successfully!"
+  echo "Output file: '$output'"
+else
+  echo "Error: ffmpeg command failed during conversion." >&2
+  # Optionally remove the potentially incomplete output file
+  # rm -f "$output"
+  exit 1 # Exit with an error status
+fi
+
+# Exit successfully
+exit 0
