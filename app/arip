@@ -11,6 +11,17 @@ required_dirs=(
     "$HOME/config"
 )
 
+# --- Docker Daemon Check ---
+echo "Checking if Docker daemon is running..."
+if ! docker info > /dev/null 2>&1; then
+    echo "Error: Docker daemon does not seem to be running or accessible."
+    echo "Please start the Docker service and try again."
+    exit 1
+else
+    echo "Docker daemon looks okay. Proceeding..."
+fi
+echo
+
 # --- Directory Check & Creation ---
 echo "Checking if required directories exist... because apparently, I have to do everything."
 
@@ -49,8 +60,9 @@ echo "Okay, enough messing around. Starting the ARM Ripper container..."
 echo
 
 # --- Run the Docker Command Directly ---
-# Execute the command directly instead of using eval.
+# Execute the command directly.
 # Use $HOME for host paths and dynamically get UID/GID.
+# Ensure no strange characters or line endings are present here.
 docker run -d \
   -p "2323:8080" \
   -e ARM_UID="$(id -u)" \
@@ -79,7 +91,13 @@ if [ $docker_exit_status -eq 0 ]; then
 else
     echo
     echo "Uh oh. Something went wrong trying to start the Docker container (Exit code: $docker_exit_status)."
-    echo "Check the output above for error messages. Good luck."
+    # Add suggestion to check daemon status based on the error code
+    if [ $docker_exit_status -eq 125 ]; then
+        echo "Exit code 125 often indicates an issue with the Docker command itself or communication with the daemon."
+        echo "Please double-check the command syntax and ensure the Docker service is running correctly."
+    else
+         echo "Check the output above for specific error messages. Good luck."
+    fi
     exit 1
 fi
 
