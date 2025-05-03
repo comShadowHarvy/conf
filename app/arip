@@ -2,48 +2,27 @@
 
 # --- Configuration ---
 # List of directories required by the ARM Docker container
-# Using ~ will expand to the current user's home directory
+# Using $HOME ensures correct expansion to the user's home directory
 required_dirs=(
-  "~/arm"
-  "~/Music"
-  "~/logs"
-  "~/media"
-  "~/config"
+    "$HOME/arm"
+    "$HOME/Music"
+    "$HOME/logs"
+    "$HOME/media"
+    "$HOME/config"
 )
-
-# Docker command to run (copied from previous context)
-docker_command="docker run -d \
-  -p \"2323:8080\" \
-  -e ARM_UID=\"$(id -u)\" \
-  -e ARM_GID=\"$(id -g)\" \
-  -v \"~/arm:/home/arm\" \
-  -v \"~/Music:/home/arm/Music\" \
-  -v \"~/logs:/home/arm/logs\" \
-  -v \"~/media:/home/arm/media\" \
-  -v \"~/config:/etc/arm/config\" \
-  --device=/dev/sr0:/dev/sr0 \
-  --device=/dev/sr1:/dev/sr1 \
-  --device=/dev/sr2:/dev/sr2 \
-  --device=/dev/sr3:/dev/sr3 \
-  --privileged \
-  --restart \"always\" \
-  --name \"arm-rippers\" \
-  automaticrippingmachine/automatic-ripping-machine:latest"
 
 # --- Directory Check & Creation ---
 echo "Checking if required directories exist... because apparently, I have to do everything."
 
-# Expand ~ to the actual home directory path for checks
-for dir_tilde in "${required_dirs[@]}"; do
-  # Use eval to correctly expand the tilde (~)
-  eval dir_expanded="$dir_tilde"
-  if [ ! -d "$dir_expanded" ]; then
-    echo "Directory '$dir_expanded' not found. Creating it for you. You're welcome."
-    # Create the directory, -p ensures parent directories are also created if needed
-    mkdir -p "$dir_expanded"
-  else
-    echo "Directory '$dir_expanded' already exists. Good job, I guess."
-  fi
+for dir_path in "${required_dirs[@]}"; do
+    # No need for eval here, $HOME expands correctly
+    if [ ! -d "$dir_path" ]; then
+        echo "Directory '$dir_path' not found. Creating it for you. You're welcome."
+        # Create the directory, -p ensures parent directories are also created if needed
+        mkdir -p "$dir_path"
+    else
+        echo "Directory '$dir_path' already exists. Good job, I guess."
+    fi
 done
 
 echo "Directory check complete. Shocking."
@@ -69,21 +48,39 @@ echo
 echo "Okay, enough messing around. Starting the ARM Ripper container..."
 echo
 
-# --- Run the Docker Command ---
-# Use eval to correctly handle the ~ expansion within the docker command's volume paths
-eval $docker_command
+# --- Run the Docker Command Directly ---
+# Execute the command directly instead of using eval.
+# Use $HOME for host paths and dynamically get UID/GID.
+docker run -d \
+  -p "2323:8080" \
+  -e ARM_UID="$(id -u)" \
+  -e ARM_GID="$(id -g)" \
+  -v "$HOME/arm:/home/arm" \
+  -v "$HOME/Music:/home/arm/Music" \
+  -v "$HOME/logs:/home/arm/logs" \
+  -v "$HOME/media:/home/arm/media" \
+  -v "$HOME/config:/etc/arm/config" \
+  --device=/dev/sr0:/dev/sr0 \
+  --device=/dev/sr1:/dev/sr1 \
+  --device=/dev/sr2:/dev/sr2 \
+  --device=/dev/sr3:/dev/sr3 \
+  --privileged \
+  --restart "always" \
+  --name "arm-rippers" \
+  automaticrippingmachine/automatic-ripping-machine:latest
 
 # Check the exit status of the docker command
-if [ $? -eq 0 ]; then
-  echo
-  echo "Docker container 'arm-rippers' should be starting up in the background."
-  echo "You can check its status with 'docker ps' or logs with 'docker logs arm-rippers'."
-  echo "Don't mess it up."
+docker_exit_status=$?
+if [ $docker_exit_status -eq 0 ]; then
+    echo
+    echo "Docker container 'arm-rippers' should be starting up in the background."
+    echo "You can check its status with 'docker ps' or logs with 'docker logs arm-rippers'."
+    echo "Don't mess it up."
 else
-  echo
-  echo "Uh oh. Something went wrong trying to start the Docker container."
-  echo "Check the output above for error messages. Good luck."
-  exit 1
+    echo
+    echo "Uh oh. Something went wrong trying to start the Docker container (Exit code: $docker_exit_status)."
+    echo "Check the output above for error messages. Good luck."
+    exit 1
 fi
 
 exit 0
