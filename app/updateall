@@ -1,0 +1,268 @@
+#!/usr/bin/env bash
+# ===----------------------------------------===
+#          Universal Updater Deluxe 9001
+# ===----------------------------------------===
+# Author: ShadowHarvy (Master of Updates)
+# Version: 1.0 (Now with extra update-y goodness!)
+#
+# Purpose: One script to rule them all! Attempts to update
+#          *everything* it can find: system packages (various distros),
+#          Flatpak, Snap, Homebrew, ZimFW, and Oh My Posh.
+#          Because updating things one by one is for peasants.
+#
+# Usage:
+#   Just run it. Preferably with sudo rights when needed.
+#   ./updateall
+#
+# Notes:
+#   - It *tries* to be smart about your distro. No guarantees.
+#   - Make sure you have 'sudo' configured if needed.
+#   - If something breaks, it's probably your fault. Or maybe mine. 50/50.
+
+# --- Configuration ---
+# Set to 1 to skip the fancy loading screen if you're *that* impatient.
+SKIP_LOADER=0
+# How long (in seconds) should the fake loader pretend to work?
+LOADER_DURATION=8
+
+# --- Functions ---
+
+# Function to simulate critical update processes happening
+fake_load() {
+  if [ "$SKIP_LOADER" -eq 1 ]; then
+    echo "Skipping the dramatic loading sequence as requested. Spoil-sport."
+    return
+  fi
+
+  local duration=${1:-$LOADER_DURATION}
+  local interval=0.4
+  local steps=$(printf "%.0f" "$(echo "$duration / $interval / 6" | bc -l)") # Adjust steps
+
+  echo "Initiating the Grand Update Sequence..."
+  sleep 1
+  echo -n "Scanning for outdated bits..."
+  for i in $(seq 1 $steps); do
+    echo -n "."
+    sleep $interval
+  done
+  echo " Found some!"
+  sleep 0.5
+  echo -n "Consulting the update spirits..."
+  for i in $(seq 1 $steps); do
+    echo -n "."
+    sleep $interval
+  done
+  echo " They approve."
+  sleep 0.5
+  echo -n "Polishing the package manager..."
+  for i in $(seq 1 $steps); do
+    echo -n "."
+    sleep $interval
+  done
+  echo " Gleaming!"
+  sleep 0.5
+  echo -n "Checking for Flatpak/Snap anomalies..."
+  for i in $(seq 1 $steps); do
+    echo -n "."
+    sleep $interval
+  done
+  echo " All clear (probably)."
+  sleep 0.5
+  echo -n "Warming up the command-line tools..."
+  for i in $(seq 1 $steps); do
+    echo -n "."
+    sleep $interval
+  done
+  echo " Toasty!"
+  sleep 0.5
+  echo -n "Finalizing update trajectory..."
+  for i in $(seq 1 $steps); do
+    echo -n "."
+    sleep $interval
+  done
+  echo " Locked on!"
+  sleep 1
+}
+
+# Function to print fancy section headers
+print_header() {
+  echo ""
+  echo "---=== $1 ===---"
+}
+
+# --- Main Update Logic ---
+
+echo "****************************************"
+echo "* Universal Updater Deluxe 9001 *"
+echo "* by ShadowHarvy             *"
+echo "****************************************"
+echo ""
+
+# Engage fake loading sequence!
+fake_load "$LOADER_DURATION"
+
+echo ""
+echo "Alright, let's get this update party started!"
+
+# --- System Package Update ---
+print_header "System Packages"
+echo "🔄 Detecting distribution and updating system packages..."
+
+distro="unknown"
+# Check if /etc/os-release exists and is readable
+if [ -r /etc/os-release ]; then
+  # Source the file to get variables like ID
+  . /etc/os-release
+  distro=${ID:-"unknown"} # Use ID variable, default to unknown
+else
+  echo "⚠️ Cannot read /etc/os-release. Distribution detection might fail."
+fi
+
+echo "Identified distribution (best guess): $distro"
+
+update_failed=0 # Flag to track if any update step fails
+
+case "$distro" in
+alpine)
+  if command -v apk >/dev/null 2>&1; then
+    echo "-> Running apk update & upgrade..."
+    sudo apk update && sudo apk upgrade || update_failed=1
+  else
+    echo "⚠️ 'apk' command not found on Alpine? That's weird."
+    update_failed=1
+  fi
+  ;;
+debian | ubuntu | linuxmint | pop) # Added common derivatives
+  if command -v apt >/dev/null 2>&1; then
+    echo "-> Running apt update & upgrade..."
+    sudo apt update && sudo apt upgrade -y || update_failed=1
+  else
+    echo "⚠️ 'apt' command not found on Debian/Ubuntu based system?"
+    update_failed=1
+  fi
+  ;;
+fedora | rhel | centos | rocky | almalinux) # Added common derivatives
+  if command -v dnf >/dev/null 2>&1; then
+    echo "-> Running dnf upgrade..."
+    sudo dnf upgrade --refresh -y || update_failed=1
+  elif command -v yum >/dev/null 2>&1; then
+    echo "-> Running yum update..."
+    sudo yum update -y || update_failed=1
+  else
+    echo "⚠️ Neither 'dnf' nor 'yum' found on Fedora/RHEL based system?"
+    update_failed=1
+  fi
+  ;;
+arch | manjaro | endeavouros | garuda) # Added common derivatives
+  if command -v pacman >/dev/null 2>&1; then
+    echo "-> Running pacman -Syu..."
+    # Pacman asks for confirmation by default, which is usually desired.
+    sudo pacman -Syu --noconfirm || update_failed=1 # Added --noconfirm for automation consistency
+  else
+    echo "⚠️ 'pacman' command not found on Arch based system?"
+    update_failed=1
+  fi
+  ;;
+*)
+  echo "⚠️ Unknown or unsupported distribution '$distro'."
+  echo "Attempting fallback detection..."
+  if command -v pacman >/dev/null 2>&1; then
+    echo "--> Found pacman, assuming Arch-like. Running pacman -Syu..."
+    sudo pacman -Syu --noconfirm || update_failed=1
+  elif command -v apt >/dev/null 2>&1; then
+    echo "--> Found apt, assuming Debian-like. Running apt update & upgrade..."
+    sudo apt update && sudo apt upgrade -y || update_failed=1
+  elif command -v dnf >/dev/null 2>&1; then
+    echo "--> Found dnf, assuming Fedora-like. Running dnf upgrade..."
+    sudo dnf upgrade --refresh -y || update_failed=1
+  elif command -v apk >/dev/null 2>&1; then
+    echo "--> Found apk, assuming Alpine-like. Running apk update & upgrade..."
+    sudo apk update && sudo apk upgrade || update_failed=1
+  else
+    echo "!! Could not detect a known package manager. Skipping system package update."
+    update_failed=1 # Consider this a failure condition
+  fi
+  ;;
+esac
+
+if [ $update_failed -eq 1 ]; then
+  echo "⚠️ System package update encountered issues."
+else
+  echo "✅ System packages seem up-to-date or updated successfully."
+fi
+
+# --- Flatpak Update ---
+if command -v flatpak >/dev/null 2>&1; then
+  print_header "Flatpak Packages"
+  echo "-> Updating Flatpak packages..."
+  flatpak update -y || echo "⚠️ Flatpak update encountered issues." && update_failed=1
+  echo "✅ Flatpak update process finished."
+fi
+
+# --- Snap Update ---
+if command -v snap >/dev/null 2>&1; then
+  print_header "Snap Packages"
+  echo "-> Updating Snap packages..."
+  sudo snap refresh || echo "⚠️ Snap refresh encountered issues." && update_failed=1
+  echo "✅ Snap refresh process finished."
+fi
+
+# --- Homebrew Update ---
+# Check common install locations as 'brew' might not be in default PATH
+if command -v brew >/dev/null 2>&1 || [ -x "/home/linuxbrew/.linuxbrew/bin/brew" ] || [ -x "/opt/homebrew/bin/brew" ]; then
+  print_header "Homebrew Packages"
+  echo "-> Updating Homebrew packages..."
+  # Ensure brew command is usable even if not in PATH initially
+  local brew_cmd
+  if command -v brew >/dev/null 2>&1; then
+    brew_cmd="brew"
+  elif [ -x "/home/linuxbrew/.linuxbrew/bin/brew" ]; then
+    brew_cmd="/home/linuxbrew/.linuxbrew/bin/brew"
+  elif [ -x "/opt/homebrew/bin/brew" ]; then
+    brew_cmd="/opt/homebrew/bin/brew"
+  fi
+
+  if [ -n "$brew_cmd" ]; then
+    "$brew_cmd" update && "$brew_cmd" upgrade || echo "⚠️ Homebrew update/upgrade encountered issues." && update_failed=1
+    echo "✅ Homebrew update process finished."
+  else
+    echo "⚠️ Could not determine brew command path."
+    update_failed=1
+  fi
+fi
+
+# --- ZimFW Update ---
+if command -v zimfw >/dev/null 2>&1; then
+  print_header "Zim Framework (Zsh)"
+  echo "-> Updating ZimFW..."
+  zimfw update || echo "⚠️ ZimFW update encountered issues." && update_failed=1
+  echo "✅ ZimFW update process finished."
+fi
+
+# --- Oh My Posh Update ---
+if command -v oh-my-posh >/dev/null 2>&1; then
+  print_header "Oh My Posh"
+  echo "-> Updating Oh My Posh..."
+  # Oh My Posh update might need sudo depending on installation method
+  if [ "$(id -u)" -ne 0 ] && [ -w "$(command -v oh-my-posh)" ]; then
+    # If we are not root BUT have write access to the binary, try without sudo
+    oh-my-posh update || sudo oh-my-posh update || echo "⚠️ Oh My Posh update encountered issues." && update_failed=1
+  else
+    # Otherwise, assume sudo is needed or let it fail if not needed/available
+    sudo oh-my-posh update || oh-my-posh update || echo "⚠️ Oh My Posh update encountered issues." && update_failed=1
+  fi
+
+  echo "✅ Oh My Posh update process finished."
+fi
+
+# --- Final Verdict ---
+print_header "Update Summary"
+if [ $update_failed -eq 1 ]; then
+  echo "👎 Update process completed, but one or more steps encountered issues. Check the output above."
+  exit 1 # Exit with error status
+else
+  echo "🎉 Success! All detected components updated (or were already up-to-date)."
+  echo "Your system is looking sharp! 😎"
+fi
+
+exit 0

@@ -1,0 +1,247 @@
+#!/bin/bash
+# ===----------------------------------------===
+#      The Fantastical Repo Grabber 5000
+# ===----------------------------------------===
+# Author: ShadowHarvy (The Code Conjurer)
+# Version: 2.0 (Now with 110% more sass!)
+#
+# Purpose: Reads a ridiculously formatted backup file and
+#          magically clones or updates repositories. Because
+#          doing it manually is for mere mortals.
+#
+# Usage:
+#   ./repo_downloader_script.sh
+#   (Make sure repo_backup.txt exists where expected!)
+#
+# Notes:
+#   - Expects repo_backup.txt in ~/backup/
+#   - Prefers ~/git/, falls back to ~/development/
+#   - If it breaks, you probably looked at it wrong.
+
+# --- Configuration ---
+# Set to 1 if you hate fun and want to skip the loading theatrics.
+SKIP_THEATRICS=0
+# How long (seconds) should the mini-loader between repos run?
+INTER_REPO_DELAY=1.5
+
+# --- Functions ---
+
+# Function for the initial dramatic loading sequence
+initial_loader() {
+  if [ "$SKIP_THEATRICS" -eq 1 ]; then
+    echo "[!] Skipping initial theatrics. Fine, be that way."
+    return
+  fi
+
+  echo ""
+  echo -n " [*] Firing up the clone engines "
+  spinner=('▹▹▹▹▹' '▸▹▹▹▹' '▹▸▹▹▹' '▹▹▸▹▹' '▹▹▹▸▹' '▹▹▹▹▸')
+  # Run spinner for about 4 seconds (20 * 0.2)
+  for i in {1..20}; do
+    echo -ne "\r [*] Firing up the clone engines ${spinner[i % 6]}"
+    sleep 0.2
+  done
+  echo -e "\r [*] Firing up the clone engines... ENGAGED!   "
+
+  # Progress bar effect
+  echo ""
+  echo " [*] Consulting the sacred backup scroll..."
+  sleep 0.7
+  echo -n " ["
+  # Simulate progress for about 1.25 seconds (25 * 0.05)
+  for i in {1..25}; do
+    echo -n "#"
+    sleep 0.05
+  done
+  echo -n "] "
+  echo "SCROLL DECIPHERED!"
+  sleep 0.5
+  echo ""
+  echo " [*] Aligning download vectors..."
+  sleep 0.8
+  echo " [*] Brace yourself, the repos are coming!"
+  sleep 0.5
+  echo ""
+}
+
+# Function for the mini-loader between repositories
+inter_repo_loader() {
+  if [ "$SKIP_THEATRICS" -eq 1 ]; then
+    # Even if skipping, a tiny pause helps readability
+    sleep 0.1
+    return
+  fi
+
+  local duration=${1:-$INTER_REPO_DELAY}
+  local interval=0.15
+  local steps=$(printf "%.0f" "$(echo "$duration / $interval" | bc -l)")
+  local loader_chars=('.' 'o' 'O' 'o')
+
+  echo -n "   -> Taking a dramatic pause"
+  for i in $(seq 1 $steps); do
+    echo -n "${loader_chars[i % 4]}"
+    sleep $interval
+    # Backspace to erase the loader char
+    echo -ne "\b"
+  done
+  # Clear the "Taking a dramatic pause" line entirely
+  echo -ne "\r                                        \r"
+}
+
+# --- Title Screen ---
+clear
+echo "===================================================================="
+echo "  _____               _____                     _                   "
+echo " |  __ \             |  __ \                   | |                  "
+echo " | |__) |___ _ __ ___| |__) |___   _____ _ __  | | ___  __ _ ___ ___ "
+echo " |  _  // _ \ '_ \ / _ \  _  // _ \ / / _ \ '__| |/ _ \/ _\` / __/ __|"
+echo " | | \ \  __/ |_) | (_) | | \ \ (_) | V /  __/ |  | |  __/ (_| \__ \__ \\"
+echo " |_|  \_\___| .__/ \___/|_|  \_\___/ \_/ \___|_|  |_|\___|\__,_|___/___/"
+echo "            | |                                                       "
+echo "            |_|          The Fantastical Repo Grabber 5000            "
+echo "                        Created by: ShadowHarvy                       "
+echo "===================================================================="
+
+# --- Initialization ---
+initial_loader
+
+# --- Directory Setup ---
+HOME_DIR="$HOME"
+GIT_DIR="$HOME_DIR/git"
+DEV_DIR="$HOME_DIR/development"
+BACKUP_DIR="$HOME_DIR/backup"
+BACKUP_FILE="$BACKUP_DIR/repo_backup.txt"
+
+print_header() {
+  echo ""
+  echo "---=== $1 ===---"
+}
+
+print_header "Locating Sacred Texts & Lairs"
+
+# Check if backup file exists (with added sass)
+if [ ! -f "$BACKUP_FILE" ]; then
+  echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+  echo "!! Error: The sacred backup scroll ($BACKUP_FILE) is MISSING! !!"
+  echo "!! Did you offer it to the cat? Aborting mission.           !!"
+  echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+  exit 1
+else
+  echo " -> Backup scroll located: $BACKUP_FILE (Phew!)"
+fi
+
+# Determine which directory to use for repositories
+REPO_DIR="" # Initialize REPO_DIR
+if [ -d "$GIT_DIR" ]; then
+  REPO_DIR="$GIT_DIR"
+  echo " -> Found preferred lair for repositories: $REPO_DIR"
+elif [ -d "$DEV_DIR" ]; then
+  REPO_DIR="$DEV_DIR"
+  echo " -> Preferred lair ($GIT_DIR) not found. Using backup lair: $REPO_DIR"
+else
+  # If neither exists, pick one to create
+  REPO_DIR="$GIT_DIR" # Defaulting to create ~/git/
+  echo " -> No suitable lair found. Will conjure one at: $REPO_DIR"
+fi
+
+# Check if repository directory exists, create if not
+if [ ! -d "$REPO_DIR" ]; then
+  echo " -> Conjuring repository lair: $REPO_DIR"
+  mkdir -p "$REPO_DIR" || {
+    echo "!! Failed to conjure lair! Do you have the magic permissions?"
+    exit 1
+  }
+fi
+
+# --- Repository Processing ---
+print_header "Initiating The Great Git Grab"
+
+repo_count=0
+cloned_count=0
+updated_count=0
+skipped_count=0
+
+# Skip the header lines (assuming first 4 lines are header/comments)
+# Use process substitution <(...) for cleaner reading than tail | while
+while IFS=',' read -r repo_url repo_name || [[ -n "$repo_url" ]]; do
+  # Trim leading/trailing whitespace from URL and Name
+  repo_url=$(echo "$repo_url" | xargs)
+  repo_name=$(echo "$repo_name" | xargs)
+
+  # Skip empty lines or lines starting with #
+  if [[ -z "$repo_url" || "$repo_url" == \#* ]]; then
+    # echo " -> Skipping irrelevant line..." # Optional: uncomment for debugging
+    skipped_count=$((skipped_count + 1))
+    continue
+  fi
+
+  repo_count=$((repo_count + 1))
+  echo "" # Add space before processing next repo
+  echo "Processing Repo #$repo_count: '$repo_url'"
+
+  # If repo_name is empty in the file, extract it from the URL (like a code detective)
+  if [ -z "$repo_name" ]; then
+    repo_name=$(basename "$repo_url" .git)
+    echo "   -> Hmm, no name provided. Deduced name: '$repo_name'. Clever, right?"
+  fi
+
+  TARGET_DIR="$REPO_DIR/$repo_name"
+
+  # Check if the repository directory already exists
+  if [ -d "$TARGET_DIR/.git" ]; then # Check for .git dir for robustness
+    echo "   -> Aha! '$repo_name' already exists at '$TARGET_DIR'."
+    echo "   -> Attempting a tactical update (git pull)..."
+    cd "$TARGET_DIR" || {
+      echo "   !! ERROR: Couldn't warp into '$TARGET_DIR'. Skipping update."
+      skipped_count=$((skipped_count + 1))
+      continue
+    }
+
+    # Run git pull and capture output/status
+    if git pull; then
+      echo "   -> Update successful (or already up-to-date). Excellent."
+      updated_count=$((updated_count + 1))
+    else
+      echo "   !! WARNING: 'git pull' for '$repo_name' encountered issues. Check manually!"
+      # Decide if you want to count this as skipped or updated with errors
+      skipped_count=$((skipped_count + 1)) # Counting as skipped for summary
+    fi
+    cd "$OLDPWD" # Go back to previous directory
+  elif [ -e "$TARGET_DIR" ]; then
+    # Target exists but isn't a git repo (or .git is missing)
+    echo "   !! WARNING: '$TARGET_DIR' exists but doesn't look like a git repo. Skipping clone to avoid conflict."
+    skipped_count=$((skipped_count + 1))
+  else
+    echo "   -> New target detected! Preparing to clone '$repo_name'..."
+    echo "   -> Target location: '$TARGET_DIR'"
+    if git clone "$repo_url" "$TARGET_DIR"; then
+      echo "   -> Clone successful! One more treasure acquired."
+      cloned_count=$((cloned_count + 1))
+    else
+      echo "   !! ERROR: Failed to clone '$repo_url'. Is the URL correct? Do you have access?"
+      skipped_count=$((skipped_count + 1)) # Count failed clones as skipped
+    fi
+  fi
+
+  # Run the mini-loader between repos
+  inter_repo_loader "$INTER_REPO_DELAY"
+
+done < <(tail -n +5 "$BACKUP_FILE") # Read from tail output via process substitution
+
+# --- Final Summary ---
+print_header "Mission Debriefing"
+echo "The Great Git Grab has concluded."
+echo "Summary:"
+echo "  - Repositories Processed: $repo_count"
+echo "  - Freshly Cloned:       $cloned_count"
+echo "  - Already Existing/Updated: $updated_count"
+echo "  - Skipped/Failed:       $skipped_count"
+echo ""
+
+if [ $skipped_count -gt 0 ]; then
+  echo "Looks like there were some hiccups ($skipped_count skipped/failed). Might wanna check the logs, boss."
+else
+  echo "Flawless execution! All repositories accounted for. Time for a coffee. 😎"
+fi
+echo ""
+exit 0

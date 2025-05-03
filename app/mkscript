@@ -1,0 +1,116 @@
+#!/bin/sh
+# ===----------------------------------------===
+#                mkscript Utility v1.1
+# ===----------------------------------------===
+# Author: ShadowHarvy (The Script Whisperer)
+# Version: 1.1 (Now with 100% more sass!)
+#
+# Purpose: Why type three commands when one ridiculously
+#          over-engineered script can do it? Creates a script,
+#          gives it the magic execution touch, and throws it
+#          into Neovim (nvim) before you can blink. Almost.
+#
+# Usage:
+#   mkscript <your_brilliant_script_name.sh>
+#
+# Example:
+#   mkscript world_domination_plot.sh
+#
+# Notes:
+#   - Needs 'nvim'. If you don't have it, what are you even doing?
+#   - Defaults to #!/bin/sh. Feel free to change SHEBANG below
+#     if you're feeling fancy (#/bin/bash, perhaps?).
+
+# --- Configuration ---
+# Your editor of choice. Or rather, *my* choice for you.
+EDITOR="nvim"
+# The mystical incantation that starts every great script.
+SHEBANG="#!/bin/sh"
+
+# --- Functions ---
+
+# Function to simulate intense, highly important work happening
+fake_load() {
+  local duration=${1:-10} # Default duration 10 seconds
+  local interval=0.5
+  local steps=$(printf "%.0f" "$(echo "$duration / $interval / 5" | bc -l)") # Adjust steps based on duration
+
+  echo "Initiating script conjuration sequence..."
+  sleep 1
+  echo -n "Brewing shebang potion..."
+  for i in $(seq 1 $steps); do echo -n "."; sleep $interval; done; echo " Done."
+  sleep 0.5
+  echo -n "Consulting the permissions oracle..."
+  for i in $(seq 1 $steps); do echo -n "."; sleep $interval; done; echo " Granted!"
+  sleep 0.5
+  echo -n "Polishing the filename..."
+  for i in $(seq 1 $steps); do echo -n "."; sleep $interval; done; echo " Shiny!"
+  sleep 0.5
+  echo -n "Waking up Neovim..."
+  for i in $(seq 1 $steps); do echo -n "."; sleep $interval; done; echo " It lives!"
+  sleep 0.5
+  echo -n "Finalizing awesomeness..."
+  for i in $(seq 1 $steps); do echo -n "."; sleep $interval; done; echo " Complete."
+  sleep 1 # Extra pause for dramatic effect
+}
+
+# --- Input Validation ---
+
+# Seriously, did you forget the filename? *sigh*
+if [ -z "$1" ]; then
+  echo "Usage: mkscript <new_script_name>" >&2
+  echo "Come on, it's not *that* hard." >&2
+  exit 1
+fi
+
+SCRIPT_NAME="$1"
+
+# Whoa there, cowboy! That name's already taken.
+if [ -e "$SCRIPT_NAME" ]; then
+  echo "Error: '$SCRIPT_NAME' already exists. Try thinking of a *new* name." >&2
+  exit 1
+fi
+
+# --- Script Creation ---
+
+echo ""
+echo "*** Engaging mkscript protocols (Codename: Lazy Genius) ***"
+echo ""
+
+# Let the pointless-but-fun loading begin!
+fake_load 10 # 10 seconds of pure anticipation
+
+echo ""
+echo "Alright, alright. Creating '$SCRIPT_NAME'..."
+
+# Add the shebang. Don't mess this up.
+printf "%s\\n\\n" "$SHEBANG" > "$SCRIPT_NAME"
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to create '$SCRIPT_NAME'. Was that so hard?" >&2
+    exit 1
+fi
+
+echo "Bestowing the holy +x permission..."
+
+# Make it runnable. It's kind of the point.
+chmod +x "$SCRIPT_NAME"
+if [ $? -ne 0 ]; then
+    echo "Error: Couldn't make '$SCRIPT_NAME' executable. Check your privileges!" >&2
+    # rm "$SCRIPT_NAME" # Uncomment if you want to be tidy on failure
+    exit 1
+fi
+
+echo "Summoning $EDITOR to deal with '$SCRIPT_NAME'..."
+
+# Open sesame! Or, you know, open nvim.
+"$EDITOR" "$SCRIPT_NAME"
+if [ $? -ne 0 ]; then
+    echo "Warning: Couldn't launch '$EDITOR'. Is it installed? Is it in your PATH? Figure it out." >&2
+    # Still exiting 0 because the script *was* created. I'm not your babysitter.
+fi
+
+echo ""
+echo "*** Mission Accomplished! '$SCRIPT_NAME' is ready for your genius. ***"
+echo ""
+exit 0
+
