@@ -1,11 +1,11 @@
-# Repository Backup File
-# Created: Tue Apr 15 07:56:31 PM UTC 2025
+# === Sacred Repository Backup Scroll ===
+# Conjured on: Sat May  3 01:38:03 AM EDT 2025
 # Format: repository_url,directory_name
+# WARNING: This scroll is REFORGED every time the script runs!
 
 https://github.com/Next-Flip/Momentum-Firmware.git,Momentum-Firmware
 https://github.com/tmux-plugins/tpm,tpm
 http://github.com/comShadowHarvy/conf,conf
-https://github.com/tmux-plugins/tpm,tpm
 https://github.com/Annex-Engineering/klipper_estimator,klipper_estimator
 https://github.com/JaKooLit/Arch-Hyprland.git,Arch-Hyprland
 https://github.com/JaKooLit/Hyprland-Dots,Hyprland-Dots
@@ -24,3 +24,5 @@ https://github.com/loxsmoke/stakeholder.git,stakeholder
 http://github.com/comShadowHarvy/betterstrap,betterstrap
 https://github.com/salman-abedin/devour/,devour
 https://github.com/deepseek-ai/DeepSeek-Coder,DeepSeek-Coder
+https://github.com/comShadowHarvy/CollectiveGenius-AutoGPT-Agent-Hub,CollectiveGenius-AutoGPT-Agent-Hub
+https://github.com/hacksider/Deep-Live-Cam,Deep-Live-Cam
