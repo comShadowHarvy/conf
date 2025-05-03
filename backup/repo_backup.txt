@@ -1,5 +1,5 @@
 # === Sacred Repository Backup Scroll ===
-# Conjured on: Sat May  3 01:38:03 AM EDT 2025
+# Conjured on: Sat May  3 04:24:09 AM EDT 2025
 # Format: repository_url,directory_name
 # WARNING: This scroll is REFORGED every time the script runs!
 
@@ -26,3 +26,4 @@ https://github.com/salman-abedin/devour/,devour
 https://github.com/deepseek-ai/DeepSeek-Coder,DeepSeek-Coder
 https://github.com/comShadowHarvy/CollectiveGenius-AutoGPT-Agent-Hub,CollectiveGenius-AutoGPT-Agent-Hub
 https://github.com/hacksider/Deep-Live-Cam,Deep-Live-Cam
+https://github.com/JaKooLit/Fedora-Hyprland,Fedora-Hyprland
