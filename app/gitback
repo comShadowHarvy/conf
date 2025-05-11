@@ -1,14 +1,15 @@
 #!/bin/bash
 # ===----------------------------------------===
-#      The Grand Repo Wrangler & Backupinator
+#     The Grand Repo Wrangler & Backupinator
 # ===----------------------------------------===
 # Author: ShadowHarvy (The Git Whisperer)
-# Version: 1.0 (Now with Management Magic!)
+# Version: 1.1 (Incremental Backup & Update Tracking!)
 #
 # Purpose: Scours the known realms (~/git, ~/development) for
 #          git repositories, bravely attempts to update them,
 #          and meticulously scribes their details onto a backup scroll.
-#          Because remembering things is hard.
+#          The scroll is now incremental, preserving known lore.
+#          Tracks new repos added and actual updates pulled.
 #
 # Usage:
 #   ./repo_manager_script.sh
@@ -16,14 +17,14 @@
 #
 # Notes:
 #   - Creates ~/git, ~/development, ~/backup if they're missing.
-#   - Overwrites ~/backup/repo_backup.txt every time. Be warned!
+#   - Updates ~/backup/repo_backup.txt: preserves existing entries, adds new ones.
 #   - If git pull fails, it just kinda shrugs and moves on. Handle with care.
 
 # --- Configuration ---
 # Set to 1 if you despise joy and want to skip the loading spectacle.
 SKIP_THEATRICS=0
 # How long (seconds) should the mini-loader between repos pretend to work?
-INTER_REPO_DELAY=1.0 # Shortened slightly for potentially many repos
+INTER_REPO_DELAY=0.5 # Shortened for potentially many repos and faster overall run
 
 # --- Functions ---
 
@@ -36,20 +37,17 @@ initial_loader() {
 
   echo ""
   echo -n " [*] Powering up the Repo Wrangler "
-  spinner=('⚙️     ' '⚙️⚙️   ' '⚙️⚙️⚙️  ' ' ⚙️⚙️⚙️ ' '  ⚙️⚙️⚙️' '   ⚙️⚙️' '    ⚙️' '     ')
-  # Run spinner for about 4 seconds (20 * 0.2)
+  spinner=('⚙️     ' '⚙️⚙️   ' '⚙️⚙️⚙️  ' ' ⚙️⚙️⚙️ ' '  ⚙️⚙️⚙️' '   ⚙️⚙️' '    ⚙️' '     ') # Adjusted spacing
   for i in {1..20}; do
-    echo -ne "\r [*] Powering up the Repo Wrangler ${spinner[i % 8]}"
+    echo -ne "\r [*] Powering up the Repo Wrangler ${spinner[i % ${#spinner[@]}]}"
     sleep 0.2
   done
-  echo -e "\r [*] Powering up the Repo Wrangler... ONLINE!   "
+  echo -e "\r [*] Powering up the Repo Wrangler... ONLINE!      "
 
-  # Progress bar effect
   echo ""
   echo " [*] Scanning known dimensions for git traces..."
   sleep 0.7
   echo -n " ["
-  # Simulate progress for about 1.25 seconds (25 * 0.05)
   for i in {1..25}; do
     echo -n "*"
     sleep 0.05
@@ -58,7 +56,7 @@ initial_loader() {
   echo "DIMENSIONS SCANNED!"
   sleep 0.5
   echo ""
-  echo " [*] Preparing the sacred backup scroll..."
+  echo " [*] Consulting the sacred backup scroll's history..."
   sleep 0.8
   echo " [*] Let the wrangling commence!"
   sleep 0.5
@@ -75,17 +73,15 @@ inter_repo_loader() {
   local duration=${1:-$INTER_REPO_DELAY}
   local interval=0.1
   local steps=$(printf "%.0f" "$(echo "$duration / $interval" | bc -l)")
-  # Simple spinner for inter-repo
   local loader_chars=('-' '\' '|' '/')
 
   echo -n "   -> Wrangling next repo "
   for i in $(seq 1 $steps); do
-    echo -ne "${loader_chars[i % 4]}"
+    echo -ne "${loader_chars[i % ${#loader_chars[@]}]}"
     sleep $interval
-    echo -ne "\b" # Backspace over the spinner char
+    echo -ne "\b"
   done
-  # Clear the "Wrangling next repo" line entirely
-  echo -ne "\r                                        \r"
+  echo -ne "\r                                        \r" # Clear the line
 }
 
 # Function to print fancy section headers
@@ -97,15 +93,15 @@ print_header() {
 # --- Title Screen ---
 clear
 echo "===================================================================="
-echo "  _____               __  __                         _              "
-echo " |  __ \             |  \/  |                       | |             "
-echo " | |__) |___  _ __   | \  / | __ _ _ __ ___   ___ __| |             "
-echo " |  _  // _ \| '_ \  | |\/| |/ _\` | '_ \` _ \ / __/ _\` |           "
-echo " | | \ \ (_) | | | | | |  | | (_| | | | | | | (_| (_| |  _ _ _      "
-echo " |_|  \_\___/|_| |_| |_|  |_|\__,_|_| |_| |_|\___\__,_| (_|_|_)     "
-echo "                                                                    "
-echo "          The Grand Repo Wrangler & Backupinator 5000               "
-echo "                    Created by: ShadowHarvy                         "
+echo "  _____                               __  __                       _            "
+echo " |  __ \                             |  \/  |                     | |           "
+echo " | |__) |___  _ __   __ _ _ __ ___   | \  / | __ _ _ __ ___   ___ __| |           "
+echo " |  _  // _ \| '_ \ / _\` | '_ \` _ \  | |\/| |/ _\` | '_ \` _ \ / __/ _\` |           "
+echo " | | \ \ (_) | | | | (_| | | | | | | | |  | | (_| | | | | | | (_| (_| |  _ _ _    "
+echo " |_|  \_\___/|_| |_|\__,_|_| |_| |_| |_|  |_|\__,_|_| |_| |_|\___\__,_| (_|_|_)   "
+echo "                                                                                "
+echo "          The Grand Repo Wrangler & Backupinator 5000 (v1.1)                  "
+echo "                       Created by: ShadowHarvy                                  "
 echo "===================================================================="
 
 # --- Initialization ---
@@ -118,128 +114,148 @@ DEV_DIR="$HOME_DIR/development"
 BACKUP_DIR="$HOME_DIR/backup"
 BACKUP_FILE="$BACKUP_DIR/repo_backup.txt"
 
-print_header "Setting Up The Corral & Scroll"
+print_header "Setting Up The Corral & Checking Scroll History"
 
-# Check and create directories if they don't exist (with commentary)
+# Check and create directories
 made_dir=0
-if [ ! -d "$GIT_DIR" ]; then
-  echo " -> Git directory ($GIT_DIR) is missing. Tch. Creating it..."
-  mkdir -p "$GIT_DIR" || {
-    echo "!! Failed to create $GIT_DIR! Permissions? Shenanigans?"
-    exit 1
-  }
-  made_dir=1
-fi
-
-if [ ! -d "$DEV_DIR" ]; then
-  echo " -> Development directory ($DEV_DIR) is missing. Creating..."
-  mkdir -p "$DEV_DIR" || {
-    echo "!! Failed to create $DEV_DIR! What now?"
-    exit 1
-  }
-  made_dir=1
-fi
-
-if [ ! -d "$BACKUP_DIR" ]; then
-  echo " -> Backup directory ($BACKUP_DIR) is missing. Creating..."
-  mkdir -p "$BACKUP_DIR" || {
-    echo "!! Failed to create $BACKUP_DIR! Seriously?"
-    exit 1
-  }
-  made_dir=1
-fi
+for dir_to_check in "$GIT_DIR" "$DEV_DIR" "$BACKUP_DIR"; do
+  if [ ! -d "$dir_to_check" ]; then
+    echo " -> Directory ($dir_to_check) is missing. Creating it..."
+    mkdir -p "$dir_to_check" || {
+      echo "!! Failed to create $dir_to_check! Permissions? Shenanigans?"
+      exit 1
+    }
+    made_dir=1
+  fi
+done
 
 if [ $made_dir -eq 0 ]; then
   echo " -> All necessary directories already exist. How organized!"
 fi
 
-# Initialize or clear backup file (with gravitas)
-echo " -> Preparing the sacred backup scroll at $BACKUP_FILE..."
-{
-  echo "# === Sacred Repository Backup Scroll ==="
-  echo "# Conjured on: $(date)"
-  echo "# Format: repository_url,directory_name"
-  echo "# WARNING: This scroll is REFORGED every time the script runs!"
-  echo ""
-} >"$BACKUP_FILE" || {
-  echo "!! Failed to write to backup scroll! Is $BACKUP_DIR writable?"
-  exit 1
-}
-echo " -> Backup scroll initialized. Ready for inscriptions."
+# --- Variables for new features & Backup File Handling (Revised) ---
+declare -A SCROLL_ENTRIES # Associative array to hold "url,reponame" -> 1
+REPOS_NEWLY_ADDED_THIS_RUN=0
+REPOS_WITH_ACTUAL_UPDATES_THIS_RUN=0
+ORIGINAL_CONJURED_DATE=""
+
+if [ -f "$BACKUP_FILE" ]; then
+  echo " -> Found existing backup scroll. Reading known lore..."
+  # Attempt to find original conjured date from the file
+  ORIGINAL_CONJURED_DATE=$(grep -m1 "^# Conjured on:" "$BACKUP_FILE" | sed 's/# Conjured on: //')
+
+  # Read existing entries: lines that contain a comma and don't start with #
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ ! "$line" =~ ^# && "$line" == *","* ]]; then
+      SCROLL_ENTRIES["$line"]=1
+    fi
+  done <"$BACKUP_FILE"
+  echo " -> Found ${#SCROLL_ENTRIES[@]} existing entries in the scroll."
+else
+  echo " -> No ancient scroll detected. A new one shall be conjured!"
+  ORIGINAL_CONJURED_DATE=$(date) # Set current date as conjured if new file
+fi
+echo " -> Scroll consultation complete."
+
+# --- Counters ---
+repo_count=0
+successful_pulls_count=0 # Renamed from updated_count
+skipped_count=0
+# REPOS_NEWLY_ADDED_THIS_RUN and REPOS_WITH_ACTUAL_UPDATES_THIS_RUN already initialized
 
 # --- Repository Update & Backup Function ---
-repo_count=0
-updated_count=0
-backup_count=0
-skipped_count=0
-
 update_and_backup_repositories() {
   local target_dir="$1"
-  local dir_name=$(basename "$target_dir") # Get 'git' or 'development'
+  local dir_name
+  dir_name=$(basename "$target_dir")
 
   echo ""
   echo " -> Now scouring the '$dir_name' dimension ($target_dir)..."
 
-  # Find all directories containing a .git subdirectory, one level deep
-  # Using -maxdepth 2 because find starts in target_dir (depth 1), .git is in repo dir (depth 2)
-  local repo_dirs
-  repo_dirs=$(find "$target_dir" -maxdepth 2 -name ".git" -type d -prune 2>/dev/null)
+  local find_output
+  find_output=$(find "$target_dir" -maxdepth 2 -name ".git" -type d -prune 2>/dev/null)
 
-  if [ -z "$repo_dirs" ]; then
-    echo "    -> Found no git repositories in '$dir_name'. How tidy. Or empty."
+  if [ -z "$find_output" ]; then
+    echo "     -> Found no git repositories in '$dir_name'. How tidy. Or empty."
     return
   fi
 
-  # Process each found .git directory
-  echo "$repo_dirs" | while IFS= read -r git_dir_path; do
+  # Use process substitution to ensure variables modified in loop are in current shell
+  while IFS= read -r git_dir_path; do
     repo_dir="$(dirname "$git_dir_path")"
     repo_basename=$(basename "$repo_dir")
     repo_count=$((repo_count + 1))
 
-    echo "" # Space before each repo
-    echo "    -> Found Repo #$repo_count: '$repo_basename' in '$dir_name'"
+    echo ""
+    echo "     -> Found Repo #$repo_count: '$repo_basename' in '$dir_name'"
 
-    # Change to the repository directory
-    if ! cd "$repo_dir"; then
-      echo "    !! ERROR: Couldn't warp into '$repo_dir'. Skipping this one."
+    # Stash current PWD to return to, robustly
+    local PUSHD_PROJECT_DIR=0
+    pushd "$repo_dir" >/dev/null 2>&1 || {
+      echo "     !! ERROR: Couldn't warp into '$repo_dir'. Skipping this one."
       skipped_count=$((skipped_count + 1))
-      inter_repo_loader "$INTER_REPO_DELAY" # Still run loader
+      inter_repo_loader "$INTER_REPO_DELAY"
       continue
-    fi
+    }
+    PUSHD_PROJECT_DIR=1
 
-    # Get the repository URL
     repo_url=$(git config --get remote.origin.url)
     if [ -z "$repo_url" ]; then
-      echo "    !! WARNING: No remote 'origin' found for '$repo_basename'. Cannot update or back up URL."
+      echo "     !! WARNING: No remote 'origin' found for '$repo_basename'. Cannot update or reliably back up."
       skipped_count=$((skipped_count + 1))
     else
-      echo "       -> Attempting tactical update (git pull)..."
-      # Attempt git pull, suppress output unless error
-      if git pull --quiet; then
-        echo "       -> Update successful (or already up-to-date)."
-        updated_count=$((updated_count + 1))
+      echo "        -> Remote 'origin' URL: $repo_url"
+      entry_key="${repo_url},${repo_basename}" # Ensure consistent key format
+
+      if [ -z "${SCROLL_ENTRIES[$entry_key]}" ]; then
+        echo "        -> New inscription for the scroll: '$repo_basename'."
+        SCROLL_ENTRIES["$entry_key"]=1 # Add to our master list for final write-out
+        REPOS_NEWLY_ADDED_THIS_RUN=$((REPOS_NEWLY_ADDED_THIS_RUN + 1))
       else
-        # If pull failed, maybe try again without quiet to see error? Or just warn.
-        echo "       !! WARNING: 'git pull' for '$repo_basename' failed. Check manually!"
-        # Not incrementing updated_count here
+        echo "        -> '$repo_basename' and its URL are already known to the scroll."
       fi
 
-      # Add to backup file regardless of pull success (if URL was found)
-      echo "       -> Inscribing '$repo_basename' onto the backup scroll..."
-      # Use printf for safer handling of potential special characters
-      printf "%s,%s\n" "$repo_url" "$repo_basename" >>"$BACKUP_FILE"
-      backup_count=$((backup_count + 1))
+      current_hash=$(git rev-parse HEAD 2>/dev/null)
+      # If current_hash is empty, it might be an empty repo or an error.
+
+      echo "        -> Attempting tactical update (git pull)..."
+      if git pull --quiet; then
+        successful_pulls_count=$((successful_pulls_count + 1))
+        echo "           -> Update command successful for '$repo_basename'."
+        new_hash=$(git rev-parse HEAD 2>/dev/null)
+
+        if [ -n "$new_hash" ]; then       # If repo has commits after pull
+          if [ -n "$current_hash" ]; then # If repo had commits before pull
+            if [ "$current_hash" != "$new_hash" ]; then
+              echo "           -> Fetched new changes for '$repo_basename'."
+              REPOS_WITH_ACTUAL_UPDATES_THIS_RUN=$((REPOS_WITH_ACTUAL_UPDATES_THIS_RUN + 1))
+            else
+              echo "           -> Already up-to-date (no new commits pulled)."
+            fi
+          else # Repo had no commits before (or error getting hash), but has commits now
+            echo "           -> Repo likely initialized or first commits pulled for '$repo_basename'."
+            REPOS_WITH_ACTUAL_UPDATES_THIS_RUN=$((REPOS_WITH_ACTUAL_UPDATES_THIS_RUN + 1))
+          fi
+        else # No commits after pull
+          if [ -n "$current_hash" ]; then
+            echo "           !! WARNING: Repo '$repo_basename' had commits but seems empty after pull. State is unusual."
+          else
+            echo "           -> Still no commits in '$repo_basename' after pull."
+          fi
+        fi
+      else
+        echo "        !! WARNING: 'git pull' for '$repo_basename' failed. Check manually!"
+      fi
+    fi # end else (repo_url was found)
+
+    if [ "$PUSHD_PROJECT_DIR" -eq 1 ]; then
+      popd >/dev/null 2>&1 || {
+        echo "!! CRITICAL ERROR: Failed to popd from $repo_dir. Subsequent operations in $dir_name might be affected."
+        # Decide if to return 1 here to stop this dimension's scan
+      }
     fi
-
-    # Go back to the starting directory before the loop continues
-    cd "$OLDPWD" || {
-      echo "!! CRITICAL ERROR: Failed to cd back from $repo_dir. Aborting further scans in $dir_name."
-      return 1
-    } # Exit function on cd failure
-
-    # Run the mini-loader between repos
     inter_repo_loader "$INTER_REPO_DELAY"
-  done
+  done < <(echo "$find_output") # Process substitution here!
 }
 
 # --- Main Execution ---
@@ -255,31 +271,85 @@ fi
 # Update repositories in the secondary directory (if it exists and is different)
 if [ -d "$DEV_DIR" ] && [ "$GIT_DIR" != "$DEV_DIR" ]; then
   update_and_backup_repositories "$DEV_DIR"
-elif [ "$GIT_DIR" == "$DEV_DIR" ]; then
-  # This case should ideally not happen with the setup logic, but good to cover
+elif [ "$GIT_DIR" == "$DEV_DIR" ] && [ -d "$DEV_DIR" ]; then # Added -d check for robustness
   echo " -> Development directory is the same as Git directory, already scanned."
 else
   echo " -> Skipping Development Directory ($DEV_DIR) as it doesn't exist."
 fi
 
+# --- Finalizing The Sacred Scroll ---
+print_header "Finalizing The Sacred Scroll"
+echo " -> Inscribing all collected lore onto $BACKUP_FILE..."
+
+# Ensure FINAL_CONJURED_DATE has a value
+if [ -z "$ORIGINAL_CONJURED_DATE" ]; then # If it was a new file and somehow this wasn't set
+  FINAL_CONJURED_DATE=$(date)
+else
+  FINAL_CONJURED_DATE="$ORIGINAL_CONJURED_DATE"
+fi
+
+{
+  echo "# === Sacred Repository Backup Scroll ==="
+  echo "# Conjured on: $FINAL_CONJURED_DATE"
+  echo "# Last Full Scan: $(date)"
+  echo "# Format: repository_url,directory_name"
+  echo "# This scroll is updated on each run, preserving existing entries."
+  echo ""
+} >"$BACKUP_FILE" || {
+  echo "!! CRITICAL: Failed to write header to backup scroll! Is $BACKUP_DIR writable?"
+  exit 1
+}
+
+# Write the actual entries, sorted for consistency
+if [ ${#SCROLL_ENTRIES[@]} -gt 0 ]; then
+  sorted_keys=()
+  for key in "${!SCROLL_ENTRIES[@]}"; do
+    sorted_keys+=("$key")
+  done
+  # Standard sort (lexicographical)
+  IFS=$'\n' sorted_entries_alpha=($(sort <<<"${sorted_keys[*]}"))
+  unset IFS
+
+  for entry in "${sorted_entries_alpha[@]}"; do
+    # Ensure printf handles percent signs in URLs correctly
+    printf "%s\n" "$entry" >>"$BACKUP_FILE"
+  done
+  echo " -> ${#SCROLL_ENTRIES[@]} total entries have been inscribed into the scroll."
+else
+  echo " -> No entries to inscribe on the scroll."
+fi
+echo " -> Backup scroll updated: $BACKUP_FILE"
+
 # --- Final Summary ---
-print_header "Wrangling Report"
+print_header "Wrangling Report (Run: $(date))"
 echo "The Grand Repo Wrangling is complete."
-echo "Summary:"
-echo "  - Repositories Found & Processed: $repo_count"
-echo "  - Successfully Updated (or current): >= $updated_count" # Use >= as pull might succeed but not change anything
-echo "  - Inscribed onto Backup Scroll:   $backup_count"
-echo "  - Skipped (No remote/Errors):     $skipped_count"
+echo "Summary for this run:"
+echo "  - Repositories Found & Processed:         $repo_count"
+echo "  - Successful 'git pull' Attempts:       $successful_pulls_count"
+echo "  - Repositories With New Commits Pulled: $REPOS_WITH_ACTUAL_UPDATES_THIS_RUN"
+echo "  - Repositories Newly Added to Scroll:   $REPOS_NEWLY_ADDED_THIS_RUN"
+echo "  - Total Entries Now in Scroll:          ${#SCROLL_ENTRIES[@]}"
+echo "  - Skipped (No remote/CD Errors):        $skipped_count"
 echo ""
 echo "Backup scroll location: $BACKUP_FILE"
 echo ""
 
 if [ $skipped_count -gt 0 ]; then
-  echo "Looks like some repos were skipped or had issues ($skipped_count). Might need a manual poke."
-elif [ $repo_count -eq 0 ]; then
+  echo "[!] Looks like $skipped_count repo(s) were skipped or had issues. Might need a manual poke."
+fi
+if [ $REPOS_NEWLY_ADDED_THIS_RUN -gt 0 ]; then
+  echo "[+] $REPOS_NEWLY_ADDED_THIS_RUN new repo(s) added to the sacred scroll this run!"
+fi
+if [ $REPOS_WITH_ACTUAL_UPDATES_THIS_RUN -gt 0 ]; then
+  echo "[*] $REPOS_WITH_ACTUAL_UPDATES_THIS_RUN repo(s) successfully pulled new changes this run!"
+elif [ $successful_pulls_count -gt 0 ]; then
+  echo "[*] All processed repos were already up-to-date or no new changes were pulled."
+fi
+
+if [ $repo_count -eq 0 ]; then
   echo "Found zero repositories to wrangle. Either super clean or you're hiding them!"
 else
-  echo "Mission accomplished! Repositories wrangled and backup scroll updated. Go forth and code! 😎"
+  echo "Mission accomplished! Go forth and code! 😎"
 fi
 echo ""
 exit 0
