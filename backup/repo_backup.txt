@@ -1,29 +1,38 @@
 # === Sacred Repository Backup Scroll ===
-# Conjured on: Sat May  3 04:24:09 AM EDT 2025
+# Conjured on: Sat May 10 07:37:55 AM EDT 2025
+# Last Full Scan: Sun May 11 05:02:16 AM EDT 2025
 # Format: repository_url,directory_name
-# WARNING: This scroll is REFORGED every time the script runs!
+# This scroll is updated on each run, preserving existing entries.
 
-https://github.com/Next-Flip/Momentum-Firmware.git,Momentum-Firmware
-https://github.com/tmux-plugins/tpm,tpm
+http://github.com/comShadowHarvy/betterstrap,betterstrap
 http://github.com/comShadowHarvy/conf,conf
 https://github.com/Annex-Engineering/klipper_estimator,klipper_estimator
-https://github.com/JaKooLit/Arch-Hyprland.git,Arch-Hyprland
-https://github.com/JaKooLit/Hyprland-Dots,Hyprland-Dots
-https://github.com/JaKooLit/GTK-themes-icons.git,GTK-themes-icons
-https://github.com/JaKooLit/ags_v1.9.0.git,ags_v1.9.0
-https://github.com/tmux-plugins/tmux-sensible,tmux-sensible
-https://github.com/ztwAdmin/ZTW-2025,ZTW-2025
-https://github.com/gpakosz/.tmux,.tmux
-https://github.com/Significant-Gravitas/AutoGPT,AutoGPT
+https://github.com/badabing2005/PixelFlasher,PixelFlasher
 https://github.com/baskerville/xdo,xdo
-https://github.com/giacomo-b/rust-stakeholder.git,rust-stakeholder
-https://github.com/rothgar/awesome-tmux,awesome-tmux
-https://github.com/square/maximum-awesome,maximum-awesome
-https://gitlab.com/dwt1/dotfiles,dtdot
-https://github.com/loxsmoke/stakeholder.git,stakeholder
-http://github.com/comShadowHarvy/betterstrap,betterstrap
-https://github.com/salman-abedin/devour/,devour
-https://github.com/deepseek-ai/DeepSeek-Coder,DeepSeek-Coder
+https://github.com/bytedance/deer-flow,deer-flow
 https://github.com/comShadowHarvy/CollectiveGenius-AutoGPT-Agent-Hub,CollectiveGenius-AutoGPT-Agent-Hub
+https://github.com/deepseek-ai/DeepSeek-Coder,DeepSeek-Coder
+https://github.com/geekau/mediastack,mediastack
+https://github.com/giacomo-b/rust-stakeholder.git,rust-stakeholder
+https://github.com/gpakosz/.tmux,.tmux
 https://github.com/hacksider/Deep-Live-Cam,Deep-Live-Cam
+https://github.com/JaKooLit/ags_v1.9.0.git,ags_v1.9.0
+https://github.com/JaKooLit/Arch-Hyprland.git,Arch-Hyprland
 https://github.com/JaKooLit/Fedora-Hyprland,Fedora-Hyprland
+https://github.com/JaKooLit/GTK-themes-icons.git,GTK-themes-icons
+https://github.com/JaKooLit/Hyprland-Dots,Hyprland-Dots
+https://github.com/lockfale/osint-framework,osint-framework
+https://github.com/loxsmoke/stakeholder.git,stakeholder
+https://github.com/Next-Flip/Momentum-Firmware.git,Momentum-Firmware
+https://github.com/recyclarr/recyclarr,recyclarr
+https://github.com/rothgar/awesome-tmux,awesome-tmux
+https://github.com/salman-abedin/devour/,devour
+https://github.com/sherlock-project/sherlock,sherlock
+https://github.com/Significant-Gravitas/AutoGPT,AutoGPT
+https://github.com/soxoj/maigret,maigret
+https://github.com/square/maximum-awesome,maximum-awesome
+https://github.com/tmux-plugins/tmux-sensible,tmux-sensible
+https://github.com/tmux-plugins/tpm,tpm
+https://github.com/ztwAdmin/ZTW-2025,ZTW-2025
+https://gitlab.com/dwt1/dotfiles,dtdot
+https://gitlab.com/kalilinux/packages/theharvester,theharvester
