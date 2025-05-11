@@ -1,17 +1,25 @@
 # === Sacred Repository Backup Scroll ===
 # Conjured on: Sat May 10 07:37:55 AM EDT 2025
-# Last Full Scan: Sun May 11 05:02:16 AM EDT 2025
+# Last Full Scan: Sun May 11 03:05:12 PM EDT 2025
 # Format: repository_url,directory_name
 # This scroll is updated on each run, preserving existing entries.
 
 http://github.com/comShadowHarvy/betterstrap,betterstrap
 http://github.com/comShadowHarvy/conf,conf
+https://github.com/aaronrausch/ascii-weather,ascii-weather
+https://github.com/alewmoose/2048-in-terminal,2048-in-terminal
+https://github.com/AngelJumbo/lavat,lavat
 https://github.com/Annex-Engineering/klipper_estimator,klipper_estimator
 https://github.com/badabing2005/PixelFlasher,PixelFlasher
 https://github.com/baskerville/xdo,xdo
+https://github.com/brenns10/tetris,tetris
 https://github.com/bytedance/deer-flow,deer-flow
+https://github.com/cmang/durdraw,durdraw
+https://github.com/cmatsuoka/figlet,figlet
 https://github.com/comShadowHarvy/CollectiveGenius-AutoGPT-Agent-Hub,CollectiveGenius-AutoGPT-Agent-Hub
+https://github.com/dankamongmen/notcurses,notcurses
 https://github.com/deepseek-ai/DeepSeek-Coder,DeepSeek-Coder
+https://github.com/Elius94/console-gui-tools,console-gui-tools
 https://github.com/geekau/mediastack,mediastack
 https://github.com/giacomo-b/rust-stakeholder.git,rust-stakeholder
 https://github.com/gpakosz/.tmux,.tmux
@@ -21,18 +29,29 @@ https://github.com/JaKooLit/Arch-Hyprland.git,Arch-Hyprland
 https://github.com/JaKooLit/Fedora-Hyprland,Fedora-Hyprland
 https://github.com/JaKooLit/GTK-themes-icons.git,GTK-themes-icons
 https://github.com/JaKooLit/Hyprland-Dots,Hyprland-Dots
+https://github.com/karlstav/cava,cava
 https://github.com/lockfale/osint-framework,osint-framework
 https://github.com/loxsmoke/stakeholder.git,stakeholder
+https://github.com/M4444/TMatrix,TMatrix
+https://github.com/magiblot/tvision,tvision
+https://github.com/meh/rust-terminfo,rust-terminfo
+https://github.com/neomutt/neomutt,neomutt
 https://github.com/Next-Flip/Momentum-Firmware.git,Momentum-Firmware
+https://github.com/nielssp/csol,csol
+https://github.com/nkleemann/ascii-rain,ascii-rain
+https://github.com/profanity-im/profanity,profanity
 https://github.com/recyclarr/recyclarr,recyclarr
 https://github.com/rothgar/awesome-tmux,awesome-tmux
+https://github.com/rtcox/Terminal-Weather-Radar/,Terminal-Weather-Radar
 https://github.com/salman-abedin/devour/,devour
 https://github.com/sherlock-project/sherlock,sherlock
 https://github.com/Significant-Gravitas/AutoGPT,AutoGPT
 https://github.com/soxoj/maigret,maigret
 https://github.com/square/maximum-awesome,maximum-awesome
+https://github.com/TheTumultuousUnicornOfDarkness/CPU-X,CPU-X
 https://github.com/tmux-plugins/tmux-sensible,tmux-sensible
 https://github.com/tmux-plugins/tpm,tpm
+https://github.com/xero/figlet-fonts,figlet-fonts
 https://github.com/ztwAdmin/ZTW-2025,ZTW-2025
 https://gitlab.com/dwt1/dotfiles,dtdot
 https://gitlab.com/kalilinux/packages/theharvester,theharvester
