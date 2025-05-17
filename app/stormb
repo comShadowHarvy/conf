@@ -1,0 +1,294 @@
+#!/bin/bash
+
+# --- Configuration ---
+WIDTH=$(tput cols)
+HEIGHT=$(tput lines)
+
+# If tput fails, use defaults
+[[ -z "$WIDTH" ]] && WIDTH=80
+[[ -z "$HEIGHT" ]] && HEIGHT=24
+
+# --- Animation Elements & Timing ---
+MIN_RAINDROPS=5
+MAX_RAINDROPS=30
+MAX_CLOUDS=5
+ANIMATION_DELAY=0.1 # s
+
+# --- Characters ---
+RAIN_CHAR='|'
+CLOUD_CHAR='☁'
+LIGHTNING_CHAR='⚡' # Simple lightning
+
+# --- ANSI Escape Codes & Colors ---
+HIDE_CURSOR="\033[?25l"
+SHOW_CURSOR="\033[?25h"
+CLEAR_SCREEN="\033[2J"
+MOVE_CURSOR_HOME="\033[H"
+RESET_COLOR="\033[0m"
+COLOR_RAIN="\033[34m"             # Blue
+COLOR_CLOUD="\033[90m"            # Dark Grey / Bright Black
+COLOR_LIGHTNING="\033[93m"        # Bright Yellow
+COLOR_SCREEN_FLASH_BG="\033[107m" # Bright White background for flash
+COLOR_PUDDLE="\033[34;1m"         # Bold Blue
+
+# --- Global State Arrays ---
+declare -a rain_x
+declare -a rain_y
+declare -a cloud_x
+declare -a cloud_y
+declare -a cloud_len
+declare -a puddle_intensity # For each column on the ground
+
+# --- Lightning State ---
+lightning_active_frames=0
+LIGHTNING_PROBABILITY=3 # Percent (e.g., 3 for 3%)
+LIGHTNING_DURATION=2    # Frames for lightning character
+SCREEN_FLASH_DURATION=1 # Frames for screen flash
+
+# Ground level for rain to stop / puddles to form
+GROUND_Y=$((HEIGHT - 2))
+RUMBLE_LINE_Y=$((HEIGHT - 1))
+
+# --- Helper Functions ---
+
+# Function to move cursor to a given x, y
+# tput cup uses 0-indexed row, col (y, x)
+tp_cup() {
+  echo -ne "\033[${1};${2}H"
+}
+
+# Initialize or reset a single raindrop
+init_raindrop() {
+  local i=$1
+  rain_x[$i]=$((RANDOM % WIDTH))
+  rain_y[$i]=$((RANDOM % (GROUND_Y / 2))) # Start in upper half
+}
+
+# Initialize or reset a single cloud
+init_cloud() {
+  local i=$1
+  cloud_len[$i]=$(((RANDOM % 5) + 3)) # Cloud length 3-7 chars
+  cloud_x[$i]=$((RANDOM % (WIDTH - cloud_len[$i])))
+  cloud_y[$i]=$((RANDOM % (HEIGHT / 4))) # Clouds in top quarter
+}
+
+# Initialize all elements
+initialize_scene() {
+  # Initialize raindrops
+  num_raindrops=$((MIN_RAINDROPS + RANDOM % (MAX_RAINDROPS - MIN_RAINDROPS + 1)))
+  for ((i = 0; i < num_raindrops; i++)); do
+    init_raindrop $i
+  done
+
+  # Initialize clouds
+  for ((i = 0; i < MAX_CLOUDS; i++)); do
+    init_cloud $i
+  done
+
+  # Initialize puddles (all zero intensity)
+  for ((i = 0; i < WIDTH; i++)); do
+    puddle_intensity[$i]=0
+  done
+}
+
+# Update positions of raindrops
+update_rain() {
+  local wind_effect=$(((RANDOM % 3) - 1)) # -1, 0, or 1 for slight drift
+
+  for ((i = 0; i < ${#rain_x[@]}; i++)); do
+    rain_y[$i]=$((rain_y[$i] + 1))
+    rain_x[$i]=$((rain_x[$i] + wind_effect))
+
+    # Keep rain within horizontal bounds (simple wrap)
+    if ((rain_x[$i] < 0)); then
+      rain_x[$i]=$((WIDTH - 1))
+    elif ((rain_x[$i] >= WIDTH)); then
+      rain_x[$i]=0
+    fi
+
+    # If rain hits ground, reset it and potentially add to puddle
+    if ((rain_y[$i] >= GROUND_Y)); then
+      local impact_x=${rain_x[$i]}
+      if ((impact_x >= 0 && impact_x < WIDTH)); then
+        # Increase puddle intensity at impact point, cap at 3
+        local current_puddle=${puddle_intensity[$impact_x]:-0}
+        if ((current_puddle < 3)); then
+          puddle_intensity[$impact_x]=$((current_puddle + 1))
+        fi
+      fi
+      init_raindrop $i # Reset raindrop to top
+    fi
+  done
+}
+
+# Update positions of clouds
+update_clouds() {
+  for ((i = 0; i < ${#cloud_x[@]}; i++)); do
+    cloud_x[$i]=$((cloud_x[$i] + 1)) # Clouds move slowly to the right
+    # If cloud moves off screen, reset it to the left
+    if ((cloud_x[$i] >= WIDTH)); then
+      cloud_x[$i]=$((0 - cloud_len[$i]))
+      cloud_y[$i]=$((RANDOM % (HEIGHT / 4))) # Re-randomize Y a bit
+    fi
+  done
+}
+
+# Handle lightning logic
+update_lightning() {
+  if ((lightning_active_frames > 0)); then
+    lightning_active_frames=$((lightning_active_frames - 1))
+  elif (((RANDOM % 100) < LIGHTNING_PROBABILITY)); then
+    lightning_active_frames=$LIGHTNING_DURATION
+    # For simplicity, lightning strikes at a random column from a random cloud if possible
+    # Or just a random column if no clouds are "overhead"
+    local strike_x=$((RANDOM % WIDTH))
+    local strike_start_y=0
+
+    # Try to find a cloud to start from
+    local potential_cloud_sources=()
+    for c_idx in "${!cloud_x[@]}"; do
+      local cx_start=${cloud_x[$c_idx]}
+      local cx_end=$((cx_start + cloud_len[$c_idx]))
+      if ((cx_start < WIDTH && cx_end > 0)); then # If cloud is visible
+        potential_cloud_sources+=($c_idx)
+      fi
+    done
+
+    if [[ ${#potential_cloud_sources[@]} -gt 0 ]]; then
+      local source_cloud_idx=${potential_cloud_sources[$((RANDOM % ${#potential_cloud_sources[@]}))]}
+      local c_start_x=${cloud_x[$source_cloud_idx]}
+      local c_l=${cloud_len[$source_cloud_idx]}
+      strike_x=$((c_start_x + RANDOM % c_l))
+      strike_x=$((strike_x < 0 ? 0 : (strike_x >= WIDTH ? WIDTH - 1 : strike_x))) # Clamp
+      strike_start_y=$((${cloud_y[$source_cloud_idx]} + 1))
+    else
+      strike_start_y=$((RANDOM % (HEIGHT / 3)))
+    fi
+
+    # Store lightning bolt segments (simplified: just one vertical line)
+    lightning_bolt_segments=()
+    for ((y = strike_start_y; y < GROUND_Y; y++)); do
+      lightning_bolt_segments+=("$strike_x,$y")
+    done
+  else
+    lightning_bolt_segments=() # Clear old bolt
+  fi
+}
+
+# Draw all elements to screen
+draw_scene() {
+  echo -ne "$CLEAR_SCREEN$MOVE_CURSOR_HOME"
+
+  # Screen flash for lightning
+  if ((lightning_active_frames > 0 && lightning_active_frames <= SCREEN_FLASH_DURATION)); then
+    echo -ne "$COLOR_SCREEN_FLASH_BG"
+    # Print spaces to fill screen with flash color (can be slow)
+    for ((y = 0; y < HEIGHT; y++)); do
+      tp_cup $y 0
+      printf "%${WIDTH}s" " "
+    done
+    echo -ne "$RESET_COLOR" # Important to reset after full screen flash
+  fi
+
+  # Draw Clouds
+  echo -ne "$COLOR_CLOUD"
+  for ((i = 0; i < ${#cloud_x[@]}; i++)); do
+    local cx=${cloud_x[$i]}
+    local cy=${cloud_y[$i]}
+    local clen=${cloud_len[$i]}
+    local cloud_str=""
+    for ((j = 0; j < clen; j++)); do cloud_str+="$CLOUD_CHAR"; done
+
+    # Only draw if on screen
+    if ((cy >= 0 && cy < HEIGHT)); then
+      for ((k = 0; k < clen; k++)); do
+        local current_char_x=$((cx + k))
+        if ((current_char_x >= 0 && current_char_x < WIDTH)); then
+          tp_cup $cy $current_char_x
+          echo -n "$CLOUD_CHAR"
+        fi
+      done
+    fi
+  done
+
+  # Draw Rain
+  echo -ne "$COLOR_RAIN"
+  for ((i = 0; i < ${#rain_x[@]}; i++)); do
+    local rx=${rain_x[$i]}
+    local ry=${rain_y[$i]}
+    if ((rx >= 0 && rx < WIDTH && ry >= 0 && ry < GROUND_Y)); then
+      tp_cup $ry $rx
+      echo -n "$RAIN_CHAR"
+    fi
+  done
+
+  # Draw Puddles
+  echo -ne "$COLOR_PUDDLE"
+  local puddle_chars=('.' '-' '~') # Index by intensity-1
+  for ((x = 0; x < WIDTH; x++)); do
+    local intensity=${puddle_intensity[$x]:-0}
+    if ((intensity > 0)); then
+      local puddle_char_to_draw=${puddle_chars[$((intensity - 1))]}
+      tp_cup $GROUND_Y $x
+      echo -n "$puddle_char_to_draw"
+    fi
+  done
+  # Simple puddle evaporation
+  if ((RANDOM % 10 < 2)); then # 20% chance each frame to evaporate a bit
+    for ((x = 0; x < WIDTH; x++)); do
+      if ((${puddle_intensity[$x]:-0} > 0)); then
+        puddle_intensity[$x]=$((${puddle_intensity[$x]} - 1))
+      fi
+    done
+  fi
+
+  # Draw Lightning Bolt (if active and not just screen flash)
+  if ((lightning_active_frames > 0 && ${#lightning_bolt_segments[@]} > 0)); then
+    echo -ne "$COLOR_LIGHTNING"
+    for segment in "${lightning_bolt_segments[@]}"; do
+      IFS=',' read -r lx ly <<<"$segment"
+      if ((lx >= 0 && lx < WIDTH && ly >= 0 && ly < GROUND_Y)); then
+        tp_cup "$ly" "$lx"
+        echo -n "$LIGHTNING_CHAR"
+      fi
+    done
+  fi
+
+  # Simple Rumble Text (if lightning just struck)
+  if ((lightning_active_frames == LIGHTNING_DURATION - 1)); then # Show rumble at start of lightning
+    local rumbles=("RUMBLE" "CRACK" "BOOM")
+    local rumble_text=${rumbles[$((RANDOM % ${#rumbles[@]}))]}
+    local text_len=${#rumble_text}
+    local start_pos=$(((WIDTH - text_len) / 2))
+    if ((start_pos < 0)); then start_pos=0; fi
+    tp_cup $RUMBLE_LINE_Y $start_pos
+    echo -ne "$COLOR_LIGHTNING$rumble_text" # Use lightning color for rumble
+  fi
+
+  echo -ne "$RESET_COLOR" # Reset color at the end of drawing
+}
+
+# --- Main Animation Loop ---
+main() {
+  echo -ne "$HIDE_CURSOR$CLEAR_SCREEN"
+  trap "echo -ne '$SHOW_CURSOR$RESET_COLOR$CLEAR_SCREEN$MOVE_CURSOR_HOME'; exit" INT TERM EXIT
+
+  initialize_scene
+
+  while true; do
+    update_rain
+    update_clouds
+    update_lightning
+    draw_scene
+    sleep "$ANIMATION_DELAY"
+  done
+}
+
+# --- Start Animation ---
+# Check if terminal size is reasonable
+if ((WIDTH < 20 || HEIGHT < 10)); then
+  echo "Terminal too small. Minimum 20x10 required."
+  exit 1
+fi
+
+main
