@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Pac-Man</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #000;
+            font-family: Arial, sans-serif;
+            color: #fff;
+        }
+        #gameCanvas {
+            border: 2px solid #fff;
+            background-color: #111;
+        }
+        #score {
+            margin-top: 20px;
+            font-size: 24px;
+        }
+        #controls {
+            margin-top: 10px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <h2>Simple Pac-Man Game</h2>
+    <canvas id="gameCanvas"></canvas>
+    <div id="score">Score: 0</div>
+    <div id="controls">Use Arrow Keys to Move</div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDisplay = document.getElementById('score');
+
+        const gridSize = 20; // Size of each grid cell and Pac-Man/dot
+        const canvasWidth = 400; // 20 cells wide
+        const canvasHeight = 300; // 15 cells high
+        canvas.width = canvasWidth;
+        canvas.height = canvasHeight;
+
+        let score = 0;
+
+        // Player (Pac-Man)
+        const player = {
+            x: gridSize, // Starting X (grid units)
+            y: gridSize, // Starting Y (grid units)
+            dx: gridSize, // Movement in X
+            dy: 0,        // Movement in Y
+            radius: gridSize / 2 - 2,
+            color: 'yellow'
+        };
+
+        // Game board layout (0 = empty, 1 = wall, 2 = dot)
+        const layout = [
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1],
+            [1,2,1,1,2,1,1,1,2,1,1,2,1,1,1,2,1,1,2,1],
+            [1,2,1,1,2,1,1,1,2,1,1,2,1,1,1,2,1,1,2,1],
+            [1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1],
+            [1,2,1,1,2,1,2,1,1,1,1,1,2,1,2,1,1,2,1,1],
+            [1,2,2,2,2,1,2,2,2,1,2,2,2,1,2,2,2,2,2,1],
+            [1,1,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,1,1,1],
+            [0,0,0,1,2,1,2,2,2,2,2,2,2,1,2,1,0,0,0,0], // Tunnel row
+            [1,1,1,1,2,1,2,1,1,1,1,1,2,1,2,1,1,1,1,1],
+            [1,2,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,2,2,1],
+            [1,2,1,1,1,1,1,1,2,1,2,1,1,1,1,1,1,1,2,1],
+            [1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+        ];
+        const numRows = layout.length;
+        const numCols = layout[0].length;
+
+        // Adjust canvas height based on layout
+        canvas.height = numRows * gridSize;
+
+        let dots = [];
+
+        function initializeDots() {
+            dots = [];
+            for (let r = 0; r < numRows; r++) {
+                for (let c = 0; c < numCols; c++) {
+                    if (layout[r][c] === 2) {
+                        dots.push({ x: c, y: r, radius: 3, color: 'white' });
+                    }
+                }
+            }
+        }
+
+        function drawPlayer() {
+            ctx.beginPath();
+            // Simple circle for Pac-Man
+            ctx.arc(player.x + player.radius + 2, player.y + player.radius + 2, player.radius, 0.2 * Math.PI, 1.8 * Math.PI);
+            ctx.lineTo(player.x + player.radius + 2, player.y + player.radius + 2); // To make the mouth
+            ctx.fillStyle = player.color;
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        function drawWalls() {
+            ctx.fillStyle = 'blue';
+            for (let r = 0; r < numRows; r++) {
+                for (let c = 0; c < numCols; c++) {
+                    if (layout[r][c] === 1) {
+                        ctx.fillRect(c * gridSize, r * gridSize, gridSize, gridSize);
+                    }
+                }
+            }
+        }
+
+        function drawDots() {
+            dots.forEach(dot => {
+                ctx.beginPath();
+                ctx.arc(dot.x * gridSize + gridSize / 2, dot.y * gridSize + gridSize / 2, dot.radius, 0, Math.PI * 2);
+                ctx.fillStyle = dot.color;
+                ctx.fill();
+                ctx.closePath();
+            });
+        }
+
+        function updateScore() {
+            scoreDisplay.textContent = `Score: ${score}`;
+        }
+
+        function movePlayer() {
+            const nextX = player.x + player.dx;
+            const nextY = player.y + player.dy;
+
+            // Tunnel logic
+            if (nextX < 0 && player.y === 8 * gridSize) { // Corresponds to layout row 9 (0-indexed)
+                player.x = (numCols - 1) * gridSize;
+                return;
+            }
+            if (nextX >= numCols * gridSize && player.y === 8 * gridSize) {
+                player.x = 0;
+                return;
+            }
+
+
+            const nextGridX = Math.floor((nextX + (player.dx > 0 ? gridSize -1 : 0) )/ gridSize);
+            const nextGridY = Math.floor((nextY + (player.dy > 0 ? gridSize -1 : 0) ) / gridSize);
+
+
+            if (nextGridX >= 0 && nextGridX < numCols && nextGridY >= 0 && nextGridY < numRows) {
+                 if (layout[nextGridY] && layout[nextGridY][nextGridX] !== 1) { // Check if it's not a wall
+                    player.x = nextX;
+                    player.y = nextY;
+                } else {
+                    // If moving into a wall, stop (set dx/dy to 0 if you want continuous movement attempt)
+                    // For this simple version, we just don't update position
+                }
+            }
+
+
+            // Eat dots
+            for (let i = dots.length - 1; i >= 0; i--) {
+                const dot = dots[i];
+                // Check if Pac-Man's center is close to the dot's center
+                 if (Math.floor(player.x / gridSize) === dot.x && Math.floor(player.y / gridSize) === dot.y) {
+                    dots.splice(i, 1);
+                    score += 10;
+                    updateScore();
+                    if (dots.length === 0) {
+                        // A simple win condition
+                        alert('You Win! Final Score: ' + score);
+                        resetGame();
+                    }
+                }
+            }
+        }
+
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function gameLoop() {
+            clearCanvas();
+            drawWalls();
+            drawDots();
+            drawPlayer();
+            // In a more complex game, movePlayer would be called based on a timer or game ticks
+            // For this keydown-driven movement, it's implicitly called before the next key press leads to movement.
+            requestAnimationFrame(gameLoop);
+        }
+
+        function resetGame() {
+            player.x = gridSize;
+            player.y = gridSize;
+            player.dx = gridSize; // Start moving right
+            player.dy = 0;
+            score = 0;
+            updateScore();
+            initializeDots();
+        }
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            const currentGridX = Math.floor(player.x / gridSize);
+            const currentGridY = Math.floor(player.y / gridSize);
+
+            let intendedDx = 0;
+            let intendedDy = 0;
+
+            switch (e.key) {
+                case 'ArrowUp':
+                    intendedDx = 0;
+                    intendedDy = -gridSize;
+                    break;
+                case 'ArrowDown':
+                    intendedDx = 0;
+                    intendedDy = gridSize;
+                    break;
+                case 'ArrowLeft':
+                    intendedDx = -gridSize;
+                    intendedDy = 0;
+                    break;
+                case 'ArrowRight':
+                    intendedDx = gridSize;
+                    intendedDy = 0;
+                    break;
+                default:
+                    return; // Exit if not an arrow key
+            }
+
+            // Check if the intended move is valid before changing direction
+            // This ensures Pac-Man completes a move into a cell before turning if the new direction is valid
+            const targetGridX = currentGridX + (intendedDx / gridSize);
+            const targetGridY = currentGridY + (intendedDy / gridSize);
+
+            if (targetGridX >= 0 && targetGridX < numCols && targetGridY >= 0 && targetGridY < numRows &&
+                layout[targetGridY] && layout[targetGridY][targetGridX] !== 1) {
+                player.dx = intendedDx;
+                player.dy = intendedDy;
+            }
+            // If the intended direction is blocked but the current direction is not,
+            // Pac-Man will continue in the current direction if player.dx/dy are not zeroed out.
+
+            // Call movePlayer directly after processing input for immediate feedback
+             movePlayer();
+        });
+
+        // Start game
+        initializeDots();
+        updateScore();
+        gameLoop(); // This will now mostly handle drawing. Movement is tied to keydown.
+
+    </script>
+</body>
+</html>
