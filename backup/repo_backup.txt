@@ -1,6 +1,6 @@
 # === Sacred Repository Backup Scroll ===
 # Conjured on: Sat May 10 07:37:55 AM EDT 2025
-# Last Full Scan: Sun May 11 03:05:12 PM EDT 2025
+# Last Full Scan: Sat 17 May 2025 06:30:26 AM EDT
 # Format: repository_url,directory_name
 # This scroll is updated on each run, preserving existing entries.
 
@@ -12,6 +12,7 @@ https://github.com/AngelJumbo/lavat,lavat
 https://github.com/Annex-Engineering/klipper_estimator,klipper_estimator
 https://github.com/badabing2005/PixelFlasher,PixelFlasher
 https://github.com/baskerville/xdo,xdo
+https://github.com/BeardedTinker/Home-Assistant_Config,bearded.config
 https://github.com/brenns10/tetris,tetris
 https://github.com/bytedance/deer-flow,deer-flow
 https://github.com/cmang/durdraw,durdraw
