@@ -29,6 +29,7 @@ PUDDLE_EVAPORATION_RATE = 0.02    # Base rate of evaporation per frame
 PUDDLE_SPREAD_THRESHOLD = 2.0     # Intensity a puddle needs to start spreading wider
 PUDDLE_MAX_WIDTH_PER_POINT = 5    # Max width a single puddle origin can grow to (before merging)
 PUDDLE_MERGE_DISTANCE = 2         # Max distance between edges of puddles to be considered for merging
+PUDDLE_DISTURBANCE_DURATION = 3  # Number of frames a puddle disturbance lasts
 INITIAL_PUDDLE_INTENSITY = 2      # Default initial intensity for new puddles
 
 # --- Clouds ---
