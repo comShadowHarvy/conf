@@ -2,7 +2,7 @@
 
 # --- Configuration ---
 DEFAULT_DEVICE="/dev/ttyUSB0" # Common default for ESP devices
-AUTHOR="ShadowHarvy & Gemini"
+AUTHOR="ShadowHarvy"
 
 # --- Colors (Because dreary monochrome is so inefficient) ---
 COLOR_RESET='\033[0m'
