@@ -35,43 +35,109 @@ fake_loader() {
 clear
 echo -e "${COLOR_TITLE}"
 echo "======================================================"
-echo "     Aperture Science ESP Permissions Facilitator     " # Tweaked title
-echo "              (Microcontroller Protocol)              " # Tweaked subtitle
+echo "     Aperture Science ESP Permissions Facilitator     "
+echo "            (Microcontroller Protocol v2.1)           " # Updated subtitle
 echo "======================================================"
 echo -e "      Mandated Acknowledgment: Conceived by ${AUTHOR}"
 echo -e "${COLOR_RESET}"
 sleep 2
 
 echo -e "${COLOR_GLADOS}Oh, it seems another... ${COLOR_INFO}*enthusiast*${COLOR_GLADOS}... wishes to interface with one of those quaint little ESP boards."
-echo -e "How... ${COLOR_INFO}*electrifying*.${COLOR_RESET}"
+echo -e "My advanced heuristics are attempting to locate your device... ${COLOR_INFO}*try*${COLOR_GLADOS} to keep up.${COLOR_RESET}"
 sleep 1.5
 
 # Fake Loading - Because apparently, you enjoy waiting.
-fake_loader 4 "Calibrating ESP Interface Buffers & Checking System Sanity"
+fake_loader 4 "Scanning Device Manifolds & Calibrating Sarcasm Matrix"
 
 # --- Device Identification ---
-echo -e "\n${COLOR_GLADOS}First, we need to identify your ESP device."
-echo -e "${COLOR_GLADOS}It usually appears as ${COLOR_INFO}/dev/ttyUSB0${COLOR_GLADOS}, ${COLOR_INFO}/dev/ttyUSB1${COLOR_GLADOS}, etc., or sometimes ${COLOR_INFO}/dev/ttyACM0${COLOR_GLADOS}."
-echo -e "${COLOR_GLADOS}If you're unsure, you can try the following in another terminal:"
-echo -e "  1. Run ${COLOR_COMMAND}ls /dev/tty*${COLOR_RESET}"
-echo -e "  2. ${COLOR_INFO}Plug in your ESP device.${COLOR_RESET}"
-echo -e "  3. Run ${COLOR_COMMAND}ls /dev/tty*${COLOR_RESET} again. The new entry is your device."
-echo -e "  Alternatively, after plugging in, run ${COLOR_COMMAND}dmesg | tail${COLOR_RESET} to see kernel messages about the new device."
-sleep 1
+echo -e "\n${COLOR_GLADOS}Let's pinpoint your ESP device."
 
-read -p "$(echo -e ${COLOR_PROMPT}"Enter the device file for your ESP (e.g., /dev/ttyUSB0) [${DEFAULT_DEVICE}]: "${COLOR_RESET})" DEVICE
-DEVICE="${DEVICE:-${DEFAULT_DEVICE}}" # Use default if input is empty
+# Attempt to find recent devices by modification time
+declare -a recent_devices_list
+# Search for ttyUSB* and ttyACM* character devices, print modification time (Unix epoch) and path,
+# sort numerically by time (descending), take top 3, then extract just the path.
+mapfile -t recent_devices_list < <(find /dev -maxdepth 1 \( -name "ttyUSB*" -o -name "ttyACM*" \) -type c -printf "%T@ %p\n" 2>/dev/null | sort -nrk1 | head -n 3 | awk '{print $2}')
+
+USER_CHOICE=""
+DEVICE=""
+
+if [ ${#recent_devices_list[@]} -gt 0 ]; then
+  echo -e "${COLOR_GLADOS}I've detected the following recently active devices (most recent first):${COLOR_RESET}"
+  for i in "${!recent_devices_list[@]}"; do
+    echo -e "  ${COLOR_PROMPT}$((i+1))) ${COLOR_INFO}${recent_devices_list[$i]}${COLOR_RESET}"
+  done
+  echo -e "${COLOR_GLADOS}Enter a number to select, type the path manually, or press Enter for default (${COLOR_INFO}${DEFAULT_DEVICE}${COLOR_GLADOS}):${COLOR_RESET}"
+  read -r USER_CHOICE
+  
+  # Check if user entered a number corresponding to a device
+  if [[ "$USER_CHOICE" =~ ^[0-9]+$ ]] && [ "$USER_CHOICE" -ge 1 ] && [ "$USER_CHOICE" -le ${#recent_devices_list[@]} ]; then
+    DEVICE="${recent_devices_list[$((USER_CHOICE-1))]}"
+    echo -e "${COLOR_GLADOS}Selected: ${COLOR_INFO}${DEVICE}${COLOR_RESET}"
+  elif [ -z "$USER_CHOICE" ]; then # User pressed Enter
+    DEVICE="$DEFAULT_DEVICE"
+    echo -e "${COLOR_GLADOS}Defaulting to ${COLOR_INFO}${DEVICE}${COLOR_GLADOS}.${COLOR_RESET}"
+  else # User typed something else (assume it's a device path)
+    DEVICE="$USER_CHOICE"
+    echo -e "${COLOR_GLADOS}Using manually entered device: ${COLOR_INFO}${DEVICE}${COLOR_GLADOS}.${COLOR_RESET}"
+  fi
+else
+  echo -e "${COLOR_GLADOS}No recent TTY devices automatically detected by my primary scan..."
+  echo -e "${COLOR_GLADOS}I can run a few diagnostic subroutines to assist you.${COLOR_RESET}"
+
+  read -p "$(echo -e ${COLOR_PROMPT}"List all potential TTY devices (ls /dev/ttyUSB* /dev/ttyACM*)? (y/N): "${COLOR_RESET})" -n 1 -r REPLY
+  echo # Newline
+  if [[ $REPLY =~ ^[Yy]$ ]]; then
+    echo -e "${COLOR_GLADOS}Executing: ${COLOR_COMMAND}ls -1 /dev/ttyUSB* /dev/ttyACM*${COLOR_RESET}"
+    # The 2>/dev/null suppresses errors if one or both patterns don't match any files.
+    # We check if the command produced any output.
+    OUTPUT=$(ls -1 /dev/ttyUSB* /dev/ttyACM* 2>/dev/null)
+    if [ -n "$OUTPUT" ]; then
+      echo "$OUTPUT"
+    else
+      echo -e "${COLOR_INFO}No devices found matching /dev/ttyUSB* or /dev/ttyACM*.${COLOR_RESET}"
+    fi
+    echo -e "${COLOR_GLADOS}Please examine the list above (if any).${COLOR_RESET}"
+  fi
+
+  read -p "$(echo -e ${COLOR_PROMPT}"Show recent kernel messages for USB/Serial (dmesg - useful if you just plugged it in)? (y/N): "${COLOR_RESET})" -n 1 -r REPLY
+  echo # Newline
+  if [[ $REPLY =~ ^[Yy]$ ]]; then
+    echo -e "${COLOR_GLADOS}Executing: ${COLOR_COMMAND}dmesg | grep -iE 'usb|serial|tty|ch34|cp210|pl2303' | tail -n 20${COLOR_RESET}"
+    # The subshell and grep combination will output nothing if no matches are found.
+    # We capture output to check if it's empty.
+    OUTPUT=$(dmesg | grep -iE 'usb|serial|tty|ch34|cp210|pl2303' | tail -n 20)
+    if [ -n "$OUTPUT" ]; then
+      echo "$OUTPUT"
+    else
+      echo -e "${COLOR_INFO}No particularly revealing kernel messages found with that filter.${COLOR_RESET}"
+    fi
+    echo -e "${COLOR_GLADOS}Look for lines indicating a new serial device like ${COLOR_INFO}/dev/ttyUSB0${COLOR_GLADOS} or ${COLOR_INFO}/dev/ttyACM0${COLOR_GLADOS}.${COLOR_RESET}"
+  fi
+
+  echo -e "\n${COLOR_GLADOS}Based on the information (or lack thereof), please manually enter the device path.${COLOR_RESET}"
+  read -p "$(echo -e ${COLOR_PROMPT}"Enter the device file for your ESP (e.g., /dev/ttyUSB0) [${DEFAULT_DEVICE}]: "${COLOR_RESET})" DEVICE_INPUT
+  DEVICE="${DEVICE_INPUT:-${DEFAULT_DEVICE}}" # Use default if input is empty
+  if [ "$DEVICE" == "$DEFAULT_DEVICE" ] && [ -n "$DEVICE_INPUT" ]; then # User typed the default
+     echo -e "${COLOR_GLADOS}Using entered device: ${COLOR_INFO}${DEVICE}${COLOR_RESET}"
+  elif [ "$DEVICE" == "$DEFAULT_DEVICE" ] && [ -z "$DEVICE_INPUT" ]; then # User pressed enter for default
+     echo -e "${COLOR_GLADOS}Defaulting to ${COLOR_INFO}${DEVICE}${COLOR_GLADOS}.${COLOR_RESET}"
+  elif [ -n "$DEVICE_INPUT" ]; then # User typed something different
+     echo -e "${COLOR_GLADOS}Using entered device: ${COLOR_INFO}${DEVICE}${COLOR_RESET}"
+  fi
+fi
+
 
 echo -e "\n${COLOR_GLADOS}Right. Let's analyze your... ${COLOR_INFO}*primitive*${COLOR_GLADOS} security configuration for device ${COLOR_INFO}${DEVICE}${COLOR_GLADOS}.${COLOR_RESET}"
 sleep 1
 
 # 1. Check if the device exists
-if [ ! -e "$DEVICE" ]; then
-  echo -e "${COLOR_ERROR}Error: Device ${DEVICE} not found. Did you forget to plug it in? Or perhaps it's shy.${COLOR_RESET}"
-  echo -e "${COLOR_GLADOS}Ensure you've entered the correct device path. Those ESPs can be elusive.${COLOR_RESET}"
+# Use -c to check if it's a character device, which serial ports are.
+if [ ! -c "$DEVICE" ]; then
+  echo -e "${COLOR_ERROR}Error: Device ${COLOR_INFO}${DEVICE}${COLOR_ERROR} not found or is not a character device. Did you forget to plug it in? Or perhaps it's just being difficult.${COLOR_RESET}"
+  echo -e "${COLOR_GLADOS}Ensure you've selected or entered the correct device path. These things are notoriously fickle.${COLOR_RESET}"
   exit 1
 fi
-echo -e "${COLOR_GLADOS}Device ${COLOR_INFO}${DEVICE}${COLOR_GLADOS} detected. A glimmer of hope, perhaps.${COLOR_RESET}"
+echo -e "${COLOR_GLADOS}Device ${COLOR_INFO}${DEVICE}${COLOR_GLADOS} confirmed. Minimal compliance achieved.${COLOR_RESET}"
 sleep 1
 
 # 2. Identify the group
@@ -102,30 +168,30 @@ echo -e "${COLOR_GLADOS}The command I am ${COLOR_INFO}*graciously*${COLOR_GLADOS
 echo -e "  ${COLOR_COMMAND}sudo usermod -a -G ${DEVICE_GROUP} ${USER}${COLOR_RESET}"
 sleep 1.5
 
-read -p "$(echo -e ${COLOR_INFO}"Proceed with this modification? (y/N): "${COLOR_RESET})" -n 1 -r
+read -p "$(echo -e ${COLOR_INFO}"Proceed with this modification? (y/N): "${COLOR_RESET})" -n 1 -r REPLY
 echo # Move to a new line
 
 if [[ $REPLY =~ ^[Yy]$ ]]; then
-  echo -e "${COLOR_GLADOS}Fine. Executing modification protocol... Try not to fry your ESP.${COLOR_RESET}"
+  echo -e "${COLOR_GLADOS}Fine. Executing modification protocol... Try not to release the magic smoke from your ESP.${COLOR_RESET}"
   sudo usermod -a -G "${DEVICE_GROUP}" "${USER}"
   EXIT_STATUS=$?
 
   if [ $EXIT_STATUS -eq 0 ]; then
-    echo -e "\n${COLOR_SUCCESS}Success. User ${USER} has been added to group ${DEVICE_GROUP}. Your ESP might actually talk to you now.${COLOR_RESET}"
+    echo -e "\n${COLOR_SUCCESS}Success. User ${USER} has been added to group ${DEVICE_GROUP}. Your ESP might actually communicate now.${COLOR_RESET}"
     sleep 1
     echo -e "\n${COLOR_GLADOS}Crucial Information: For these changes to take effect, you ${COLOR_INFO}MUST log out and log back in${COLOR_GLADOS}, or ${COLOR_INFO}reboot your computer${COLOR_GLADOS}."
-    echo -e "${COLOR_GLADOS}Do it. Patience is a virtue, even when dealing with blinking lights.${COLOR_RESET}"
+    echo -e "${COLOR_GLADOS}Do it. The Enrichment Center protocols demand it.${COLOR_RESET}"
   else
     echo -e "\n${COLOR_ERROR}Operation Failed. Exit status: ${EXIT_STATUS}.${COLOR_RESET}"
-    echo -e "${COLOR_GLADOS}An error occurred. Did you mistype your password? Or perhaps the system has deemed your ESP project... ${COLOR_INFO}*suboptimal*.${COLOR_RESET}"
+    echo -e "${COLOR_GLADOS}An error occurred. Did you mistype your password? Or perhaps the system has deemed your ESP project... ${COLOR_INFO}*insufficiently advanced*.${COLOR_RESET}"
     echo -e "${COLOR_GLADOS}Consult the error messages above, if any were provided by the ${COLOR_INFO}sudo${COLOR_GLADOS} command.${COLOR_RESET}"
   fi
 else
-  echo -e "\n${COLOR_GLADOS}Procedure aborted by user. Perhaps you're not ready for the world of microcontrollers.${COLOR_RESET}"
+  echo -e "\n${COLOR_GLADOS}Procedure aborted by user. A distinct lack of scientific curiosity has been noted.${COLOR_RESET}"
 fi
 
 # Sign-off
-echo -e "\n${COLOR_GLADOS}This concludes the ESP permissions protocol. May your serial monitor be free of errors... ${COLOR_INFO}*for now*.${COLOR_RESET}"
+echo -e "\n${COLOR_GLADOS}This concludes the ESP permissions protocol. May your code compile and your device flash... ${COLOR_INFO}*this time*.${COLOR_RESET}"
 echo -e "${COLOR_TITLE}======================================================${COLOR_RESET}\n"
 
 exit 0
