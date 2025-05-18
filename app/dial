@@ -2,7 +2,7 @@
 
 # --- Configuration ---
 DEVICE="/dev/ttyACM0" # The device file we are inspecting
-AUTHOR="ShadowHarvy"  # As requested by the... subject.
+AUTHOR="ShadowHarvy"  
 
 # --- Colors (Because dreary monochrome is so inefficient) ---
 COLOR_RESET='\033[0m'
