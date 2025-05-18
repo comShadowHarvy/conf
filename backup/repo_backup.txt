@@ -1,6 +1,6 @@
 # === Sacred Repository Backup Scroll ===
 # Conjured on: Sat May 10 07:37:55 AM EDT 2025
-# Last Full Scan: Sat 17 May 2025 06:30:26 AM EDT
+# Last Full Scan: Sun 18 May 2025 08:29:53 AM EDT
 # Format: repository_url,directory_name
 # This scroll is updated on each run, preserving existing entries.
 
@@ -21,6 +21,12 @@ https://github.com/comShadowHarvy/CollectiveGenius-AutoGPT-Agent-Hub,CollectiveG
 https://github.com/dankamongmen/notcurses,notcurses
 https://github.com/deepseek-ai/DeepSeek-Coder,DeepSeek-Coder
 https://github.com/Elius94/console-gui-tools,console-gui-tools
+https://github.com/FergusGriggs/20q,20q
+https://github.com/FergusGriggs/Fegaria-Remastered,Fegaria-Remastered
+https://github.com/FergusGriggs/Feggle,Feggle
+https://github.com/FergusGriggs/pysweeper,pysweeper
+https://github.com/FergusGriggs/Tower-Defence-Extravaganza,Tower-Defence-Extravaganza
+https://github.com/FergusGriggs/Worms-Total-Carnage,Worms-Total-Carnage
 https://github.com/geekau/mediastack,mediastack
 https://github.com/giacomo-b/rust-stakeholder.git,rust-stakeholder
 https://github.com/gpakosz/.tmux,.tmux
