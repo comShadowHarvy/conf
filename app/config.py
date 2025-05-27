@@ -29,10 +29,8 @@ PUDDLE_EVAPORATION_RATE = 0.02    # Base rate of evaporation per frame
 PUDDLE_SPREAD_THRESHOLD = 2.0     # Intensity a puddle needs to start spreading wider
 PUDDLE_MAX_WIDTH_PER_POINT = 5    # Max width a single puddle origin can grow to (before merging)
 PUDDLE_MERGE_DISTANCE = 2         # Max distance between edges of puddles to be considered for merging
-PUDDLE_DISTURBANCE_DURATION = 6  # Number of frames a puddle disturbance lasts
-PUDDLE_DISTURBANCE_CHAR = '*'    # Character to show when a puddle is disturbed by rain
-COLOR_PUDDLE = '\033[36m'        # Cyan color for puddles
-COLOR_PUDDLE_DISTURBANCE = '\033[96m'  # Bright cyan for puddle disturbances
+PUDDLE_DISTURBANCE_DURATION = 3  # Number of frames a puddle disturbance lasts
+PUDDLE_DISTURBANCE_CHAR = '*'   # Character for puddle disturbance
 INITIAL_PUDDLE_INTENSITY = 2      # Default initial intensity for new puddles
 
 # --- Clouds ---
@@ -40,7 +38,7 @@ NUM_CLOUDS_FG = 4
 NUM_CLOUDS_BG = 3
 CLOUD_CHAR = '☁'                # Base character for simple clouds
 CLOUD_MIN_WIDTH = 5
-CLOUD_MAX_WIDTH = 2
+CLOUD_MAX_WIDTH = 12
 BASE_CLOUD_SPEED_FG = 0.3
 CLOUD_WIND_FACTOR_FG = 0.4      # How much foreground clouds are affected by wind
 BASE_CLOUD_SPEED_BG_FACTOR = 0.6 # Background clouds move slower
@@ -63,11 +61,11 @@ RUMBLE_DURATION_MIN = 12
 RUMBLE_DURATION_MAX = 30
 LIGHTNING_FLICKER_DURATION = 3  # How many frames the bolt stays visible
 LIGHTNING_COMPLEXITY_PROBABILITY = 0.5 # Chance of having branches
-LIGHTNING_MAX_BRANCHES = 9
+LIGHTNING_MAX_BRANCHES = 4
 LIGHTNING_BRANCH_LENGTH_FACTOR = 0.6
-LIGHTNING_FLASH_DURATION = 2    # How many frames the screen flash lasts
+LIGHTNING_FLASH_DURATION = 1    # How many frames the screen flash lasts
 GROUND_STRIKE_EFFECT_CHAR = '⁂'
-GROUND_STRIKE_EFFECT_DURATION = 4
+GROUND_STRIKE_EFFECT_DURATION = 2
 
 # --- Animation ---
 ANIMATION_DELAY = 0.09
