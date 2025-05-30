@@ -1,0 +1,62 @@
+#!/bin/bash
+
+# Check if an argument (file or directory to zip) is provided
+if [ -z "$1" ]; then
+  echo "Usage: $0 <file_or_directory_to_zip>"
+  exit 1
+fi
+
+# Get the input file or directory
+TARGET="$1"
+
+# Check if the target exists
+if [ ! -e "$TARGET" ]; then
+  echo "Error: File or directory '$TARGET' not found."
+  exit 1
+fi
+
+# --- Get Original Size ---
+echo "Calculating original size..."
+ORIGINAL_SIZE_BYTES=$(du -sb "$TARGET" | awk '{print $1}')
+ORIGINAL_SIZE_HUMAN=$(du -sh "$TARGET" | awk '{print $1}')
+echo "Original size: $ORIGINAL_SIZE_HUMAN ($ORIGINAL_SIZE_BYTES bytes)"
+
+# --- Create the Zip Archive ---
+ARCHIVE_NAME="${TARGET%/}.zip" # Removes trailing slash if it's a directory
+echo "Creating archive '$ARCHIVE_NAME' with maximum compression..."
+
+# If it's a directory, use -r for recursive zipping
+if [ -d "$TARGET" ]; then
+  zip -9 -r "$ARCHIVE_NAME" "$TARGET"
+else
+  zip -9 "$ARCHIVE_NAME" "$TARGET"
+fi
+
+# Check if zip command was successful
+if [ $? -ne 0 ]; then
+  echo "Error: Zip command failed."
+  exit 1
+fi
+
+echo "Archive created successfully."
+
+# --- Get New Size ---
+echo "Calculating new archive size..."
+NEW_SIZE_BYTES=$(du -sb "$ARCHIVE_NAME" | awk '{print $1}')
+NEW_SIZE_HUMAN=$(du -sh "$ARCHIVE_NAME" | awk '{print $1}')
+echo "New archive size: $NEW_SIZE_HUMAN ($NEW_SIZE_BYTES bytes)"
+
+# --- Calculate and Display Difference ---
+DIFFERENCE_BYTES=$((ORIGINAL_SIZE_BYTES - NEW_SIZE_BYTES))
+SAVED_PERCENTAGE=$(awk "BEGIN {printf \"%.2f\", ($DIFFERENCE_BYTES / $ORIGINAL_SIZE_BYTES) * 100}")
+
+echo "----------------------------------------"
+echo "Compression Summary for '$TARGET':"
+echo "----------------------------------------"
+echo "Original Size   : $ORIGINAL_SIZE_HUMAN ($ORIGINAL_SIZE_BYTES bytes)"
+echo "Compressed Size : $NEW_SIZE_HUMAN ($NEW_SIZE_BYTES bytes)"
+echo "Space Saved     : $(numfmt --to=iec-i --suffix=B $DIFFERENCE_BYTES | sed 's/ //g') ($DIFFERENCE_BYTES bytes)" # More robust human-readable difference
+echo "Compression Ratio: $SAVED_PERCENTAGE%"
+echo "----------------------------------------"
+
+exit 0
