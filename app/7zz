@@ -1,0 +1,101 @@
+#!/bin/bash
+
+# Check if an argument (file or directory to compress) is provided
+if [ -z "$1" ]; then
+  echo "Usage: $0 <file_or_directory_to_compress_with_7z>"
+  exit 1
+fi
+
+# Get the input file or directory
+TARGET="$1"
+
+# Check if the target exists
+if [ ! -e "$TARGET" ]; then
+  echo "Error: File or directory '$TARGET' not found."
+  exit 1
+fi
+
+# Check if 7z is installed
+if ! command -v 7z >/dev/null 2>&1; then
+  echo "Error: '7z' command not found. Please install p7zip package."
+  echo "(e.g., 'sudo apt install p7zip-full' or 'sudo yum install p7zip p7zip-plugins')"
+  exit 1
+fi
+
+# --- Get Original Size ---
+echo "Calculating original size of '$TARGET'..."
+ORIGINAL_SIZE_BYTES=$(du -sb "$TARGET" | awk '{print $1}')
+ORIGINAL_SIZE_HUMAN=$(du -sh "$TARGET" | awk '{print $1}')
+echo "Original size: $ORIGINAL_SIZE_HUMAN ($ORIGINAL_SIZE_BYTES bytes)"
+
+# --- Create the 7z Archive ---
+# Determine archive name: remove trailing slash if directory, then add .7z
+TARGET_BASENAME=$(basename "$TARGET")
+ARCHIVE_NAME="${TARGET_BASENAME%/}.7z"
+
+# Prevent overwriting the input if it's a file and somehow has the same name (unlikely with .7z)
+if [ -f "$TARGET" ] && [ "$TARGET" == "$ARCHIVE_NAME" ]; then
+  # Try to create a slightly different name
+  ARCHIVE_NAME="${TARGET_BASENAME%.*}_archive.7z"
+  if [ "$TARGET" == "$ARCHIVE_NAME" ]; then # Still the same, highly unlikely
+    echo "Error: Could not determine a safe archive name. Please rename your input file or the script."
+    exit 1
+  fi
+fi
+
+echo "Creating archive '$ARCHIVE_NAME' with 7z (ultra compression)..."
+echo "This might take a while for large files/directories..."
+
+# Use 7z: 'a' to add, '-mx=9' for ultra compression, '-mmt=on' for multi-threading
+# Redirect verbose output to /dev/null to keep script output clean
+if [ -d "$TARGET" ]; then
+  7z a -mx=9 -mmt=on "$ARCHIVE_NAME" "$TARGET" >/dev/null
+else
+  7z a -mx=9 -mmt=on "$ARCHIVE_NAME" "$TARGET" >/dev/null
+fi
+
+# Check if 7z command was successful
+if [ $? -ne 0 ]; then
+  echo "Error: 7z compression failed."
+  # Attempt to remove partially created archive if it exists
+  [ -f "$ARCHIVE_NAME" ] && rm "$ARCHIVE_NAME"
+  exit 1
+fi
+
+echo "Archive created successfully: '$ARCHIVE_NAME'"
+
+# --- Get New Size ---
+echo "Calculating new archive size..."
+if [ ! -f "$ARCHIVE_NAME" ]; then
+  echo "Error: Compressed file '$ARCHIVE_NAME' not found after compression."
+  exit 1
+fi
+NEW_SIZE_BYTES=$(du -sb "$ARCHIVE_NAME" | awk '{print $1}')
+NEW_SIZE_HUMAN=$(du -sh "$ARCHIVE_NAME" | awk '{print $1}')
+echo "New archive size: $NEW_SIZE_HUMAN ($NEW_SIZE_BYTES bytes)"
+
+# --- Calculate and Display Difference ---
+DIFFERENCE_BYTES=$((ORIGINAL_SIZE_BYTES - NEW_SIZE_BYTES))
+
+SAVED_PERCENTAGE="0.00" # Default if original size is zero
+if [ "$ORIGINAL_SIZE_BYTES" -ne 0 ]; then
+  SAVED_PERCENTAGE=$(awk "BEGIN {printf \"%.2f\", ($DIFFERENCE_BYTES / $ORIGINAL_SIZE_BYTES) * 100}")
+fi
+
+echo "----------------------------------------"
+echo "7z Compression Summary for '$TARGET':"
+echo "----------------------------------------"
+echo "Original Size   : $ORIGINAL_SIZE_HUMAN ($ORIGINAL_SIZE_BYTES bytes)"
+echo "Compressed Size : $NEW_SIZE_HUMAN ($NEW_SIZE_BYTES bytes)"
+
+if [ "$DIFFERENCE_BYTES" -lt 0 ]; then
+  # Handle case where archive is larger (e.g., compressing already compressed data or very small files)
+  # ${DIFFERENCE_BYTES#-} removes the leading minus sign for numfmt
+  echo "Space Increased By: $(numfmt --to=iec-i --suffix=B ${DIFFERENCE_BYTES#-} | sed 's/ //g') (${DIFFERENCE_BYTES#-} bytes) (Note: Archive is LARGER)"
+else
+  echo "Space Saved     : $(numfmt --to=iec-i --suffix=B $DIFFERENCE_BYTES | sed 's/ //g') ($DIFFERENCE_BYTES bytes)"
+fi
+echo "Compression Ratio: $SAVED_PERCENTAGE%"
+echo "----------------------------------------"
+
+exit 0
