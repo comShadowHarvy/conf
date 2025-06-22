@@ -42,7 +42,11 @@ HISTFILE="${ZDOTDIR:-$HOME}/.zsh_history"
 HISTSIZE=10000
 SAVEHIST=10000
 # Ignore common commands and duplicates
-export HISTORY_IGNORE="(ls|cd|pwd|exit|sudo reboot|history|cd -|cd ..| *|&:)" # Ignore duplicates and commands starting with space
+#export HISTORY_IGNORE="(ls|cd|pwd|exit|sudo reboot|history|cd -|cd ..| *|&:)" # Ignore duplicates and commands starting with space
+# Zsh-native way to ignore patterns. The `|` acts as an OR.
+# The `&` is for duplicates (already handled by HIST_IGNORE_ALL_DUPS)
+# The leading space is handled by HIST_IGNORE_SPACE
+HIST_IGNORE_PATTERNS="ls|cd|pwd|exit|sudo reboot|history|cd -|cd ..|exa*|lsd*"
 
 # --- Environment Variables & Paths ---
 # Use ZDOTDIR if set, otherwise default to $HOME
@@ -231,7 +235,44 @@ _install_if_missing() {
       return 1
   fi
 }
+#____________________________________________________________________________________________
+# REFACTOR: Defer slow startup visuals to run *after* the first prompt is drawn.
+# This makes the shell feel instantaneous.
+_run_deferred_startup_visuals() {
+    # STEP 1: Immediately unregister this function so it only runs ONCE per session.
+    # This is the key to the "run only once" trick.
+    unset -f _run_deferred_startup_visuals
+    add-zsh-hook -d precmd _run_deferred_startup_visuals
 
+    # STEP 2: Place your original logic for showing visuals here.
+    # This will now print *above* your first ready-to-use prompt.
+    if [[ "$SHOW_POKEMON" == "true" ]]; then
+        # Check dependencies first
+        if (( $+commands[pokemon-colorscripts] )) && (( $+commands[fastfetch] )); then
+            # Run your preferred combined command. Using the pipe version as an example.
+            pokemon-colorscripts --no-title -r | fastfetch --pipe
+
+        elif (( $+commands[pokemon-colorscripts] )); then
+            # Fallback to just pokemon if fastfetch is missing
+            pokemon-colorscripts --no-title -r
+
+        elif (( $+commands[fastfetch] )); then
+            # Fallback to just fastfetch if pokemon is missing
+            fastfetch
+        fi
+    elif (( $+commands[fastfetch] )); then
+        # If pokemon is disabled, just show fastfetch
+        fastfetch
+    elif (( $+commands[neofetch] )); then
+        # Fallback to neofetch if fastfetch is missing
+        neofetch
+    fi
+
+    # STEP 3 (Optional but Recommended): Redraw the prompt.
+    # When the async command finishes, this ensures the prompt is neatly positioned underneath.
+    zle && zle .redisplay
+}
+#_____________________________________________________________________________________________
 # --- Completion System ---
 # Initialize completions; use cache if available and less than 24 hours old
 autoload -Uz compinit
