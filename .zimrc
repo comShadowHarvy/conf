@@ -20,7 +20,6 @@ zmodule completion --no-submodules            # Completion system (load early fo
 # Directory navigation and management
 zmodule prompt-pwd                            # Show working directory in prompt
 zmodule kiesman99/zim-zoxide                  # Smart directory jumping (faster alternative to z)
-zmodule rupa/z --source 'z.sh'                # Original z for directory jumping using frecency
 zmodule GetAmbush/deepx-zsh-plugin            # Enhanced directory navigation with bookmarks
 zmodule aikow/zsh-auto-ls                     # Auto-list directory contents after cd
 zmodule direnv                                # Directory-specific environments
@@ -36,7 +35,6 @@ zmodule direnv                                # Directory-specific environments
 (( ${+commands[python]} )) && zmodule pvenv   # Python virtualenv
 
 # Development and container tools
-(( ${+commands[docker]} )) && zmodule webyneter/docker-aliases     # Docker aliases
 (( ${+commands[python]} )) && zmodule MichaelAquilina/zsh-autoswitch-virtualenv # Python virtualenv switching
 zmodule ssh --no-submodules                   # SSH management
 zmodule pacman                                # Package management
@@ -87,8 +85,6 @@ zmodule PatTheMav/zimfw-extras \
 # Oh My Zsh Plugin Integration
 # ============================================================================
 
-# Load Oh My Zsh core
-zmodule ohmyzsh/ohmyzsh --source 'oh-my-zsh.sh'
 
 # Load Git plugins if git is available
 if (( ${+commands[git]} )); then
@@ -118,13 +114,13 @@ zmodule ohmyzsh/ohmyzsh --source 'plugins/sudo/sudo.plugin.zsh'
 # Homebrew Integration (Silent Operation)
 # ============================================================================
 
-if (( ${+commands[brew]} )); then
-    # Add Homebrew completions and site functions silently
-    BREW_PREFIX=$(brew --prefix 2>/dev/null)
-    [[ -d "$BREW_PREFIX/completions/zsh" ]] && zmodule "$BREW_PREFIX/completions/zsh" --fpath .
-    [[ -d "$BREW_PREFIX/share/zsh/site-functions" ]] && zmodule "$BREW_PREFIX/share/zsh" --fpath "site-functions"
-    unset BREW_PREFIX
-fi
+# if (( ${+commands[brew]} )); then
+#    # Add Homebrew completions and site functions silently
+#    BREW_PREFIX=$(brew --prefix 2>/dev/null)
+#    [[ -d "$BREW_PREFIX/completions/zsh" ]] && zmodule "$BREW_PREFIX/completions/zsh" --fpath .
+#    [[ -d "$BREW_PREFIX/share/zsh/site-functions" ]] && zmodule "$BREW_PREFIX/share/zsh" --fpath "site-functions"
+#    unset BREW_PREFIX
+# fi
 
 # ============================================================================
 # Completions (Enhanced)
@@ -139,6 +135,5 @@ zmodule RobSis/zsh-completion-generator          # Dynamic generation of complet
 
 # These modules should be loaded last for optimal performance
 zmodule zdharma-continuum/fast-syntax-highlighting  # Advanced syntax highlighting
-zmodule zsh-users/zsh-syntax-highlighting           # Syntax highlighting (loads after completions)
 zmodule zsh-users/zsh-history-substring-search      # History substring search
 zmodule zsh-users/zsh-autosuggestions               # Command autosuggestions based on history
