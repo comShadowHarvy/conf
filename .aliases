@@ -14,16 +14,15 @@ mkcd() {
 
 # Navigate to a directory matching a pattern
 cdf() {
-  [[ -z "$1" ]] && {
-    echo "Usage: cdf <pattern>"
-    return 1
-  }
+  # Use fd if available (it's faster), otherwise use find.
+  # Then pipe the list of directories into fzf to let you choose.
+  local cmd=("find . -maxdepth 2 -type d")
+  (( ${+commands[fd]} )) && cmd=("fd --type d --max-depth 2")
+
   local dir
-  dir=$(find . -maxdepth 1 -type d -name "*$1*" | head -n 1)
-  [[ -n "$dir" ]] && cd "$dir" || {
-    echo "No directory matching pattern '$1' found."
-    return 1
-  }
+  dir=$(eval $cmd | fzf --height 20% --reverse --prompt="Select directory> ")
+  # If a directory was selected (fzf didn't exit with an error), cd into it.
+  [[ -n "$dir" ]] && cd "$dir"
 }
 
 # Extract wisdom from YouTube transcripts (requires yt and fabric)
@@ -112,6 +111,62 @@ extract() {
   [[ -n "$original_dir" ]] && cd "$original_dir"
 
   return $exit_status
+}
+
+# Extract all archives in a directory into their own named subdirectories
+extract-all() {
+  # Display help if requested
+  if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    echo "Usage: extract-all [directory]"
+    echo "Extracts all supported archives in the specified directory (or current directory)"
+    echo "into individual subfolders named after each archive."
+    return 0
+  fi
+
+  # Use the first argument as the target directory, or the current directory if none is given.
+  local target_dir="${1:-.}"
+
+  # Check if the target directory exists
+  if [[ ! -d "$target_dir" ]]; then
+    echo "Error: Directory '$target_dir' not found."
+    return 1
+  fi
+
+  # Use find to locate all regular files and process them.
+  # This is safer than a simple for loop if filenames contain spaces or special characters.
+  find "$target_dir" -maxdepth 1 -type f | while read -r archive_path; do
+    # Check if the file is a supported archive type using the logic from the extract function.
+    # This prevents creating empty folders for non-archive files (like .txt or .jpg).
+    case "$archive_path" in
+    *.tar.bz2 | *.tbz2 | *.tbz | *.tar.gz | *.tgz | *.tar.xz | *.txz | *.tar | *.cbt | *.zip | *.cbz | *.epub | *.rar | *.cbr | *.7z | *.arj | *.cab | *.cb7 | *.chm | *.deb | *.dmg | *.iso | *.lzh | *.msi | *.pkg | *.rpm | *.udf | *.wim | *.xar | *.gz | *.bz2 | *.xz | *.tlz | *.lzma | *.Z | *.exe | *.cpio | *.cba | *.ace)
+      # It's an archive, so let's process it.
+      local filename
+      filename=$(basename "$archive_path")
+
+      # Create a clean directory name by stripping the extension(s).
+      # This handles complex extensions like ".tar.gz" as well as simple ones like ".zip".
+      local dest_dir
+      dest_dir=$(echo "$filename" | sed -E 's/(\.tar\.(gz|bz2|xz|lzma|Z)|\.t(gz|bz2|xz|lz))?$//' | sed -E 's/\.[^.]+$//')
+
+      # Construct the full path for the destination directory
+      local full_dest_path
+      full_dest_path="${target_dir}/${dest_dir}"
+
+      echo "--------------------------------------------------"
+      echo "Found archive: '$filename'"
+
+      # Call the original extract function, passing the full path to the archive
+      # and the desired destination directory.
+      extract "$archive_path" "$full_dest_path"
+      ;;
+    *)
+      # Not a recognized archive file, do nothing.
+      ;;
+    esac
+  done
+
+  echo "--------------------------------------------------"
+  echo "All archives processed."
 }
 
 # ========================
@@ -560,10 +615,16 @@ alias christitus='curl -fsSL christitus.com/linux | sh'
 alias christitusdev='curl -fsSL https://christitus.com/linuxdev | sh'
 
 # Shell management
-alias zimupdate="zimfw update"
-alias reload-zsh="source ~/.zshrc"
-alias edit-zsh="nvim ~/.zshrc"
-alias edit-aliases="nvim ~/.aliases"
+##alias zimupdate="zimfw update"
+##alias reload-zsh="source ~/.zshrc"
+##alias edit-zsh="nvim ~/.zshrc"
+##alias edit-aliases="nvim ~/.aliases"
+# In .zshrc, you have: export ZDOTDIR="${ZDOTDIR:-$HOME}"
+# In .aliases, you can then use:
+alias reload-zsh="source ${ZDOTDIR:-$HOME}/.zshrc"
+alias edit-zsh="nvim ${ZDOTDIR:-$HOME}/.zshrc"
+alias edit-aliases="nvim ${ZDOTDIR:-$HOME}/.aliases" 
+
 
 # Package installer helper
 pkg-install() {
