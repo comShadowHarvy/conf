@@ -199,7 +199,8 @@ ycd() {
 # ========================
 
 # Enhanced file management aliases
-alias cp="rsync -avhW --no-compress --progress"
+alias cp='rsync -avhP --info=progress2'
+alias mv='rsync -avhP --remove-source-files --info=progress2'
 alias mkdir='mkdir -pv'
 
 # File listing utilities - Use eza if available
