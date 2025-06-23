@@ -1,6 +1,6 @@
 # === Sacred Repository Backup Scroll ===
 # Conjured on: Sat May 10 07:37:55 AM EDT 2025
-# Last Full Scan: Wed 04 Jun 2025 09:02:31 PM EDT
+# Last Full Scan: Mon 23 Jun 2025 02:58:08 PM EDT
 # Format: repository_url,directory_name
 # This scroll is updated on each run, preserving existing entries.
 
@@ -8,6 +8,7 @@ http://github.com/comShadowHarvy/betterstrap,betterstrap
 http://github.com/comShadowHarvy/conf,conf
 https://github.com/0xb1b1/docker-files,docker-files
 https://github.com/aaronrausch/ascii-weather,ascii-weather
+https://github.com/adi1090x/plymouth-themes,plymouth-themes
 https://github.com/alewmoose/2048-in-terminal,2048-in-terminal
 https://github.com/AngelJumbo/lavat,lavat
 https://github.com/Annex-Engineering/klipper_estimator,klipper_estimator
@@ -17,6 +18,7 @@ https://github.com/badabing2005/PixelFlasher,PixelFlasher
 https://github.com/baskerville/xdo,xdo
 https://github.com/BeardedTinker/Home-Assistant_Config,bearded.config
 https://github.com/binhex/arch-qbittorrentvpn,arch-qbittorrentvpn
+https://github.com/BreadOnPenguins/scripts,scripts
 https://github.com/bremor/bureau_of_meteorology,bureau_of_meteorology
 https://github.com/brenns10/tetris,tetris
 https://github.com/bst04/payloads_flipperZero,payloads_flipperZero
@@ -89,6 +91,7 @@ https://github.com/TheTumultuousUnicornOfDarkness/CPU-X,CPU-X
 https://github.com/tmux-plugins/tmux-sensible,tmux-sensible
 https://github.com/tmux-plugins/tpm,tpm
 https://github.com/valoq/bwscripts,bwscripts
+https://github.com/VandalByte/dedsec-grub2-theme,dedsec-grub2-theme
 https://github.com/xero/figlet-fonts,figlet-fonts
 https://github.com/xillwillx/BashBunny,BashBunny
 https://github.com/ztwAdmin/ZTW-2025,ZTW-2025
