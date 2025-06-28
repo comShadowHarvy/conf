@@ -1,6 +1,6 @@
 # === Sacred Repository Backup Scroll ===
 # Conjured on: Sat May 10 07:37:55 AM EDT 2025
-# Last Full Scan: Mon 23 Jun 2025 02:58:08 PM EDT
+# Last Full Scan: Sat 28 Jun 2025 08:19:24 AM EDT
 # Format: repository_url,directory_name
 # This scroll is updated on each run, preserving existing entries.
 
@@ -15,6 +15,8 @@ https://github.com/Annex-Engineering/klipper_estimator,klipper_estimator
 https://github.com/archcraft-os/archcraft,archcraft
 https://github.com/augmentcode/augment.vim,augment.vim
 https://github.com/badabing2005/PixelFlasher,PixelFlasher
+https://github.com/basecamp/omakub,omakub
+https://github.com/basecamp/omarchy,omarchy
 https://github.com/baskerville/xdo,xdo
 https://github.com/BeardedTinker/Home-Assistant_Config,bearded.config
 https://github.com/binhex/arch-qbittorrentvpn,arch-qbittorrentvpn
@@ -79,6 +81,7 @@ https://github.com/Robitx/gp.nvim,gp.nvim
 https://github.com/rothgar/awesome-tmux,awesome-tmux
 https://github.com/rtcox/Terminal-Weather-Radar/,Terminal-Weather-Radar
 https://github.com/salman-abedin/devour/,devour
+https://github.com/searxng/searxng,searxng
 https://github.com/sherlock-project/sherlock,sherlock
 https://github.com/SickChill/sickchill,sickchill
 https://github.com/Significant-Gravitas/AutoGPT,AutoGPT
