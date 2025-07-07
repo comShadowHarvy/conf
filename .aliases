@@ -677,6 +677,9 @@ elif command -v bat >/dev/null 2>&1; then
   alias man='MANPAGER="sh -c \"col -bx | bat -l man -p\"" man'
 fi
 
+alias gemini_cli='npx https://github.com/google-gemini/gemini-cli'
+alias run_qwen3='ollama run qwen3:8b'
+alias run_llama3='ollama run llama3:8b'
 alias jctl="journalctl -p 3 -xb"
 alias gpg-check="gpg2 --keyserver-options auto-key-retrieve --verify"
 alias gpg-retrieve="gpg2 --keyserver-options auto-key-retrieve --receive-keys"
