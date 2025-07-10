@@ -1,139 +1,114 @@
-# =====================================================
-# Optimized ZimFW Configuration (zimrc)
-# =====================================================
-
 # ============================================================================
-# Core System and Shell Modules (Load First)
-# ============================================================================
-
-# Essential environment foundation (always load these first)
-zmodule environment                           # Core Zsh settings
-zmodule input                                 # Input handling
-zmodule termtitle                             # Terminal title management
-zmodule utility                               # Basic shell utilities
-zmodule completion --no-submodules            # Completion system (load early for best performance)
-
-# ============================================================================
-# Navigation and Directory Tools
+# Optimized .zimrc
+#
+# Modules are ordered for optimal startup performance.
+# Core/utility modules are loaded first.
+# UI/visual modules (prompts, highlighting) are loaded last.
 # ============================================================================
 
-# Directory navigation and management
-zmodule prompt-pwd                            # Show working directory in prompt
-zmodule kiesman99/zim-zoxide                  # Smart directory jumping (faster alternative to z)
-zmodule GetAmbush/deepx-zsh-plugin            # Enhanced directory navigation with bookmarks
-zmodule aikow/zsh-auto-ls                     # Auto-list directory contents after cd
-zmodule direnv                                # Directory-specific environments
+# ----------------------------------------------------------------------------
+# 1. CORE & UTILITY MODULES (Load First)
+# ----------------------------------------------------------------------------
+# These provide the essential foundation for the shell.
 
-# ============================================================================
-# Developer Tools and Integrations
-# ============================================================================
+zmodule environment      # Sets up the basic Zsh environment.
+zmodule utility          # Provides useful utility functions and aliases.
+zmodule input            # Enhances the command-line editing experience.
+zmodule termtitle        # Manages the terminal window title.
 
-# Conditionally load language-specific modules (more efficient)
-(( ${+commands[git]} )) && zmodule git-info   # Git information (only if git is installed)
-(( ${+commands[brew]} )) && zmodule homebrew  # Homebrew integration
-(( ${+commands[ruby]} )) && zmodule ruby      # Ruby support
-(( ${+commands[python]} )) && zmodule pvenv   # Python virtualenv
+# ----------------------------------------------------------------------------
+# 2. PROMPT SETUP
+# ----------------------------------------------------------------------------
+# Configure the look and feel of your prompt.
+# Loading this early allows other modules to hook into it if needed.
 
-# Development and container tools
-(( ${+commands[python]} )) && zmodule MichaelAquilina/zsh-autoswitch-virtualenv # Python virtualenv switching
-zmodule ssh --no-submodules                   # SSH management
-zmodule pacman                                # Package management
+zmodule asciiship        # A fast, lightweight, and customizable prompt.
+zmodule duration-info    # Adds command execution time to the prompt.
 
-# ============================================================================
-# Prompt and Visual Enhancements
-# ============================================================================
+# ----------------------------------------------------------------------------
+# 3. COMPLETIONS
+# ----------------------------------------------------------------------------
+# Load the completion system and additional completion definitions.
+# Loading this after the core but before most tools ensures they can add their own completions.
 
-# Prompt configuration
-zmodule asciiship                             # Lightweight ASCII prompt (inspired by Spaceship)
-zmodule duration-info --no-submodules         # Command duration display
-zmodule magic-enter                           # Smart Enter key functionality
+zmodule completion                         # Initializes the Zsh completion system.
+zmodule zsh-users/zsh-completions          # Provides a comprehensive collection of extra completions.
+zmodule RobSis/zsh-completion-generator    # Generates completions for commands that lack them.
 
-# Color enhancements
-zmodule ael-code/zsh-colored-man-pages        # Colorized man pages
-zmodule zpm-zsh/colorize                      # Additional colorization
-zmodule gretzky/auto-color-ls                 # Intelligent, colorized ls output
+# ----------------------------------------------------------------------------
+# 4. NAVIGATION & FILE/DIRECTORY MANAGEMENT
+# ----------------------------------------------------------------------------
+# Tools that enhance filesystem navigation.
 
-# ============================================================================
-# Additional Utilities and Productivity Tools
-# ============================================================================
+zmodule kiesman99/zim-zoxide             # A smarter 'cd' command that learns your habits.
+zmodule aikow/zsh-auto-ls                # Automatically lists directory contents on 'cd'.
+zmodule junegunn/fzf                     # The core fuzzy finder utility.
+zmodule gretzky/auto-color-ls            # Automatically enables color for 'ls' and handles aliases.
 
-# Productivity tools
-zmodule MichaelAquilina/zsh-auto-notify       # Desktop notifications for long-running commands
-zmodule laggardkernel/zsh-thefuck             # Command correction utility
-zmodule juanrgon/yadm-zsh                     # YADM (Yet Another Dotfiles Manager) integration
-zmodule djui/alias-tips                       # Command alias tips and reminders
-zmodule junegunn/fzf                          # Fuzzy finder for files and history
+# ----------------------------------------------------------------------------
+# 5. DEVELOPMENT & ENVIRONMENT TOOLS (Conditionally Loaded)
+# ----------------------------------------------------------------------------
+# These modules are loaded only if the corresponding command is found.
 
-# Package management utilities
-(( ${+commands[pacman]} )) && zmodule redxtech/zsh-aur-install  # AUR package installation helper
+# --- Git Integration ---
+if (( ${+commands[git]} )); then
+  zmodule git-info    # Exposes Git repository information to the prompt.
+  # Consider choosing one Git plugin from Oh My Zsh if functionality overlaps.
+  zmodule ohmyzsh/ohmyzsh --source 'plugins/git/git.plugin.zsh'
+  zmodule ohmyzsh/ohmyzsh --source 'plugins/git-auto-fetch/git-auto-fetch.plugin.zsh'
+fi
 
-# Fun additions
-zmodule ahmubashshir/zinsults                 # Fun insults for command mistakes
+# --- Python ---
+if (( ${+commands[python]} )); then
+  zmodule pvenv                                            # Manages Python virtual environments.
+  zmodule MichaelAquilina/zsh-autoswitch-virtualenv      # Automatically switches virtualenvs.
+fi
 
-# ============================================================================
-# Extra Utilities (Conditionally Loaded)
-# ============================================================================
+# --- Other Dev Tools ---
+(( ${+commands[brew]} ))    && zmodule homebrew     # Homebrew integration.
+(( ${+commands[ruby]} ))    && zmodule ruby         # Ruby environment tools.
+(( ${+commands[docker]} ))  && zmodule ohmyzsh/ohmyzsh --source 'plugins/docker/docker.plugin.zsh' --fpath 'plugins/docker'
+(( ${+commands[kubectl]} )) && zmodule ohmyzsh/ohmyzsh --source 'plugins/kubectl/kubectl.plugin.zsh'
+(( ${+commands[mvn]} ))     && zmodule ohmyzsh/ohmyzsh --source 'plugins/mvn/mvn.plugin.zsh'
+(( ${+commands[direnv]} ))  && zmodule direnv       # Loads and unloads environment variables depending on the current directory.
 
-# Load custom functions and aliases
+# ----------------------------------------------------------------------------
+# 6. PRODUCTIVITY & UTILITY TOOLS
+# ----------------------------------------------------------------------------
+# General-purpose tools to improve your workflow.
+
+zmodule MichaelAquilina/zsh-auto-notify     # Sends desktop notifications for long-running commands.
+zmodule laggardkernel/zsh-thefuck           # Corrects errors in your previous console command.
+zmodule djui/alias-tips                     # Reminds you when a command has a shorter alias.
+zmodule ael-code/zsh-colored-man-pages      # Adds color to 'man' pages.
+zmodule zpm-zsh/colorize                    # A lightweight plugin to colorize command output.
+zmodule magic-enter                         # Enhances the 'Enter' key for smarter command execution.
+zmodule ohmyzsh/ohmyzsh --source 'plugins/sudo/sudo.plugin.zsh' # Adds 'sudo' to the command with a double-esc.
+
+# --- Custom & Niche Tools ---
+zmodule juanrgon/yadm-zsh                   # YADM (Yet Another Dotfiles Manager) integration.
+zmodule ssh                                 # SSH helpers and aliases.
+
+# --- AUR Helper for Arch Linux ---
+(( ${+commands[pacman]} )) && zmodule redxtech/zsh-aur-install # AUR installation helper.
+
+# --- Fun Additions ---
+zmodule ahmubashshir/zinsults               # Insults you for typos. Fun, but can be disabled for a micro-optimization.
+
+# --- Custom Local Files ---
 zmodule PatTheMav/zimfw-extras \
     --source 'aliases.zsh' \
     --source 'functions/gif2mp4' \
     --source 'functions/makemp4' \
     --source 'functions/checkpwhash'
 
-# ============================================================================
-# Oh My Zsh Plugin Integration
-# ============================================================================
+# ----------------------------------------------------------------------------
+# 7. SYNTAX HIGHLIGHTING & AUTO-SUGGESTIONS (LOAD LAST)
+# ----------------------------------------------------------------------------
+# These modules are the most performance-critical for the user interface.
+# Loading them at the end ensures the shell is already functional and
+# they just add the final visual layer.
 
-
-# Load Git plugins if git is available
-if (( ${+commands[git]} )); then
-    zmodule ohmyzsh/ohmyzsh --source 'plugins/git/git.plugin.zsh'
-    zmodule ohmyzsh/ohmyzsh --source 'plugins/git-auto-fetch/git-auto-fetch.plugin.zsh'
-fi
-
-# Load kubectl plugin if available
-if (( ${+commands[kubectl]} )); then
-    zmodule ohmyzsh/ohmyzsh --source 'plugins/kubectl/kubectl.plugin.zsh'
-fi
-
-# Load Docker plugin if available
-if (( ${+commands[docker]} )); then
-    zmodule ohmyzsh/ohmyzsh --source 'plugins/docker/docker.plugin.zsh' --fpath 'plugins/docker'
-fi
-
-# Load Maven plugin if available
-if (( ${+commands[mvn]} )); then
-    zmodule ohmyzsh/ohmyzsh --source 'plugins/mvn/mvn.plugin.zsh'
-fi
-
-# Always load sudo plugin (very lightweight)
-zmodule ohmyzsh/ohmyzsh --source 'plugins/sudo/sudo.plugin.zsh'
-
-# ============================================================================
-# Homebrew Integration (Silent Operation)
-# ============================================================================
-
-# if (( ${+commands[brew]} )); then
-#    # Add Homebrew completions and site functions silently
-#    BREW_PREFIX=$(brew --prefix 2>/dev/null)
-#    [[ -d "$BREW_PREFIX/completions/zsh" ]] && zmodule "$BREW_PREFIX/completions/zsh" --fpath .
-#    [[ -d "$BREW_PREFIX/share/zsh/site-functions" ]] && zmodule "$BREW_PREFIX/share/zsh" --fpath "site-functions"
-#    unset BREW_PREFIX
-# fi
-
-# ============================================================================
-# Completions (Enhanced)
-# ============================================================================
-
-zmodule zsh-users/zsh-completions --fpath src   # Additional completions
-zmodule RobSis/zsh-completion-generator          # Dynamic generation of completions
-
-# ============================================================================
-# Final Modules (ALWAYS LOAD LAST for best performance)
-# ============================================================================
-
-# These modules should be loaded last for optimal performance
-zmodule zdharma-continuum/fast-syntax-highlighting  # Advanced syntax highlighting
-zmodule zsh-users/zsh-history-substring-search      # History substring search
-zmodule zsh-users/zsh-autosuggestions               # Command autosuggestions based on history
+zmodule zdharma-continuum/fast-syntax-highlighting  # Fast and feature-rich syntax highlighting.
+zmodule zsh-users/zsh-history-substring-search      # Allows searching history with partial matches.
+zmodule zsh-users/zsh-autosuggestions               # Suggests commands as you type based on history.
