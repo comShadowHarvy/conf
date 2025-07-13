@@ -1,0 +1,42 @@
+//* ---- 💫 https://github.com/JaKooLit 💫 ---- *//
+/* Waybar Modules Extras */
+
+/* This is where you can add Extra Modules you wish. copy.sh will try to restore*/
+/* this file along with the unique configs and styles. */
+/* IMPORTANT, be mindful with , or ". else waybar will not start */
+
+
+// ### IP ADDRESS MODULES ### //
+{
+    // Local IP Address
+    "network#local-ip": {
+    "format": "🏠 {ipaddr}",
+    "tooltip-format": "{ifname} via {gateway}",
+    "on-click": "nm-connection-editor"
+},
+
+    // Public IP Address
+    "custom/public-ip": {
+        "format": "🌍 {}",
+        "exec": "curl -s ifconfig.me",
+        "interval": 3600, // a long interval to avoid spamming the service
+        "tooltip": "Public IP Address"
+    }
+}
+{
+    "custom/asus-profile": {
+        "format": "{} ",
+        "exec": "asusctl profile -p | awk 'NR==2 {print $1}'",
+        "interval": 5,
+        "tooltip": true,
+        "tooltip-format": "Fan Profile: {}. Click to cycle.",
+        "on-click": "~/.config/waybar/scripts/cycle_asus_profile.sh"
+    },
+
+    "custom/asus-fan-speed": {
+        "format": "{} RPM ", //  is a spinning fan icon
+        "exec": "asusctl fan-curve -g | grep 'CPU Fan' | awk '{print $3}'",
+        "interval": 2,
+        "tooltip": false
+    }
+}
