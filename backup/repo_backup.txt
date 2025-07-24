@@ -1,6 +1,6 @@
 # === Sacred Repository Backup Scroll ===
 # Conjured on: Sat May 10 07:37:55 AM EDT 2025
-# Last Full Scan: Sat 28 Jun 2025 08:19:24 AM EDT
+# Last Full Scan: Thu Jul 24 06:46:08 AM EDT 2025
 # Format: repository_url,directory_name
 # This scroll is updated on each run, preserving existing entries.
 
@@ -8,11 +8,13 @@ http://github.com/comShadowHarvy/betterstrap,betterstrap
 http://github.com/comShadowHarvy/conf,conf
 https://github.com/0xb1b1/docker-files,docker-files
 https://github.com/aaronrausch/ascii-weather,ascii-weather
+https://github.com/Abdess/retroarch_system,retroarch_system
 https://github.com/adi1090x/plymouth-themes,plymouth-themes
 https://github.com/alewmoose/2048-in-terminal,2048-in-terminal
 https://github.com/AngelJumbo/lavat,lavat
 https://github.com/Annex-Engineering/klipper_estimator,klipper_estimator
 https://github.com/archcraft-os/archcraft,archcraft
+https://github.com/Ariescyn/EldenRing-Save-Manager,EldenRing-Save-Manager
 https://github.com/augmentcode/augment.vim,augment.vim
 https://github.com/badabing2005/PixelFlasher,PixelFlasher
 https://github.com/basecamp/omakub,omakub
@@ -26,10 +28,12 @@ https://github.com/brenns10/tetris,tetris
 https://github.com/bst04/payloads_flipperZero,payloads_flipperZero
 https://github.com/bytedance/deer-flow,deer-flow
 https://github.com/CedArctic/DigiSpark-Scripts,DigiSpark-Scripts
+https://github.com/ClayAmore/ER-Save-Editor,ER-Save-Editor
 https://github.com/cmang/durdraw,durdraw
 https://github.com/cmatsuoka/figlet,figlet
 https://github.com/comShadowHarvy/Atlas,Atlas
 https://github.com/comShadowHarvy/CollectiveGenius-AutoGPT-Agent-Hub,CollectiveGenius-AutoGPT-Agent-Hub
+https://github.com/cyberrumor/ammo,ammo
 https://github.com/daboynb/linux_scripts,linux_scripts
 https://github.com/dankamongmen/notcurses,notcurses
 https://github.com/dbisu/pico-ducky,pico-ducky
@@ -37,6 +41,8 @@ https://github.com/deepseek-ai/DeepSeek-Coder,DeepSeek-Coder
 https://github.com/dnhkng/GLaDOS,GLaDOS
 https://github.com/Elius94/console-gui-tools,console-gui-tools
 https://github.com/elkowar/eww,eww
+https://github.com/emilianavt/OpenSeeFace,OpenSeeFace
+https://github.com/FalsePhilosopher/badusb,badusb
 https://github.com/felddy/foundryvtt-docker,foundryvtt-docker
 https://github.com/FergusGriggs/20q,20q
 https://github.com/FergusGriggs/Fegaria-Remastered,Fegaria-Remastered
@@ -52,6 +58,7 @@ https://github.com/hacksider/Deep-Live-Cam,Deep-Live-Cam
 https://github.com/hak5/bashbunny-payloads,bashbunny-payloads
 https://github.com/hak5/usbrubberducky-payloads,usbrubberducky-payloads
 https://github.com/Haxxnet/Compose-Examples,Compose-Examples
+https://github.com/I-Am-Jakoby/Flipper-Zero-BadUSB,Flipper-Zero-BadUSB
 https://github.com/JaKooLit/ags_v1.9.0.git,ags_v1.9.0
 https://github.com/JaKooLit/Arch-Hyprland.git,Arch-Hyprland
 https://github.com/JaKooLit/Fedora-Hyprland,Fedora-Hyprland
@@ -66,10 +73,12 @@ https://github.com/lockfale/osint-framework,osint-framework
 https://github.com/loxsmoke/stakeholder.git,stakeholder
 https://github.com/M4444/TMatrix,TMatrix
 https://github.com/magiblot/tvision,tvision
+https://github.com/MarkCyber/BadUSB,BadUSB
 https://github.com/mcarvalho1/Simple-NerdFonts-Downloader,Simple-NerdFonts-Downloader
 https://github.com/meh/rust-terminfo,rust-terminfo
 https://github.com/mharjac/bad_ducky,bad_ducky
 https://github.com/mrjones2014/smart-splits.nvim,smart-splits.nvim
+https://github.com/myshell-ai/OpenVoice,OpenVoice
 https://github.com/neomutt/neomutt,neomutt
 https://github.com/Next-Flip/Momentum-Firmware.git,Momentum-Firmware
 https://github.com/nielssp/csol,csol
@@ -81,7 +90,10 @@ https://github.com/Robitx/gp.nvim,gp.nvim
 https://github.com/rothgar/awesome-tmux,awesome-tmux
 https://github.com/rtcox/Terminal-Weather-Radar/,Terminal-Weather-Radar
 https://github.com/salman-abedin/devour/,devour
+https://github.com/searxng/searxng-docker.git,searxng-docker
+https://github.com/searxng/searxng.git,searxn
 https://github.com/searxng/searxng,searxng
+https://github.com/SelinaDev/Godot-Roguelike-Tutorial,Godot-Roguelike-Tutorial
 https://github.com/sherlock-project/sherlock,sherlock
 https://github.com/SickChill/sickchill,sickchill
 https://github.com/Significant-Gravitas/AutoGPT,AutoGPT
@@ -93,6 +105,7 @@ https://github.com/TheFes/HA-configuration,HA-configuration
 https://github.com/TheTumultuousUnicornOfDarkness/CPU-X,CPU-X
 https://github.com/tmux-plugins/tmux-sensible,tmux-sensible
 https://github.com/tmux-plugins/tpm,tpm
+https://github.com/UberGuidoZ/Flipper,Flipper
 https://github.com/valoq/bwscripts,bwscripts
 https://github.com/VandalByte/dedsec-grub2-theme,dedsec-grub2-theme
 https://github.com/xero/figlet-fonts,figlet-fonts
