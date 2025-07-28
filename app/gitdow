@@ -1,306 +1,403 @@
 #!/bin/bash
 # ===----------------------------------------===
-#     The Fantastical Repo Grabber 5000
+#      The Fantastical Repo Grabber 9001
 # ===----------------------------------------===
 # Author: ShadowHarvy (The Code Conjurer)
-# Version: 2.1 (More Robust, More Insightful, Still Sassy!)
+# Version: 3.0 (The Many-Faced Mod)
 #
-# Purpose: Reads a ridiculously formatted backup file and
-#          magically clones or updates repositories. Now with
-#          smarter parsing, dirty repo checks, and detailed updates.
+# Purpose: Reads a backup file and magically clones or
+#          updates repositories, now with selectable
+#          personalities for a more... interesting experience.
 #
 # Usage:
-#   ./repo_downloader_script.sh
-#   (Make sure repo_backup.txt exists where expected!)
+#   ./repo_grabber_script.sh [options]
 #
-# Notes:
-#   - Expects repo_backup.txt in ~/backup/
-#   - Prefers ~/git/, falls back to ~/development/
-#   - If it breaks, you probably looked at it wrong. Or maybe I did.
+# Options:
+#   -p <persona>  Choose a personality: wizard, glados, dm.
+#                 If omitted, a random one is chosen.
+#   -h            Show this help message.
+
+# --- Strict Mode & Safety First ---
+set -euo pipefail
 
 # --- Configuration ---
-# Set to 1 if you hate fun and want to skip the loading theatrics.
-SKIP_THEATRICS=0
-# How long (seconds) should the mini-loader between repos run?
-INTER_REPO_DELAY=1.0 # Slightly shorter for potentially faster runs
-# Git pull options. Default to --quiet. Set to "" for verbose pull.
-GIT_PULL_OPTIONS="--quiet"
-
-# --- Functions ---
-
-# Function for the initial dramatic loading sequence
-initial_loader() {
-  if [ "$SKIP_THEATRICS" -eq 1 ]; then
-    echo "[!] Skipping initial theatrics. Fine, be that way."
-    return
-  fi
-
-  echo ""
-  echo -n " [*] Firing up the clone engines "
-  spinner=('▹▹▹▹▹' '▸▹▹▹▹' '▹▸▹▹▹' '▹▹▸▹▹' '▹▹▹▸▹' '▹▹▹▹▸')
-  for i in {1..20}; do
-    echo -ne "\r [*] Firing up the clone engines ${spinner[i % ${#spinner[@]}]}"
-    sleep 0.2
-  done
-  echo -e "\r [*] Firing up the clone engines... ENGAGED!      "
-
-  echo ""
-  echo " [*] Consulting the sacred backup scroll..."
-  sleep 0.7
-  echo -n " ["
-  for i in {1..25}; do
-    echo -n "#"
-    sleep 0.05
-  done
-  echo -n "] "
-  echo "SCROLL DECIPHERED!"
-  sleep 0.5
-  echo ""
-  echo " [*] Aligning download vectors..."
-  sleep 0.8
-  echo " [*] Brace yourself, the repos are coming!"
-  sleep 0.5
-  echo ""
-}
-
-# Function for the mini-loader between repositories
-inter_repo_loader() {
-  if [ "$SKIP_THEATRICS" -eq 1 ]; then
-    sleep 0.1 # Tiny pause even when skipping
-    return
-  fi
-
-  local duration=${1:-$INTER_REPO_DELAY}
-  local interval=0.15
-  local steps=$(printf "%.0f" "$(echo "$duration / $interval" | bc -l)")
-  local loader_chars=('.' 'o' 'O' 'o')
-
-  echo -n "   -> Taking a dramatic pause"
-  for i in $(seq 1 $steps); do
-    echo -n "${loader_chars[i % ${#loader_chars[@]}]}"
-    sleep $interval
-    echo -ne "\b"
-  done
-  echo -ne "\r                                        \r" # Clear the line
-}
-
-# Function to print fancy section headers
-print_header() {
-  echo ""
-  echo "---=== $1 ===---"
-}
-
-# --- Title Screen ---
-clear
-echo "===================================================================="
-echo "  _____                     _____                               _            "
-echo " |  __ \                   |  __ \                             | |           "
-echo " | |__) |___ _ __ ___ ___  | |__) |___   _____ _ __   | | ___  __ _ ___ ___ "
-echo " |  _  // _ \ '_ \ / _ \ __|  _  // _ \ / / _ \ '__|  |/ _ \/ _\` / __/ __|"
-echo " | | \ \  __/ |_) | (_) |___ \ | \ \ (_) | V /  __/ |   | |  __/ (_| \__ \__ \\"
-echo " |_|  \_\___| .__/ \___/    |_|  \_\___/ \_/ \___|_|   |_|\___|\__,_|___/___/"
-echo "             | |                                                            "
-echo "             |_|      The Fantastical Repo Grabber 5000 (v2.1)              "
-echo "                           Created by: ShadowHarvy                          "
-echo "===================================================================="
-
-# --- Initialization ---
-initial_loader
-
-# --- Directory Setup ---
-HOME_DIR="$HOME"
-GIT_DIR="$HOME_DIR/git"
-DEV_DIR="$HOME_DIR/development"
-BACKUP_DIR="$HOME_DIR/backup"
+BACKUP_DIR="$HOME/backup"
 BACKUP_FILE="$BACKUP_DIR/repo_backup.txt"
+# Directories to try, in order of preference.
+PREFERRED_DIRS=(
+  "$HOME/git"
+  "$HOME/development"
+)
+SKIP_THEATRICS=0
+INTER_REPO_DELAY=0.5
 
-print_header "Locating Sacred Texts & Lairs"
-
-# Check if backup file exists
-if [ ! -f "$BACKUP_FILE" ]; then
-  echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-  echo "!! Error: The sacred backup scroll ($BACKUP_FILE) is MISSING! !!"
-  echo "!! Did you offer it to the cat? Aborting mission.           !!"
-  echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-  exit 1
+# --- Colors & Styles ---
+if [ -t 1 ]; then
+  C_RESET='\033[0m' C_BOLD='\033[1m' C_RED='\033[0;31m' C_GREEN='\033[0;32m'
+  C_YELLOW='\033[0;33m' C_BLUE='\033[0;34m' C_PURPLE='\033[0;35m' C_CYAN='\033[0;36m'
 else
-  echo " -> Backup scroll located: $BACKUP_FILE (Phew!)"
+  C_RESET='' C_BOLD='' C_RED='' C_GREEN='' C_YELLOW='' C_BLUE='' C_PURPLE='' C_CYAN=''
 fi
 
-# Determine which directory to use for repositories
-REPO_BASE_DIR="" # Initialize REPO_BASE_DIR
-if [ -d "$GIT_DIR" ]; then
-  REPO_BASE_DIR="$GIT_DIR"
-  echo " -> Found preferred lair for repositories: $REPO_BASE_DIR"
-elif [ -d "$DEV_DIR" ]; then
-  REPO_BASE_DIR="$DEV_DIR"
-  echo " -> Preferred lair ($GIT_DIR) not found. Using backup lair: $REPO_BASE_DIR"
-else
-  REPO_BASE_DIR="$GIT_DIR" # Defaulting to create ~/git/
-  echo " -> No suitable lair found. Will conjure one at: $REPO_BASE_DIR"
-fi
-
-# Check if repository base directory exists, create if not
-if [ ! -d "$REPO_BASE_DIR" ]; then
-  echo " -> Conjuring repository lair: $REPO_BASE_DIR"
-  mkdir -p "$REPO_BASE_DIR" || {
-    echo "!! Failed to conjure lair! Do you have the magic permissions?"
-    exit 1
-  }
-fi
-
-# --- Repository Processing ---
-print_header "Initiating The Great Git Grab"
-
-# Counters
-processed_backup_lines_count=0
-valid_repo_entries_count=0
+# --- Global State & Persona Text ---
+declare -A TEXT # This will hold the text for the chosen persona
 cloned_count=0
-update_attempts_made_count=0
 successful_pulls_count=0
 actual_commits_pulled_count=0
 skipped_dirty_repo_count=0
 failed_clone_count=0
 failed_pull_count=0
-failed_cd_count=0
 skipped_non_git_conflict_count=0
-skipped_header_comment_lines=0
 
-# Read the backup file line by line
-while IFS= read -r line || [[ -n "$line" ]]; do
-  processed_backup_lines_count=$((processed_backup_lines_count + 1))
+# --- Functions ---
 
-  # Trim leading/trailing whitespace from the whole line first
-  trimmed_line=$(echo "$line" | xargs)
+print_usage() {
+  cat <<EOF
+Usage: $0 [options]
 
-  # Skip empty lines or lines starting with #
-  if [[ -z "$trimmed_line" || "$trimmed_line" == \#* ]]; then
-    skipped_header_comment_lines=$((skipped_header_comment_lines + 1))
-    continue
+The Fantastical Repo Grabber 9001
+
+Options:
+  -p <persona>  Choose a personality. Available: wizard, glados, dm.
+                If this option is omitted, a random one is chosen.
+  -h            Show this help message and exit.
+EOF
+}
+
+# Loads the text strings for the selected personality.
+setup_persona() {
+  local choice="${1:-}"
+  local personas=("wizard" "glados" "dm")
+
+  if [ -z "$choice" ]; then
+    choice=${personas[$((RANDOM % ${#personas[@]}))]}
+    printf "${C_YELLOW}No persona specified. The fates have chosen: ${C_BOLD}%s${C_RESET}\n" "$choice"
+    sleep 1
   fi
 
-  # Now parse the valid line
-  repo_url=$(echo "$trimmed_line" | cut -d',' -f1 | xargs)
-  repo_name=$(echo "$trimmed_line" | cut -d',' -f2- | xargs) # Handle names with commas if any
+  # --- Persona Text Definitions ---
+  declare -A WIZARD_TEXT=(
+    [title]="The Fantastical Repo Grabber 9001"
+    [author]="Crafted by: ShadowHarvy, the Code Conjurer"
+    [intro_start]="Firing up the clone engines"
+    [intro_online]="Firing up the clone engines... ENGAGED!"
+    [intro_scroll]="Consulting the sacred backup scroll..."
+    [intro_deciphered]="SCROLL DECIPHERED!"
+    [intro_commence]="Brace yourself, the repos are coming!"
+    [setup_header]="Locating Sacred Texts & Lairs"
+    [scroll_missing]="Error: The sacred backup scroll (%s) is MISSING! Aborting mission."
+    [scroll_found]="Backup scroll located: %s (Phew!)"
+    [lair_preference]="Found preferred lair for repositories: %s"
+    [lair_fallback]="Preferred lair not found. Using backup lair: %s"
+    [lair_conjure]="No suitable lair found. Will conjure one at: %s"
+    [grab_header]="Initiating The Great Git Grab"
+    [processing_entry]="Processing Entry #%s: URL '%s'"
+    [name_deduced]="Hmm, no name provided. Deduced name: '%s'. Clever, right?"
+    [name_provided]="Provided Name: '%s'"
+    [repo_exists]="Aha! '%s' already exists at '%s'."
+    [repo_dirty]="WARNING: Repo '%s' has uncommitted changes. Skipping pull to avoid conflicts."
+    [update_attempt]="Attempting a tactical update..."
+    [pull_success]="Update command successful for '%s'."
+    [new_commits]="Fetched new commits for '%s'! Magnificent."
+    [already_updated]="Already up-to-date, or no new remote changes."
+    [pull_fail]="WARNING: 'git pull' for '%s' encountered issues. Check manually!"
+    [path_conflict]="WARNING: '%s' exists but doesn't look like a git repo. Skipping clone to avoid conflict."
+    [cloning_new]="New target detected! Preparing to clone '%s'..."
+    [clone_success]="Clone successful! One more treasure acquired."
+    [clone_fail]="ERROR: Failed to clone '%s'. Is the URL correct? Do you have access?"
+    [debrief_header]="Mission Debriefing (Run: $(date))"
+    [debrief_conclusion]="Flawless execution! All accounted for according to the scroll. Time for a coffee. 😎"
+  )
 
-  # Double check if repo_url is empty after parsing (e.g. line was just a comma)
-  if [[ -z "$repo_url" ]]; then
-    echo " -> Skipping malformed line (empty URL): $trimmed_line"
-    # This could be a new counter for malformed_lines if desired
-    continue
-  fi
+  declare -A GLADOS_TEXT=(
+    [title]="Aperture Science Specimen Acquisition System"
+    [author]="'For a better tomorrow, tomorrow.'"
+    [intro_start]="Powering up the Material Replication Device"
+    [intro_online]="Material Replication Device... ONLINE."
+    [intro_scroll]="Accessing acquisition manifest..."
+    [intro_deciphered]="MANIFEST PARSED."
+    [intro_commence]="Prepare for specimen delivery. It will be... educational."
+    [setup_header]="Preparing Specimen Containment Area"
+    [scroll_missing]="FATAL ERROR: Acquisition manifest (%s) not found. The operation is a failure."
+    [scroll_found]="Acquisition manifest located: %s"
+    [lair_preference]="Primary containment area located: %s"
+    [lair_fallback]="Primary containment unavailable. Using secondary containment: %s"
+    [lair_conjure]="No containment area found. Fabricating one at: %s"
+    [grab_header]="Commencing Specimen Acquisition"
+    [processing_entry]="Processing Manifest Item #%s: Source '%s'"
+    [name_deduced]="No designation provided. Assigning designation: '%s'."
+    [name_provided]="Designation: '%s'"
+    [repo_exists]="Specimen '%s' is already in containment at '%s'."
+    [repo_dirty]="WARNING: Specimen '%s' has been... altered. Halting synchronization to prevent contamination."
+    [update_attempt]="Synchronizing with remote specimen data..."
+    [pull_success]="Synchronization successful for '%s'."
+    [new_commits]="New data acquired for specimen '%s'."
+    [already_updated]="Specimen is already up to date with remote data."
+    [pull_fail]="WARNING: Synchronization for '%s' failed. The data may be corrupted."
+    [path_conflict]="WARNING: A non-specimen entity occupies the designated containment unit '%s'. Skipping."
+    [cloning_new]="New specimen detected. Initiating replication of '%s'..."
+    [clone_success]="Replication successful. Specimen is now in containment."
+    [clone_fail]="ERROR: Replication of '%s' failed. The source may be unstable."
+    [debrief_header]="Post-Acquisition Analysis (Date: $(date))"
+    [debrief_conclusion]="All tests are complete. You have been an adequate test subject. Mostly."
+  )
 
-  valid_repo_entries_count=$((valid_repo_entries_count + 1))
-  echo "" # Add space before processing next repo
-  echo "Processing Entry #$valid_repo_entries_count: URL '$repo_url'"
+  declare -A DM_TEXT=(
+    [title]="The Tome of Summoning"
+    [author]="As told by the Dungeon Master"
+    [intro_start]="The summoning circle begins to glow"
+    [intro_online]="The summoning circle is active... The portal opens!"
+    [intro_scroll]="Reading from the scroll of ancient pacts..."
+    [intro_deciphered]="THE PACTS ARE UNDERSTOOD!"
+    [intro_commence]="Stand back! The summoning is about to begin!"
+    [setup_header]="Preparing the Summoning Chamber"
+    [scroll_missing]="Catastrophe! The scroll of pacts (%s) has been lost! The ritual cannot proceed."
+    [scroll_found]="The ancient scroll is in hand: %s"
+    [lair_preference]="The primary summoning circle is ready at: %s"
+    [lair_fallback]="The primary circle is unstable. The ritual will be held at: %s"
+    [lair_conjure]="No summoning circle exists. One is being hastily drawn at: %s"
+    [grab_header]="The Grand Summoning"
+    [processing_entry]="Reading Pact #%s: True Name '%s'"
+    [name_deduced]="A name was not provided. Scrying reveals its local moniker: '%s'."
+    [name_provided]="It shall be known as: '%s'"
+    [repo_exists]="The entity '%s' has already been summoned to '%s'."
+    [repo_dirty]="WARNING: The entity '%s' is in a state of flux! Reinforcing the binding wards and pausing the ritual."
+    [update_attempt]="Attempting to strengthen the connection to the outer plane..."
+    [pull_success]="The connection to '%s' has been reinforced."
+    [new_commits]="New secrets have been whispered from the outer plane for '%s'."
+    [already_updated]="The entity is already in perfect harmony with its plane."
+    [pull_fail]="WARNING: The connection to '%s' wavered! The ritual was unstable."
+    [path_conflict]="WARNING: Something already occupies the summoning circle at '%s'. The ritual is blocked."
+    [cloning_new]="A new pact is being fulfilled. Summoning '%s'..."
+    [clone_success]="The summoning was a success! The entity is bound."
+    [clone_fail]="ERROR: The summoning of '%s' failed! The pact was rejected or the name is false."
+    [debrief_header]="The Aftermath (Recorded: $(date))"
+    [debrief_conclusion]="The ritual is complete. The summoned entities are stable... for now. Well done, adventurers."
+  )
 
-  # If repo_name is empty in the file, extract it from the URL
-  if [ -z "$repo_name" ]; then
-    repo_name=$(basename "$repo_url" .git)
-    echo "   -> Hmm, no name provided. Deduced name: '$repo_name'. Clever, right?"
+  case "$choice" in
+  wizard) for k in "${!WIZARD_TEXT[@]}"; do TEXT["$k"]="${WIZARD_TEXT[$k]}"; done ;;
+  glados) for k in "${!GLADOS_TEXT[@]}"; do TEXT["$k"]="${GLADOS_TEXT[$k]}"; done ;;
+  dm) for k in "${!DM_TEXT[@]}"; do TEXT["$k"]="${DM_TEXT[$k]}"; done ;;
+  *)
+    printf "${C_RED}Error: Unknown persona '%s'.${C_RESET}\n" "$choice"
+    print_usage
+    exit 1
+    ;;
+  esac
+}
+
+print_header() {
+  printf "\n${C_BOLD}${C_PURPLE}---=== %s ===---${C_RESET}\n" "$1"
+}
+
+initial_loader() {
+  if [ "$SKIP_THEATRICS" -eq 1 ]; then return; fi
+  printf "\n"
+  local spinner=('▹▹▹▹▹' '▸▹▹▹▹' '▹▸▹▹▹' '▹▹▸▹▹' '▹▹▹▸▹' '▹▹▹▹▸')
+  for i in {1..20}; do
+    printf "\r ${C_CYAN}[*] %s ${spinner[i % ${#spinner[@]}]}${C_RESET}" "${TEXT[intro_start]}"
+    sleep 0.2
+  done
+  printf "\r ${C_GREEN}[*] %s      ${C_RESET}\n\n" "${TEXT[intro_online]}"
+  printf " ${C_CYAN}[*] %s${C_RESET}\n" "${TEXT[intro_scroll]}"
+  sleep 0.7
+  printf " [*] %s\n" "${TEXT[intro_deciphered]}"
+  sleep 0.5
+  printf " ${C_GREEN}[*] %s${C_RESET}\n" "${TEXT[intro_commence]}"
+  sleep 0.5
+}
+
+# --- Main Execution Logic ---
+main() {
+  local persona_choice=""
+  while getopts ":p:h" opt; do
+    case $opt in
+    p) persona_choice="$OPTARG" ;;
+    h)
+      print_usage
+      exit 0
+      ;;
+    \?)
+      printf "Invalid option: -$OPTARG\n" >&2
+      print_usage
+      exit 1
+      ;;
+    esac
+  done
+
+  setup_persona "$persona_choice"
+
+  clear
+  cat <<EOF
+====================================================================
+${TEXT[title]}
+${TEXT[author]}
+====================================================================
+EOF
+
+  initial_loader
+
+  print_header "${TEXT[setup_header]}"
+
+  if [ ! -f "$BACKUP_FILE" ]; then
+    printf "${C_RED}"
+    printf "${TEXT[scroll_missing]}" "$BACKUP_FILE"
+    printf "${C_RESET}\n"
+    exit 1
   else
-    echo "   -> Provided Name: '$repo_name'"
+    printf " -> "
+    printf "${TEXT[scroll_found]}" "$BACKUP_FILE"
+    printf "\n"
   fi
 
-  TARGET_DIR="$REPO_BASE_DIR/$repo_name"
+  local REPO_BASE_DIR=""
+  for dir in "${PREFERRED_DIRS[@]}"; do
+    if [ -d "$dir" ]; then
+      REPO_BASE_DIR="$dir"
+      printf " -> "
+      printf "${TEXT[lair_preference]}" "$REPO_BASE_DIR"
+      printf "\n"
+      break
+    fi
+  done
 
-  # Check if the repository directory already exists
-  if [ -d "$TARGET_DIR/.git" ]; then # Check for .git dir for robustness
-    echo "   -> Aha! '$repo_name' already exists at '$TARGET_DIR'."
-    update_attempts_made_count=$((update_attempts_made_count + 1))
-
-    # Stash current PWD to return to, robustly
-    local PUSHD_PROJECT_DIR=0
-    pushd "$TARGET_DIR" >/dev/null 2>&1 || {
-      echo "   !! ERROR: Couldn't warp into '$TARGET_DIR'. Skipping update."
-      failed_cd_count=$((failed_cd_count + 1))
-      inter_repo_loader "$INTER_REPO_DELAY"
-      continue # Skip to next repo in the backup file
-    }
-    PUSHD_PROJECT_DIR=1
-
-    # Check for uncommitted changes ("dirty" working directory)
-    if ! git diff-index --quiet HEAD --; then
-      echo "   !! WARNING: Repo '$repo_name' has uncommitted changes. Skipping pull to avoid conflicts."
-      skipped_dirty_repo_count=$((skipped_dirty_repo_count + 1))
+  if [ -z "$REPO_BASE_DIR" ]; then
+    if [ -d "${PREFERRED_DIRS[1]}" ]; then
+      REPO_BASE_DIR="${PREFERRED_DIRS[1]}"
+      printf " -> "
+      printf "${TEXT[lair_fallback]}"
+      printf "\n"
     else
-      echo "   -> Attempting a tactical update (git pull ${GIT_PULL_OPTIONS:-[verbose]})..."
-      current_hash=$(git rev-parse HEAD 2>/dev/null) # Get hash before pull
+      REPO_BASE_DIR="${PREFERRED_DIRS[0]}"
+      printf " -> "
+      printf "${TEXT[lair_conjure]}" "$REPO_BASE_DIR"
+      printf "\n"
+    fi
+  fi
 
-      # shellcheck disable=SC2086 # We want word splitting for GIT_PULL_OPTIONS
-      if git pull $GIT_PULL_OPTIONS; then
-        echo "   -> Update command successful for '$repo_name'."
-        successful_pulls_count=$((successful_pulls_count + 1))
-        new_hash=$(git rev-parse HEAD 2>/dev/null) # Get hash after pull
+  if [ ! -d "$REPO_BASE_DIR" ]; then
+    mkdir -p "$REPO_BASE_DIR"
+  fi
 
-        if [ -n "$new_hash" ] && [ "$current_hash" != "$new_hash" ]; then
-          echo "      -> Fetched new commits for '$repo_name'! Magnificent."
-          actual_commits_pulled_count=$((actual_commits_pulled_count + 1))
-        elif [ -n "$new_hash" ]; then # Hashes are same, or current_hash was empty (newly initialized repo)
-          echo "      -> Already up-to-date, or no new remote changes."
-        else # new_hash is empty, pull might have cleared an empty repo or other oddity
-          echo "      -> Repo state after pull is unusual (no commits found). Check manually."
-        fi
+  print_header "${TEXT[grab_header]}"
+
+  local valid_repo_entries_count=0
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    local trimmed_line
+    trimmed_line=$(echo "$line" | xargs)
+
+    if [[ -z "$trimmed_line" || "$trimmed_line" == \#* ]]; then
+      continue
+    fi
+
+    local repo_url
+    repo_url=$(echo "$trimmed_line" | cut -d',' -f1 | xargs)
+    local repo_name
+    repo_name=$(echo "$trimmed_line" | cut -d',' -f2- | xargs)
+
+    if [[ -z "$repo_url" ]]; then
+      continue
+    fi
+
+    valid_repo_entries_count=$((valid_repo_entries_count + 1))
+    printf "\n"
+    printf "${C_CYAN}"
+    printf "${TEXT[processing_entry]}" "$valid_repo_entries_count" "$repo_url"
+    printf "${C_RESET}\n"
+
+    if [ -z "$repo_name" ]; then
+      repo_name=$(basename "$repo_url" .git)
+      printf "   -> "
+      printf "${TEXT[name_deduced]}" "$repo_name"
+      printf "\n"
+    else
+      printf "   -> "
+      printf "${TEXT[name_provided]}" "$repo_name"
+      printf "\n"
+    fi
+
+    local TARGET_DIR="$REPO_BASE_DIR/$repo_name"
+
+    if [ -d "$TARGET_DIR/.git" ]; then
+      printf "   -> "
+      printf "${TEXT[repo_exists]}" "$repo_name" "$TARGET_DIR"
+      printf "\n"
+
+      if ! pushd "$TARGET_DIR" >/dev/null; then continue; fi
+
+      if ! git diff-index --quiet HEAD --; then
+        printf "   ${C_YELLOW}"
+        printf "${TEXT[repo_dirty]}" "$repo_name"
+        printf "${C_RESET}\n"
+        skipped_dirty_repo_count=$((skipped_dirty_repo_count + 1))
       else
-        echo "   !! WARNING: 'git pull' for '$repo_name' encountered issues. Check manually!"
-        failed_pull_count=$((failed_pull_count + 1))
+        printf "   -> %s\n" "${TEXT[update_attempt]}"
+        local current_hash
+        current_hash=$(git rev-parse HEAD 2>/dev/null)
+
+        if git pull --quiet; then
+          printf "   -> "
+          printf "${TEXT[pull_success]}" "$repo_name"
+          printf "\n"
+          successful_pulls_count=$((successful_pulls_count + 1))
+          local new_hash
+          new_hash=$(git rev-parse HEAD 2>/dev/null)
+          if [ "$current_hash" != "$new_hash" ]; then
+            printf "      -> ${C_GREEN}"
+            printf "${TEXT[new_commits]}" "$repo_name"
+            printf "${C_RESET}\n"
+            actual_commits_pulled_count=$((actual_commits_pulled_count + 1))
+          else
+            printf "      -> %s\n" "${TEXT[already_updated]}"
+          fi
+        else
+          printf "   ${C_YELLOW}"
+          printf "${TEXT[pull_fail]}" "$repo_name"
+          printf "${C_RESET}\n"
+          failed_pull_count=$((failed_pull_count + 1))
+        fi
       fi
-    fi # End of dirty check
-
-    if [ "$PUSHD_PROJECT_DIR" -eq 1 ]; then
-      popd >/dev/null 2>&1 || echo "!! WARN: popd failed from $TARGET_DIR, but continuing."
-    fi
-
-  elif [ -e "$TARGET_DIR" ]; then
-    # Target exists but isn't a git repo (or .git is missing)
-    echo "   !! WARNING: '$TARGET_DIR' exists but doesn't look like a git repo. Skipping clone to avoid conflict."
-    skipped_non_git_conflict_count=$((skipped_non_git_conflict_count + 1))
-  else
-    echo "   -> New target detected! Preparing to clone '$repo_name'..."
-    echo "   -> Target location: '$TARGET_DIR'"
-    # shellcheck disable=SC2086 # We want word splitting for GIT_PULL_OPTIONS (though not used in clone)
-    if git clone "$repo_url" "$TARGET_DIR"; then
-      echo "   -> Clone successful! One more treasure acquired."
-      cloned_count=$((cloned_count + 1))
+      popd >/dev/null
+    elif [ -e "$TARGET_DIR" ]; then
+      printf "   ${C_YELLOW}"
+      printf "${TEXT[path_conflict]}" "$TARGET_DIR"
+      printf "${C_RESET}\n"
+      skipped_non_git_conflict_count=$((skipped_non_git_conflict_count + 1))
     else
-      echo "   !! ERROR: Failed to clone '$repo_url'. Is the URL correct? Do you have access?"
-      failed_clone_count=$((failed_clone_count + 1))
+      printf "   -> "
+      printf "${TEXT[cloning_new]}" "$repo_name"
+      printf "\n"
+      if git clone "$repo_url" "$TARGET_DIR" --quiet; then
+        printf "   -> ${C_GREEN}"
+        printf "${TEXT[clone_success]}"
+        printf "${C_RESET}\n"
+        cloned_count=$((cloned_count + 1))
+      else
+        printf "   ${C_RED}"
+        printf "${TEXT[clone_fail]}" "$repo_url"
+        printf "${C_RESET}\n"
+        failed_clone_count=$((failed_clone_count + 1))
+      fi
     fi
-  fi
+    sleep "$INTER_REPO_DELAY"
+  done <"$BACKUP_FILE"
 
-  inter_repo_loader "$INTER_REPO_DELAY" # Run the mini-loader between repos
-done <"$BACKUP_FILE"                    # Read directly from the backup file
+  print_header "${TEXT[debrief_header]}"
+  printf "Repository Operations:\n"
+  printf "  - Freshly Cloned:                 %s\n" "$cloned_count"
+  printf "  - Successful 'git pull' cmds:     %s\n" "$successful_pulls_count"
+  printf "  - Repos with New Commits Pulled:  %s\n" "$actual_commits_pulled_count"
+  printf "\nSkipped/Failed Operations:\n"
+  printf "  - Skipped (Dirty Local Changes):  %s\n" "$skipped_dirty_repo_count"
+  printf "  - Skipped (Path Conflict/Not Git):%s\n" "$skipped_non_git_conflict_count"
+  printf "  - Failed Clones:                  %s\n" "$failed_clone_count"
+  printf "  - Failed Pulls (after attempt):   %s\n" "$failed_pull_count"
+  printf "\n"
+  printf "${TEXT[debrief_conclusion]}\n\n"
+}
 
-# --- Final Summary ---
-print_header "Mission Debriefing (Run: $(date))"
-echo "The Great Git Grab has concluded."
-echo "Scroll Stats:"
-echo "  - Lines Read from Backup Scroll:    $processed_backup_lines_count"
-echo "  - Skipped Header/Comment Lines:   $skipped_header_comment_lines"
-echo "  - Valid Repository Entries Found:   $valid_repo_entries_count"
-echo ""
-echo "Repository Operations:"
-echo "  - Freshly Cloned:                 $cloned_count"
-echo "  - Update Attempts on Existing:    $update_attempts_made_count"
-echo "    - Successful 'git pull' cmds:   $successful_pulls_count"
-echo "    - Repos with New Commits Pulled:$actual_commits_pulled_count"
-echo ""
-echo "Skipped/Failed Operations:"
-echo "  - Skipped (Dirty Local Changes):  $skipped_dirty_repo_count"
-echo "  - Skipped (Path Conflict/Not Git):$skipped_non_git_conflict_count"
-echo "  - Failed Clones:                  $failed_clone_count"
-echo "  - Failed Pulls (after attempt):   $failed_pull_count"
-echo "  - Failed 'cd' into Repo Dir:    $failed_cd_count"
-echo ""
+# --- Script Entry Point ---
+main "$@"
 
-total_issues=$((skipped_dirty_repo_count + skipped_non_git_conflict_count + failed_clone_count + failed_pull_count + failed_cd_count))
-
-if [ $total_issues -gt 0 ]; then
-  echo "Looks like there were some hiccups ($total_issues total issues/skips). Might wanna check the logs, boss."
-elif [ $valid_repo_entries_count -eq 0 ]; then
-  echo "The backup scroll seems to be empty of valid repository entries. Nothing to grab!"
-else
-  echo "Flawless execution! All accounted for according to the scroll. Time for a coffee. 😎"
-fi
-echo ""
 exit 0

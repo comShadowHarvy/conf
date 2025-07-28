@@ -1,355 +1,412 @@
 #!/bin/bash
-# ===----------------------------------------===
-#     The Grand Repo Wrangler & Backupinator
-# ===----------------------------------------===
+# ===--------------------------------------------------===
+#      The Grand Repo Wrangler & Backupinator 9001
+# ===--------------------------------------------------===
 # Author: ShadowHarvy (The Git Whisperer)
-# Version: 1.1 (Incremental Backup & Update Tracking!)
+# Version: 3.3 (Final Bug Hunt Edition)
 #
-# Purpose: Scours the known realms (~/git, ~/development) for
-#          git repositories, bravely attempts to update them,
-#          and meticulously scribes their details onto a backup scroll.
-#          The scroll is now incremental, preserving known lore.
-#          Tracks new repos added and actual updates pulled.
+# Purpose: Scours configured realms for git repositories,
+#          bravely attempts to update them, and meticulously
+#          scribes their details onto a backup scroll.
+#          Now with selectable personalities for varied flavor!
 #
 # Usage:
-#   ./repo_manager_script.sh
-#   (It *will* create directories and a backup file if needed.)
+#   ./repo_manager_script_v3.sh [options]
 #
-# Notes:
-#   - Creates ~/git, ~/development, ~/backup if they're missing.
-#   - Updates ~/backup/repo_backup.txt: preserves existing entries, adds new ones.
-#   - If git pull fails, it just kinda shrugs and moves on. Handle with care.
+# Options:
+#   -p <persona>  Choose a personality: wizard, glados, dm.
+#                 If omitted, a random one is chosen.
+#   -h            Show this help message.
+
+# --- Strict Mode & Safety First ---
+set -euo pipefail
 
 # --- Configuration ---
-# Set to 1 if you despise joy and want to skip the loading spectacle.
+SEARCH_DIRS=(
+  "$HOME/git"
+  "$HOME/development"
+)
+BACKUP_DIR="$HOME/backup"
+BACKUP_FILE="$BACKUP_DIR/repo_backup.txt"
 SKIP_THEATRICS=0
-# How long (seconds) should the mini-loader between repos pretend to work?
-INTER_REPO_DELAY=0.5 # Shortened for potentially many repos and faster overall run
+INTER_REPO_DELAY=0.2
+
+# --- Colors & Styles ---
+if [ -t 1 ]; then
+  C_RESET='\033[0m' C_BOLD='\033[1m' C_RED='\033[0;31m' C_GREEN='\033[0;32m'
+  C_YELLOW='\033[0;33m' C_BLUE='\033[0;34m' C_PURPLE='\033[0;35m' C_CYAN='\033[0;36m'
+else
+  C_RESET='' C_BOLD='' C_RED='' C_GREEN='' C_YELLOW='' C_BLUE='' C_PURPLE='' C_CYAN=''
+fi
+
+# --- Global State & Persona Text ---
+declare -A SCROLL_ENTRIES
+declare -A TEXT # This will hold the text for the chosen persona
+REPOS_NEWLY_ADDED=0
+REPOS_WITH_UPDATES=0
+repo_count=0
+skipped_count=0
 
 # --- Functions ---
 
-# Function for the initial dramatic loading sequence
-initial_loader() {
-  if [ "$SKIP_THEATRICS" -eq 1 ]; then
-    echo "[!] Skipping initial theatrics. Your loss."
-    return
+print_usage() {
+  cat <<EOF
+Usage: $0 [options]
+
+The Grand Repo Wrangler & Backupinator 9001
+
+Options:
+  -p <persona>  Choose a personality. Available: wizard, glados, dm.
+                If this option is omitted, a random one is chosen.
+  -h            Show this help message and exit.
+EOF
+}
+
+# Loads the text strings for the selected personality.
+setup_persona() {
+  local choice="${1:-}"
+  local personas=("wizard" "glados" "dm")
+
+  if [ -z "$choice" ]; then
+    # Choose a random persona if none is specified
+    choice=${personas[$((RANDOM % ${#personas[@]}))]}
+    printf "${C_YELLOW}No persona specified. The fates have chosen: ${C_BOLD}%s${C_RESET}\n" "$choice"
+    sleep 1
   fi
 
-  echo ""
-  echo -n " [*] Powering up the Repo Wrangler "
-  spinner=('⚙️     ' '⚙️⚙️   ' '⚙️⚙️⚙️  ' ' ⚙️⚙️⚙️ ' '  ⚙️⚙️⚙️' '   ⚙️⚙️' '    ⚙️' '     ') # Adjusted spacing
+  # --- Persona Text Definitions ---
+
+  # Default: The Original Git Wizard
+  declare -A WIZARD_TEXT=(
+    [title]="The Grand Repo Wrangler & Backupinator 9001"
+    [author]="Created by: ShadowHarvy"
+    [intro_start]="Powering up the Repo Wrangler"
+    [intro_online]="Powering up the Repo Wrangler... ONLINE!"
+    [intro_scan]="Scanning known dimensions for git traces..."
+    [intro_scroll]="Consulting the sacred backup scroll's history..."
+    [intro_commence]="Let the wrangling commence!"
+    [corral_setup]="Setting Up The Corral & Checking Scroll History"
+    [scouring_dim]="Now scouring the '%s' dimension (%s)..."
+    [no_repos_found]="Found no git repositories in '%s'. How tidy. Or empty."
+    [repo_found]="Found Repo #%s: '%s'"
+    [remote_url]="Remote 'origin' URL: %s"
+    [new_inscription]="New inscription for the scroll: '%s'."
+    [known_to_scroll]="Already known to the scroll."
+    [update_attempt]="Attempting tactical update (fetch & check)..."
+    [fetch_fail]="'git fetch' for '%s' failed. Check manually!"
+    [behind_remote]="Branch is behind remote. Pulling changes..."
+    [pull_success]="✔ Successfully pulled new changes."
+    [pull_fail]="!! ERROR: 'git pull' failed. Merge conflict or other issue?"
+    [ahead_remote]="Branch is ahead of remote. No pull needed."
+    [up_to_date]="✔ Already up-to-date."
+    [diverged]="!! WARNING: Branch has diverged. Manual intervention required."
+    [no_tracking]="No tracking info, or other status. Skipping pull."
+    [finalizing_scroll]="Finalizing The Sacred Scroll"
+    [inscribing_lore]="Inscribing all collected lore onto %s"
+    [report_header]="Wrangling Report (Run: $(date))"
+    [mission_accomplished]="Mission accomplished! Go forth and code! 😎"
+  )
+
+  # GLaDOS: Sarcastic AI
+  declare -A GLADOS_TEXT=(
+    [title]="Aperture Science Collaborative Work Monitoring System"
+    [author]="Now with 80% less spontaneous combustion."
+    [intro_start]="Initiating Surprise Compliance Test"
+    [intro_online]="Compliance testing protocols... ACTIVE."
+    [intro_scan]="Scanning test chambers for unauthorized projects..."
+    [intro_scroll]="Reviewing your... permanent record."
+    [intro_commence]="Let the 'testing' begin. For science."
+    [corral_setup]="Calibrating Test Environment"
+    [scouring_dim]="Analyzing sector '%s' (%s)..."
+    [no_repos_found]="Sector '%s' is clean. Suspiciously clean."
+    [repo_found]="Test Subject #%s located: '%s'"
+    [remote_url]="Central repository link established: %s"
+    [new_inscription]="A new variable has been added to your test profile: '%s'."
+    [known_to_scroll]="This variable is already noted in your file."
+    [update_attempt]="Attempting mandatory synchronization..."
+    [fetch_fail]="Synchronization failed for '%s'. A note has been made of your failure."
+    [behind_remote]="Your work is outdated. Initiating corrective synchronization..."
+    [pull_success]="✔ Synchronization complete. All your work now belongs to us."
+    [pull_fail]="!! ERROR: Synchronization conflict. You broke it, didn't you?"
+    [ahead_remote]="You have unsubmitted work. This is... inefficient."
+    [up_to_date]="✔ Your work is compliant with the central repository. For now."
+    [diverged]="!! WARNING: You have deviated from testing parameters. This is being recorded."
+    [no_tracking]="This project is not registered. A demerit has been issued."
+    [finalizing_scroll]="Finalizing Your Performance Review"
+    [inscribing_lore]="Archiving test results to %s"
+    [report_header]="Mandatory Performance Review (Date: $(date))"
+    [mission_accomplished]="The test is complete. You may now resume your pointless activities. The cake is a lie."
+  )
+
+  # Dungeon Master: Epic Narrator
+  declare -A DM_TEXT=(
+    [title]="Tome of the Git-Scryer"
+    [author]="Chronicled by: The Dungeon Master"
+    [intro_start]="The party gathers at the terminal"
+    [intro_online]="The terminal glows with arcane energy... READY!"
+    [intro_scan]="Scrying the digital planes for ancient sigils..."
+    [intro_scroll]="Consulting the ancient scrolls of backup..."
+    [intro_commence]="Let the adventure begin!"
+    [corral_setup]="Preparing The Quest Board & Reviewing Old Maps"
+    [scouring_dim]="You enter the '%s' dungeon, a maze of directories (%s)..."
+    [no_repos_found]="The '%s' dungeon is empty. You find no treasure here."
+    [repo_found]="A glint of magic! You've found Artifact #%s: '%s'"
+    [remote_url]="It resonates with a distant source: %s"
+    [new_inscription]="You transcribe the artifact's sigil to your map: '%s'."
+    [known_to_scroll]="This artifact is already marked on your map."
+    [update_attempt]="You attempt to channel energy from the remote source..."
+    [fetch_fail]="Your connection to the source is blocked for '%s'!"
+    [behind_remote]="The source holds new knowledge. You begin the ritual of pulling..."
+    [pull_success]="✔ The ritual is a success! New lore has been absorbed."
+    [pull_fail]="!! The ritual fails! A wave of chaotic energy erupts."
+    [ahead_remote]="Your knowledge surpasses the source. No ritual is needed."
+    [up_to_date]="✔ Your knowledge is in harmony with the source."
+    [diverged]="!! Your lore and the source's have diverged! A paradox is imminent."
+    [no_tracking]="This artifact has no connection to a remote source."
+    [finalizing_scroll]="Binding The Final Chronicle"
+    [inscribing_lore]="Inscribing the session's tales onto the scroll at %s"
+    [report_header]="Tale of the Session (Recorded: $(date))"
+    [mission_accomplished]="Your quest is complete! Rest now, for more adventures await at dawn."
+  )
+
+  case "$choice" in
+  wizard) for k in "${!WIZARD_TEXT[@]}"; do TEXT["$k"]="${WIZARD_TEXT[$k]}"; done ;;
+  glados) for k in "${!GLADOS_TEXT[@]}"; do TEXT["$k"]="${GLADOS_TEXT[$k]}"; done ;;
+  dm) for k in "${!DM_TEXT[@]}"; do TEXT["$k"]="${DM_TEXT[$k]}"; done ;;
+  *)
+    printf "${C_RED}Error: Unknown persona '%s'.${C_RESET}\n" "$choice"
+    print_usage
+    exit 1
+    ;;
+  esac
+}
+
+print_header() {
+  printf "\n${C_BOLD}${C_PURPLE}---=== %s ===---${C_RESET}\n" "$1"
+}
+
+initial_loader() {
+  if [ "$SKIP_THEATRICS" -eq 1 ]; then return; fi
+  printf "\n"
+  local spinner=('⚙️    ' '⚙️⚙️   ' '⚙️⚙️⚙️  ' ' ⚙️⚙️⚙️ ' '  ⚙️⚙️⚙️' '   ⚙️⚙️' '    ⚙️' '     ')
   for i in {1..20}; do
-    echo -ne "\r [*] Powering up the Repo Wrangler ${spinner[i % ${#spinner[@]}]}"
+    printf "\r ${C_CYAN}[*] %s ${spinner[i % ${#spinner[@]}]}${C_RESET}" "${TEXT[intro_start]}"
     sleep 0.2
   done
-  echo -e "\r [*] Powering up the Repo Wrangler... ONLINE!      "
-
-  echo ""
-  echo " [*] Scanning known dimensions for git traces..."
+  printf "\r ${C_GREEN}[*] %s      ${C_RESET}\n\n" "${TEXT[intro_online]}"
+  printf " ${C_CYAN}[*] %s${C_RESET}\n" "${TEXT[intro_scan]}"
   sleep 0.7
-  echo -n " ["
-  for i in {1..25}; do
-    echo -n "*"
-    sleep 0.05
-  done
-  echo -n "] "
-  echo "DIMENSIONS SCANNED!"
-  sleep 0.5
-  echo ""
-  echo " [*] Consulting the sacred backup scroll's history..."
+  printf " ${C_CYAN}[*] %s${C_RESET}\n" "${TEXT[intro_scroll]}"
   sleep 0.8
-  echo " [*] Let the wrangling commence!"
+  printf " ${C_GREEN}[*] %s${C_RESET}\n" "${TEXT[intro_commence]}"
   sleep 0.5
-  echo ""
 }
 
-# Function for the mini-loader between repositories
-inter_repo_loader() {
-  if [ "$SKIP_THEATRICS" -eq 1 ]; then
-    sleep 0.05 # Tiny pause even when skipping
-    return
-  fi
-
-  local duration=${1:-$INTER_REPO_DELAY}
-  local interval=0.1
-  local steps=$(printf "%.0f" "$(echo "$duration / $interval" | bc -l)")
-  local loader_chars=('-' '\' '|' '/')
-
-  echo -n "   -> Wrangling next repo "
-  for i in $(seq 1 $steps); do
-    echo -ne "${loader_chars[i % ${#loader_chars[@]}]}"
-    sleep $interval
-    echo -ne "\b"
-  done
-  echo -ne "\r                                        \r" # Clear the line
-}
-
-# Function to print fancy section headers
-print_header() {
-  echo ""
-  echo "---=== $1 ===---"
-}
-
-# --- Title Screen ---
-clear
-echo "===================================================================="
-echo "  _____                               __  __                       _            "
-echo " |  __ \                             |  \/  |                     | |           "
-echo " | |__) |___  _ __   __ _ _ __ ___   | \  / | __ _ _ __ ___   ___ __| |           "
-echo " |  _  // _ \| '_ \ / _\` | '_ \` _ \  | |\/| |/ _\` | '_ \` _ \ / __/ _\` |           "
-echo " | | \ \ (_) | | | | (_| | | | | | | | |  | | (_| | | | | | | (_| (_| |  _ _ _    "
-echo " |_|  \_\___/|_| |_|\__,_|_| |_| |_| |_|  |_|\__,_|_| |_| |_|\___\__,_| (_|_|_)   "
-echo "                                                                                "
-echo "          The Grand Repo Wrangler & Backupinator 5000 (v1.1)                  "
-echo "                       Created by: ShadowHarvy                                  "
-echo "===================================================================="
-
-# --- Initialization ---
-initial_loader
-
-# --- Directory Setup ---
-HOME_DIR="$HOME"
-GIT_DIR="$HOME_DIR/git"
-DEV_DIR="$HOME_DIR/development"
-BACKUP_DIR="$HOME_DIR/backup"
-BACKUP_FILE="$BACKUP_DIR/repo_backup.txt"
-
-print_header "Setting Up The Corral & Checking Scroll History"
-
-# Check and create directories
-made_dir=0
-for dir_to_check in "$GIT_DIR" "$DEV_DIR" "$BACKUP_DIR"; do
-  if [ ! -d "$dir_to_check" ]; then
-    echo " -> Directory ($dir_to_check) is missing. Creating it..."
-    mkdir -p "$dir_to_check" || {
-      echo "!! Failed to create $dir_to_check! Permissions? Shenanigans?"
-      exit 1
-    }
-    made_dir=1
-  fi
-done
-
-if [ $made_dir -eq 0 ]; then
-  echo " -> All necessary directories already exist. How organized!"
-fi
-
-# --- Variables for new features & Backup File Handling (Revised) ---
-declare -A SCROLL_ENTRIES # Associative array to hold "url,reponame" -> 1
-REPOS_NEWLY_ADDED_THIS_RUN=0
-REPOS_WITH_ACTUAL_UPDATES_THIS_RUN=0
-ORIGINAL_CONJURED_DATE=""
-
-if [ -f "$BACKUP_FILE" ]; then
-  echo " -> Found existing backup scroll. Reading known lore..."
-  # Attempt to find original conjured date from the file
-  ORIGINAL_CONJURED_DATE=$(grep -m1 "^# Conjured on:" "$BACKUP_FILE" | sed 's/# Conjured on: //')
-
-  # Read existing entries: lines that contain a comma and don't start with #
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    if [[ ! "$line" =~ ^# && "$line" == *","* ]]; then
-      SCROLL_ENTRIES["$line"]=1
-    fi
-  done <"$BACKUP_FILE"
-  echo " -> Found ${#SCROLL_ENTRIES[@]} existing entries in the scroll."
-else
-  echo " -> No ancient scroll detected. A new one shall be conjured!"
-  ORIGINAL_CONJURED_DATE=$(date) # Set current date as conjured if new file
-fi
-echo " -> Scroll consultation complete."
-
-# --- Counters ---
-repo_count=0
-successful_pulls_count=0 # Renamed from updated_count
-skipped_count=0
-# REPOS_NEWLY_ADDED_THIS_RUN and REPOS_WITH_ACTUAL_UPDATES_THIS_RUN already initialized
-
-# --- Repository Update & Backup Function ---
-update_and_backup_repositories() {
+process_repositories_in_dir() {
   local target_dir="$1"
   local dir_name
   dir_name=$(basename "$target_dir")
 
-  echo ""
-  echo " -> Now scouring the '$dir_name' dimension ($target_dir)..."
+  printf "\n${C_BOLD}"
+  printf "${TEXT[scouring_dim]}" "$dir_name" "$target_dir"
+  printf "${C_RESET}\n"
 
   local find_output
-  find_output=$(find "$target_dir" -maxdepth 2 -name ".git" -type d -prune 2>/dev/null)
+  find_output=$(find "$target_dir" -maxdepth 2 -name ".git" -type d -prune 2>/dev/null || true)
 
   if [ -z "$find_output" ]; then
-    echo "     -> Found no git repositories in '$dir_name'. How tidy. Or empty."
+    printf "    -> "
+    printf "${TEXT[no_repos_found]}" "$dir_name"
+    printf "\n"
     return
   fi
 
-  # Use process substitution to ensure variables modified in loop are in current shell
   while IFS= read -r git_dir_path; do
+    local repo_dir
     repo_dir="$(dirname "$git_dir_path")"
+    local repo_basename
     repo_basename=$(basename "$repo_dir")
     repo_count=$((repo_count + 1))
 
-    echo ""
-    echo "     -> Found Repo #$repo_count: '$repo_basename' in '$dir_name'"
+    printf "\n${C_CYAN}  -> "
+    printf "${TEXT[repo_found]}" "$repo_count" "$repo_basename"
+    printf "${C_RESET}\n"
 
-    # Stash current PWD to return to, robustly
-    local PUSHD_PROJECT_DIR=0
-    pushd "$repo_dir" >/dev/null 2>&1 || {
-      echo "     !! ERROR: Couldn't warp into '$repo_dir'. Skipping this one."
+    if ! pushd "$repo_dir" >/dev/null; then
+      printf "   ${C_RED}!! ERROR: Couldn't warp into '%s'. Skipping.${C_RESET}\n" "$repo_dir"
       skipped_count=$((skipped_count + 1))
-      inter_repo_loader "$INTER_REPO_DELAY"
       continue
-    }
-    PUSHD_PROJECT_DIR=1
+    fi
 
-    repo_url=$(git config --get remote.origin.url)
+    local repo_url
+    repo_url=$(git config --get remote.origin.url || true)
+
     if [ -z "$repo_url" ]; then
-      echo "     !! WARNING: No remote 'origin' found for '$repo_basename'. Cannot update or reliably back up."
+      printf "   ${C_YELLOW}!! WARNING: No remote 'origin' found. Cannot update or reliably back up.${C_RESET}\n"
       skipped_count=$((skipped_count + 1))
     else
-      echo "        -> Remote 'origin' URL: $repo_url"
-      entry_key="${repo_url},${repo_basename}" # Ensure consistent key format
+      printf "      -> "
+      printf "${TEXT[remote_url]}" "$repo_url"
+      printf "\n"
+      local entry_key="${repo_url},${repo_basename}"
 
       if [ -z "${SCROLL_ENTRIES[$entry_key]}" ]; then
-        echo "        -> New inscription for the scroll: '$repo_basename'."
-        SCROLL_ENTRIES["$entry_key"]=1 # Add to our master list for final write-out
-        REPOS_NEWLY_ADDED_THIS_RUN=$((REPOS_NEWLY_ADDED_THIS_RUN + 1))
+        printf "      -> ${C_GREEN}"
+        printf "${TEXT[new_inscription]}" "$repo_basename"
+        printf "${C_RESET}\n"
+        SCROLL_ENTRIES["$entry_key"]=1
+        REPOS_NEWLY_ADDED=$((REPOS_NEWLY_ADDED + 1))
       else
-        echo "        -> '$repo_basename' and its URL are already known to the scroll."
+        printf "      -> %s\n" "${TEXT[known_to_scroll]}"
       fi
 
-      current_hash=$(git rev-parse HEAD 2>/dev/null)
-      # If current_hash is empty, it might be an empty repo or an error.
-
-      echo "        -> Attempting tactical update (git pull)..."
-      if git pull --quiet; then
-        successful_pulls_count=$((successful_pulls_count + 1))
-        echo "           -> Update command successful for '$repo_basename'."
-        new_hash=$(git rev-parse HEAD 2>/dev/null)
-
-        if [ -n "$new_hash" ]; then       # If repo has commits after pull
-          if [ -n "$current_hash" ]; then # If repo had commits before pull
-            if [ "$current_hash" != "$new_hash" ]; then
-              echo "           -> Fetched new changes for '$repo_basename'."
-              REPOS_WITH_ACTUAL_UPDATES_THIS_RUN=$((REPOS_WITH_ACTUAL_UPDATES_THIS_RUN + 1))
-            else
-              echo "           -> Already up-to-date (no new commits pulled)."
-            fi
-          else # Repo had no commits before (or error getting hash), but has commits now
-            echo "           -> Repo likely initialized or first commits pulled for '$repo_basename'."
-            REPOS_WITH_ACTUAL_UPDATES_THIS_RUN=$((REPOS_WITH_ACTUAL_UPDATES_THIS_RUN + 1))
-          fi
-        else # No commits after pull
-          if [ -n "$current_hash" ]; then
-            echo "           !! WARNING: Repo '$repo_basename' had commits but seems empty after pull. State is unusual."
+      printf "      -> %s\n" "${TEXT[update_attempt]}"
+      if ! git fetch --quiet; then
+        printf "   ${C_YELLOW}!! WARNING: "
+        printf "${TEXT[fetch_fail]}" "$repo_basename"
+        printf "${C_RESET}\n"
+      else
+        local status
+        status=$(git status --short --branch)
+        # BUGFIX: Corrected the conditional logic for checking git status.
+        # The previous version had a syntax error in the 'diverged' check.
+        # This version uses correct glob patterns and a more logical order.
+        if [[ "$status" == *"[diverged"* ]]; then
+          printf "         -> ${C_YELLOW}%s${C_RESET}\n" "${TEXT[diverged]}"
+        elif [[ "$status" == *"[behind "*"]"* ]]; then
+          printf "         -> %s\n" "${TEXT[behind_remote]}"
+          if git pull --quiet; then
+            printf "         -> ${C_GREEN}%s${C_RESET}\n" "${TEXT[pull_success]}"
+            REPOS_WITH_UPDATES=$((REPOS_WITH_UPDATES + 1))
           else
-            echo "           -> Still no commits in '$repo_basename' after pull."
+            printf "         -> ${C_RED}%s${C_RESET}\n" "${TEXT[pull_fail]}"
           fi
+        elif [[ "$status" == *"[ahead "*"]"* ]]; then
+          printf "         -> %s\n" "${TEXT[ahead_remote]}"
+        elif [[ "$status" == *"..."* ]]; then # This means it has a remote tracking branch
+          printf "         -> ${C_GREEN}%s${C_RESET}\n" "${TEXT[up_to_date]}"
+        else
+          printf "         -> %s\n" "${TEXT[no_tracking]}"
         fi
-      else
-        echo "        !! WARNING: 'git pull' for '$repo_basename' failed. Check manually!"
       fi
-    fi # end else (repo_url was found)
-
-    if [ "$PUSHD_PROJECT_DIR" -eq 1 ]; then
-      popd >/dev/null 2>&1 || {
-        echo "!! CRITICAL ERROR: Failed to popd from $repo_dir. Subsequent operations in $dir_name might be affected."
-        # Decide if to return 1 here to stop this dimension's scan
-      }
     fi
-    inter_repo_loader "$INTER_REPO_DELAY"
-  done < <(echo "$find_output") # Process substitution here!
+    popd >/dev/null
+  done < <(echo "$find_output")
 }
 
-# --- Main Execution ---
-print_header "Commencing The Wrangling"
+# --- Main Execution Logic ---
+main() {
+  local persona_choice=""
+  while getopts ":p:h" opt; do
+    case $opt in
+    p) persona_choice="$OPTARG" ;;
+    h)
+      print_usage
+      exit 0
+      ;;
+    \?)
+      printf "Invalid option: -$OPTARG\n" >&2
+      print_usage
+      exit 1
+      ;;
+    esac
+  done
 
-# Update repositories in the primary directory (if it exists)
-if [ -d "$GIT_DIR" ]; then
-  update_and_backup_repositories "$GIT_DIR"
-else
-  echo " -> Skipping Git Directory ($GIT_DIR) as it doesn't exist."
-fi
+  setup_persona "$persona_choice"
 
-# Update repositories in the secondary directory (if it exists and is different)
-if [ -d "$DEV_DIR" ] && [ "$GIT_DIR" != "$DEV_DIR" ]; then
-  update_and_backup_repositories "$DEV_DIR"
-elif [ "$GIT_DIR" == "$DEV_DIR" ] && [ -d "$DEV_DIR" ]; then # Added -d check for robustness
-  echo " -> Development directory is the same as Git directory, already scanned."
-else
-  echo " -> Skipping Development Directory ($DEV_DIR) as it doesn't exist."
-fi
+  clear
+  cat <<EOF
+====================================================================
+${TEXT[title]}
+${TEXT[author]}
+====================================================================
+EOF
 
-# --- Finalizing The Sacred Scroll ---
-print_header "Finalizing The Sacred Scroll"
-echo " -> Inscribing all collected lore onto $BACKUP_FILE..."
+  initial_loader
 
-# Ensure FINAL_CONJURED_DATE has a value
-if [ -z "$ORIGINAL_CONJURED_DATE" ]; then # If it was a new file and somehow this wasn't set
-  FINAL_CONJURED_DATE=$(date)
-else
-  FINAL_CONJURED_DATE="$ORIGINAL_CONJURED_DATE"
-fi
+  print_header "${TEXT[corral_setup]}"
+  # ... (Directory setup and scroll reading logic remains the same)
+  local made_dir=0
+  for dir_to_check in "${SEARCH_DIRS[@]}" "$BACKUP_DIR"; do
+    if [ ! -d "$dir_to_check" ]; then
+      printf " -> Directory (%s) is missing. Creating it...\n" "$dir_to_check"
+      mkdir -p "$dir_to_check"
+      made_dir=1
+    fi
+  done
+  if [ $made_dir -eq 0 ]; then
+    printf " -> All necessary directories already exist. How organized!\n"
+  fi
+  local original_conjured_date=""
+  if [ -f "$BACKUP_FILE" ]; then
+    printf " -> Found existing backup scroll. Reading known lore...\n"
+    original_conjured_date=$(grep -m1 "^# Conjured on:" "$BACKUP_FILE" | sed 's/# Conjured on: //' || true)
 
-{
-  echo "# === Sacred Repository Backup Scroll ==="
-  echo "# Conjured on: $FINAL_CONJURED_DATE"
-  echo "# Last Full Scan: $(date)"
-  echo "# Format: repository_url,directory_name"
-  echo "# This scroll is updated on each run, preserving existing entries."
-  echo ""
-} >"$BACKUP_FILE" || {
-  echo "!! CRITICAL: Failed to write header to backup scroll! Is $BACKUP_DIR writable?"
-  exit 1
+    # FIX 2.0: Read filtered file content into a variable first, then loop
+    # over it using a here-string. This is more robust than process substitution
+    # and can prevent certain classes of subshell-related errors.
+    local file_content
+    file_content=$(grep -v '^#' "$BACKUP_FILE" | grep ',' || true)
+    if [ -n "$file_content" ]; then
+      while IFS= read -r line; do
+        # Ensure we don't process empty lines that might sneak through
+        if [ -n "$line" ]; then
+          SCROLL_ENTRIES["$line"]=1
+        fi
+      done <<<"$file_content"
+    fi
+
+    printf " -> Found ${C_BOLD}%s${C_RESET} existing entries in the scroll.\n" "${#SCROLL_ENTRIES[@]}"
+  else
+    printf " -> No ancient scroll detected. A new one shall be conjured!\n"
+    original_conjured_date=$(date)
+  fi
+  printf " -> Scroll consultation complete.\n"
+
+  print_header "${TEXT[intro_commence]}"
+  for dir in "${SEARCH_DIRS[@]}"; do
+    if [ -d "$dir" ]; then
+      process_repositories_in_dir "$dir"
+    else
+      printf "\n${C_YELLOW} -> Skipping Directory (%s) as it doesn't exist.${C_RESET}\n" "$dir"
+    fi
+  done
+
+  print_header "${TEXT[finalizing_scroll]}"
+  printf " -> "
+  printf "${TEXT[inscribing_lore]}" "$BACKUP_FILE"
+  printf "\n"
+
+  {
+    printf "# === Sacred Repository Backup Scroll ===\n"
+    printf "# Conjured on: %s\n" "$original_conjured_date"
+    printf "# Last Full Scan: %s\n" "$(date)"
+    printf "# Format: repository_url,directory_name\n"
+    printf "# This scroll is updated on each run, preserving existing entries.\n\n"
+  } >"$BACKUP_FILE"
+
+  if [ ${#SCROLL_ENTRIES[@]} -gt 0 ]; then
+    printf "%s\n" "${!SCROLL_ENTRIES[@]}" | sort >>"$BACKUP_FILE"
+    printf " -> ${C_GREEN}%s total entries have been inscribed into the scroll.${C_RESET}\n" "${#SCROLL_ENTRIES[@]}"
+  else
+    printf " -> No entries to inscribe on the scroll.\n"
+  fi
+  printf " -> Backup scroll updated: ${C_BOLD}%s${C_RESET}\n" "$BACKUP_FILE"
+
+  print_header "${TEXT[report_header]}"
+  printf "Summary for this run:\n"
+  printf "  - Repositories Found & Processed:     ${C_BOLD}%s${C_RESET}\n" "$repo_count"
+  printf "  - Repositories With New Commits:      ${C_BOLD}${C_GREEN}%s${C_RESET}\n" "$REPOS_WITH_UPDATES"
+  printf "  - Repositories Newly Added to Scroll: ${C_BOLD}${C_CYAN}%s${C_RESET}\n" "$REPOS_NEWLY_ADDED"
+  printf "  - Total Entries Now in Scroll:        ${C_BOLD}%s${C_RESET}\n" "${#SCROLL_ENTRIES[@]}"
+  printf "  - Skipped (No remote/CD Errors):      ${C_BOLD}${C_YELLOW}%s${C_RESET}\n" "$skipped_count"
+  printf "\n"
+
+  printf "%s\n" "${TEXT[mission_accomplished]}"
+  printf "\n"
 }
 
-# Write the actual entries, sorted for consistency
-if [ ${#SCROLL_ENTRIES[@]} -gt 0 ]; then
-  sorted_keys=()
-  for key in "${!SCROLL_ENTRIES[@]}"; do
-    sorted_keys+=("$key")
-  done
-  # Standard sort (lexicographical)
-  IFS=$'\n' sorted_entries_alpha=($(sort <<<"${sorted_keys[*]}"))
-  unset IFS
+# --- Script Entry Point ---
+main "$@"
 
-  for entry in "${sorted_entries_alpha[@]}"; do
-    # Ensure printf handles percent signs in URLs correctly
-    printf "%s\n" "$entry" >>"$BACKUP_FILE"
-  done
-  echo " -> ${#SCROLL_ENTRIES[@]} total entries have been inscribed into the scroll."
-else
-  echo " -> No entries to inscribe on the scroll."
-fi
-echo " -> Backup scroll updated: $BACKUP_FILE"
-
-# --- Final Summary ---
-print_header "Wrangling Report (Run: $(date))"
-echo "The Grand Repo Wrangling is complete."
-echo "Summary for this run:"
-echo "  - Repositories Found & Processed:         $repo_count"
-echo "  - Successful 'git pull' Attempts:       $successful_pulls_count"
-echo "  - Repositories With New Commits Pulled: $REPOS_WITH_ACTUAL_UPDATES_THIS_RUN"
-echo "  - Repositories Newly Added to Scroll:   $REPOS_NEWLY_ADDED_THIS_RUN"
-echo "  - Total Entries Now in Scroll:          ${#SCROLL_ENTRIES[@]}"
-echo "  - Skipped (No remote/CD Errors):        $skipped_count"
-echo ""
-echo "Backup scroll location: $BACKUP_FILE"
-echo ""
-
-if [ $skipped_count -gt 0 ]; then
-  echo "[!] Looks like $skipped_count repo(s) were skipped or had issues. Might need a manual poke."
-fi
-if [ $REPOS_NEWLY_ADDED_THIS_RUN -gt 0 ]; then
-  echo "[+] $REPOS_NEWLY_ADDED_THIS_RUN new repo(s) added to the sacred scroll this run!"
-fi
-if [ $REPOS_WITH_ACTUAL_UPDATES_THIS_RUN -gt 0 ]; then
-  echo "[*] $REPOS_WITH_ACTUAL_UPDATES_THIS_RUN repo(s) successfully pulled new changes this run!"
-elif [ $successful_pulls_count -gt 0 ]; then
-  echo "[*] All processed repos were already up-to-date or no new changes were pulled."
-fi
-
-if [ $repo_count -eq 0 ]; then
-  echo "Found zero repositories to wrangle. Either super clean or you're hiding them!"
-else
-  echo "Mission accomplished! Go forth and code! 😎"
-fi
-echo ""
 exit 0
