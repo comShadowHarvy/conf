@@ -1,116 +1,254 @@
-#!/bin/sh
+#!/bin/bash
 # ===----------------------------------------===
-#                mkscript Utility v1.1
+#            mkscript Utility v2.0
 # ===----------------------------------------===
 # Author: ShadowHarvy (The Script Whisperer)
-# Version: 1.1 (Now with 100% more sass!)
+# Version: 2.0 (The Many-Faced Mod)
 #
-# Purpose: Why type three commands when one ridiculously
-#          over-engineered script can do it? Creates a script,
-#          gives it the magic execution touch, and throws it
-#          into Neovim (nvim) before you can blink. Almost.
+# Purpose: Creates a script, makes it executable, and opens
+#          it in your editor of choice, all with a flair for
+#          the dramatic provided by selectable personalities.
 #
 # Usage:
-#   mkscript <your_brilliant_script_name.sh>
+#   mkscript [options] <script_name>
 #
-# Example:
-#   mkscript world_domination_plot.sh
-#
-# Notes:
-#   - Needs 'nvim'. If you don't have it, what are you even doing?
-#   - Defaults to #!/bin/sh. Feel free to change SHEBANG below
-#     if you're feeling fancy (#/bin/bash, perhaps?).
+# Options:
+#   -p <persona>  Choose a personality: wizard, glados, dm.
+#   -s <shebang>  Specify a shebang (e.g., "#!/bin/bash").
+#   -e <editor>   Specify an editor (e.g., "vim").
+#   -h            Show this help message.
+
+# --- Strict Mode & Safety First ---
+set -euo pipefail
 
 # --- Configuration ---
-# Your editor of choice. Or rather, *my* choice for you.
-EDITOR="nvim"
-# The mystical incantation that starts every great script.
-SHEBANG="#!/bin/sh"
+DEFAULT_EDITOR="nvim"
+DEFAULT_SHEBANG="#!/bin/sh"
+SKIP_THEATRICS=0
+
+# --- Colors & Styles ---
+if [ -t 1 ]; then
+  C_RESET='\033[0m' C_BOLD='\033[1m' C_RED='\033[0;31m' C_GREEN='\033[0;32m'
+  C_YELLOW='\033[0;33m' C_BLUE='\033[0;34m' C_PURPLE='\033[0;35m' C_CYAN='\033[0;36m'
+else
+  C_RESET='' C_BOLD='' C_RED='' C_GREEN='' C_YELLOW='' C_BLUE='' C_PURPLE='' C_CYAN=''
+fi
+
+# --- Global State & Persona Text ---
+declare -A TEXT # This will hold the text for the chosen persona
 
 # --- Functions ---
 
-# Function to simulate intense, highly important work happening
-fake_load() {
-  local duration=${1:-10} # Default duration 10 seconds
-  local interval=0.5
-  local steps=$(printf "%.0f" "$(echo "$duration / $interval / 5" | bc -l)") # Adjust steps based on duration
+print_usage() {
+  cat <<EOF
+Usage: $0 [options] <script_name>
 
-  echo "Initiating script conjuration sequence..."
-  sleep 1
-  echo -n "Brewing shebang potion..."
-  for i in $(seq 1 $steps); do echo -n "."; sleep $interval; done; echo " Done."
-  sleep 0.5
-  echo -n "Consulting the permissions oracle..."
-  for i in $(seq 1 $steps); do echo -n "."; sleep $interval; done; echo " Granted!"
-  sleep 0.5
-  echo -n "Polishing the filename..."
-  for i in $(seq 1 $steps); do echo -n "."; sleep $interval; done; echo " Shiny!"
-  sleep 0.5
-  echo -n "Waking up Neovim..."
-  for i in $(seq 1 $steps); do echo -n "."; sleep $interval; done; echo " It lives!"
-  sleep 0.5
-  echo -n "Finalizing awesomeness..."
-  for i in $(seq 1 $steps); do echo -n "."; sleep $interval; done; echo " Complete."
-  sleep 1 # Extra pause for dramatic effect
+The mkscript Utility v2.0
+
+Creates a new script, makes it executable, and opens it in an editor.
+
+Options:
+  -p <persona>  Choose a personality. Available: wizard, glados, dm.
+                If omitted, a random one is chosen.
+  -s <shebang>  Specify a shebang. Defaults to "$DEFAULT_SHEBANG".
+                (e.g., -s "#!/bin/bash")
+  -e <editor>   Specify an editor. Defaults to "$DEFAULT_EDITOR".
+  -h            Show this help message and exit.
+EOF
 }
 
-# --- Input Validation ---
+# Loads the text strings for the selected personality.
+setup_persona() {
+  local choice="${1:-}"
+  local personas=("wizard" "glados" "dm")
 
-# Seriously, did you forget the filename? *sigh*
-if [ -z "$1" ]; then
-  echo "Usage: mkscript <new_script_name>" >&2
-  echo "Come on, it's not *that* hard." >&2
-  exit 1
-fi
+  if [ -z "$choice" ]; then
+    choice=${personas[$((RANDOM % ${#personas[@]}))]}
+    printf "${C_YELLOW}No persona specified. The fates have chosen: ${C_BOLD}%s${C_RESET}\n" "$choice"
+    sleep 1
+  fi
 
-SCRIPT_NAME="$1"
+  # --- Persona Text Definitions ---
+  declare -A WIZARD_TEXT=(
+    [title]="The Grand Script Conjurer"
+    [author]="Scrolls scribed by: ShadowHarvy"
+    [intro_start]="Initiating script conjuration sequence..."
+    [intro_online]="The runes glow... The ritual is ready!"
+    [intro_shebang]="Brewing shebang potion..."
+    [intro_perms]="Consulting the permissions oracle..."
+    [intro_filename]="Polishing the artifact's true name..."
+    [intro_editor]="Waking the editing familiar..."
+    [no_filename]="You must provide a name for the new scroll!"
+    [already_exists]="A scroll named '%s' already exists in this realm. Choose another name."
+    [creating]="Alright, alright. Conjuring '%s'..."
+    [shebang_written]="The initial incantation has been inscribed."
+    [chmod_perms]="Bestowing the holy +x permission..."
+    [editor_summon]="Summoning the %s familiar to attend to '%s'..."
+    [conclusion]="Mission Accomplished! '%s' is ready for your genius."
+  )
 
-# Whoa there, cowboy! That name's already taken.
-if [ -e "$SCRIPT_NAME" ]; then
-  echo "Error: '$SCRIPT_NAME' already exists. Try thinking of a *new* name." >&2
-  exit 1
-fi
+  declare -A GLADOS_TEXT=(
+    [title]="Aperture Science Quick-Start Test Chamber Fabricator"
+    [author]="'We do what we must, because we can.'"
+    [intro_start]="Initiating test chamber fabrication..."
+    [intro_online]="Fabrication unit... ONLINE."
+    [intro_shebang]="Calibrating core directive..."
+    [intro_perms]="Assigning operational parameters..."
+    [intro_filename]="Assigning test chamber designation..."
+    [intro_editor]="Activating the editing sub-routine..."
+    [no_filename]="A test chamber designation is required for this test."
+    [already_exists]="Error: Test chamber '%s' already exists. Unscheduled disassembly is not recommended."
+    [creating]="Now fabricating test chamber '%s'. Try not to break this one."
+    [shebang_written]="Core directive has been installed."
+    [chmod_perms]="Operational parameters have been set."
+    [editor_summon]="Now interfacing with the %s editing module for chamber '%s'..."
+    [conclusion]="Fabrication complete. Your mandatory participation in this test may now begin."
+  )
 
-# --- Script Creation ---
+  declare -A DM_TEXT=(
+    [title]="The Adventurer's Blank Character Sheet"
+    [author]="Quest issued by: The Dungeon Master"
+    [intro_start]="A new adventurer is born..."
+    [intro_online]="The character sheet is ready to be filled!"
+    [intro_shebang]="Choosing a starting class and alignment..."
+    [intro_perms]="Granting proficiency bonuses..."
+    [intro_filename]="Naming your new hero..."
+    [intro_editor]="Handing you the Quill of Editing..."
+    [no_filename]="Your adventurer needs a name to be remembered by!"
+    [already_exists]="An adventurer named '%s' is already in the party. Try a different name."
+    [creating]="Creating a new character sheet for '%s'..."
+    [shebang_written]="Class and alignment have been noted."
+    [chmod_perms]="Proficiencies have been granted."
+    [editor_summon]="You take up the %s Quill to write the tale of '%s'..."
+    [conclusion]="Your new adventurer, '%s', is ready. May their quests be legendary."
+  )
 
-echo ""
-echo "*** Engaging mkscript protocols (Codename: Lazy Genius) ***"
-echo ""
-
-# Let the pointless-but-fun loading begin!
-fake_load 10 # 10 seconds of pure anticipation
-
-echo ""
-echo "Alright, alright. Creating '$SCRIPT_NAME'..."
-
-# Add the shebang. Don't mess this up.
-printf "%s\\n\\n" "$SHEBANG" > "$SCRIPT_NAME"
-if [ $? -ne 0 ]; then
-    echo "Error: Failed to create '$SCRIPT_NAME'. Was that so hard?" >&2
+  case "$choice" in
+  wizard) for k in "${!WIZARD_TEXT[@]}"; do TEXT["$k"]="${WIZARD_TEXT[$k]}"; done ;;
+  glados) for k in "${!GLADOS_TEXT[@]}"; do TEXT["$k"]="${GLADOS_TEXT[$k]}"; done ;;
+  dm) for k in "${!DM_TEXT[@]}"; do TEXT["$k"]="${DM_TEXT[$k]}"; done ;;
+  *)
+    printf "${C_RED}Error: Unknown persona '%s'.${C_RESET}\n" "$choice"
+    print_usage
     exit 1
-fi
+    ;;
+  esac
+}
 
-echo "Bestowing the holy +x permission..."
+initial_loader() {
+  if [ "$SKIP_THEATRICS" -eq 1 ]; then return; fi
+  local interval=0.1
 
-# Make it runnable. It's kind of the point.
-chmod +x "$SCRIPT_NAME"
-if [ $? -ne 0 ]; then
-    echo "Error: Couldn't make '$SCRIPT_NAME' executable. Check your privileges!" >&2
-    # rm "$SCRIPT_NAME" # Uncomment if you want to be tidy on failure
+  printf "\n"
+  printf "${TEXT[intro_start]}\n"
+  sleep 0.5
+
+  printf "  -> %s" "${TEXT[intro_shebang]}"
+  for i in {1..5}; do
+    printf "."
+    sleep $interval
+  done
+  printf " Done.\n"
+
+  printf "  -> %s" "${TEXT[intro_perms]}"
+  for i in {1..5}; do
+    printf "."
+    sleep $interval
+  done
+  printf " Granted!\n"
+
+  printf "  -> %s" "${TEXT[intro_filename]}"
+  for i in {1..5}; do
+    printf "."
+    sleep $interval
+  done
+  printf " Shiny!\n"
+
+  printf "  -> %s" "${TEXT[intro_editor]}"
+  for i in {1..5}; do
+    printf "."
+    sleep $interval
+  done
+  printf " It lives!\n"
+
+  sleep 0.5
+  printf "${C_GREEN}%s${C_RESET}\n" "${TEXT[intro_online]}"
+  sleep 1
+}
+
+# --- Main Execution Logic ---
+main() {
+  local persona_choice=""
+  local shebang="$DEFAULT_SHEBANG"
+  local editor="$DEFAULT_EDITOR"
+
+  while getopts ":p:s:e:h" opt; do
+    case $opt in
+    p) persona_choice="$OPTARG" ;;
+    s) shebang="$OPTARG" ;;
+    e) editor="$OPTARG" ;;
+    h)
+      print_usage
+      exit 0
+      ;;
+    \?)
+      printf "Invalid option: -$OPTARG\n" >&2
+      print_usage
+      exit 1
+      ;;
+    esac
+  done
+  shift $((OPTIND - 1)) # Remove parsed options
+
+  setup_persona "$persona_choice"
+
+  if [ -z "$1" ]; then
+    printf "${C_RED}%s${C_RESET}\n" "${TEXT[no_filename]}" >&2
     exit 1
-fi
+  fi
+  local SCRIPT_NAME="$1"
 
-echo "Summoning $EDITOR to deal with '$SCRIPT_NAME'..."
+  if [ -e "$SCRIPT_NAME" ]; then
+    printf "${C_RED}"
+    printf "${TEXT[already_exists]}" "$SCRIPT_NAME"
+    printf "${C_RESET}\n" >&2
+    exit 1
+  fi
 
-# Open sesame! Or, you know, open nvim.
-"$EDITOR" "$SCRIPT_NAME"
-if [ $? -ne 0 ]; then
-    echo "Warning: Couldn't launch '$EDITOR'. Is it installed? Is it in your PATH? Figure it out." >&2
-    # Still exiting 0 because the script *was* created. I'm not your babysitter.
-fi
+  clear
+  cat <<EOF
+====================================================================
+${TEXT[title]}
+${TEXT[author]}
+====================================================================
+EOF
 
-echo ""
-echo "*** Mission Accomplished! '$SCRIPT_NAME' is ready for your genius. ***"
-echo ""
+  initial_loader
+
+  printf "\n"
+  printf "${C_CYAN}"
+  printf "${TEXT[creating]}" "$SCRIPT_NAME"
+  printf "${C_RESET}\n"
+
+  printf "%s\n\n" "$shebang" >"$SCRIPT_NAME"
+  printf " -> %s\n" "${TEXT[shebang_written]}"
+
+  chmod +x "$SCRIPT_NAME"
+  printf " -> %s\n" "${TEXT[chmod_perms]}"
+
+  printf " -> "
+  printf "${TEXT[editor_summon]}" "$editor" "$SCRIPT_NAME"
+  printf "\n"
+
+  # Launch the editor
+  "$editor" "$SCRIPT_NAME"
+
+  printf "\n${C_GREEN}*** "
+  printf "${TEXT[conclusion]}" "$SCRIPT_NAME"
+  printf " ***${C_RESET}\n\n"
+}
+
+# --- Script Entry Point ---
+main "$@"
+
 exit 0
-
