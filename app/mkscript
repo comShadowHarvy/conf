@@ -1,9 +1,10 @@
 #!/bin/bash
 # ===----------------------------------------===
-#            mkscript Utility v2.0
+#            mkscript Utility v2.1
 # ===----------------------------------------===
 # Author: ShadowHarvy (The Script Whisperer)
-# Version: 2.0 (The Many-Faced Mod)
+# Refactored by: Gemini
+# Version: 2.1 (Even More Personalities)
 #
 # Purpose: Creates a script, makes it executable, and opens
 #          it in your editor of choice, all with a flair for
@@ -13,7 +14,7 @@
 #   mkscript [options] <script_name>
 #
 # Options:
-#   -p <persona>  Choose a personality: wizard, glados, dm.
+#   -p <persona>  Choose a personality: wizard, glados, dm, sassy, sarcastic.
 #   -s <shebang>  Specify a shebang (e.g., "#!/bin/bash").
 #   -e <editor>   Specify an editor (e.g., "vim").
 #   -h            Show this help message.
@@ -43,12 +44,12 @@ print_usage() {
   cat <<EOF
 Usage: $0 [options] <script_name>
 
-The mkscript Utility v2.0
+The mkscript Utility v2.1
 
 Creates a new script, makes it executable, and opens it in an editor.
 
 Options:
-  -p <persona>  Choose a personality. Available: wizard, glados, dm.
+  -p <persona>  Choose a personality. Available: wizard, glados, dm, sassy, sarcastic.
                 If omitted, a random one is chosen.
   -s <shebang>  Specify a shebang. Defaults to "$DEFAULT_SHEBANG".
                 (e.g., -s "#!/bin/bash")
@@ -60,7 +61,7 @@ EOF
 # Loads the text strings for the selected personality.
 setup_persona() {
   local choice="${1:-}"
-  local personas=("wizard" "glados" "dm")
+  local personas=("wizard" "glados" "dm" "sassy" "sarcastic")
 
   if [ -z "$choice" ]; then
     choice=${personas[$((RANDOM % ${#personas[@]}))]}
@@ -123,10 +124,48 @@ setup_persona() {
     [conclusion]="Your new adventurer, '%s', is ready. May their quests be legendary."
   )
 
+  declare -A SASSY_TEXT=(
+    [title]="The 'I'm Too Busy For This' Script Maker"
+    [author]="By: Someone with better things to do."
+    [intro_start]="Ugh, fine. Let's make a script. Let's get this over with."
+    [intro_online]="There. It's ready. Are we done?"
+    [intro_shebang]="Adding the shebang thingy..."
+    [intro_perms]="Making it executable, whatever..."
+    [intro_filename]="Giving it a name, because apparently it needs one..."
+    [intro_editor]="Waking up the editor. It was probably sleeping..."
+    [no_filename]="Hello? You forgot the filename. Not a great start."
+    [already_exists]="That name's taken, honey. Think of something original for once."
+    [creating]="Creating '%s'. Don't mess it up."
+    [shebang_written]="Shebang's in. Next."
+    [chmod_perms]="It's executable now. You're welcome."
+    [editor_summon]="Opening '%s' in %s. Now the real work starts, and it's all on you."
+    [conclusion]="Okay, '%s' is ready. Don't call me, I'll call you. (I won't call you)."
+  )
+
+  declare -A SARCASTIC_TEXT=(
+    [title]="The Procrastinator's Script Pro-Creator"
+    [author]="Because typing three whole commands is just too much."
+    [intro_start]="Initiating the incredibly complex process of... creating a file."
+    [intro_online]="Wow. We did it. A file has been created. Truly groundbreaking."
+    [intro_shebang]="Carefully placing the shebang at the top. A crucial step."
+    [intro_perms]="Bestowing the great and powerful +x permission. All hail the +x."
+    [intro_filename]="Thinking long and hard about the filename..."
+    [intro_editor]="Summoning the editor from its slumber..."
+    [no_filename]="You had one job. One. And that was to provide a filename."
+    [already_exists]="Oh, look, '%s' already exists. What a shocking development."
+    [creating]="Now creating '%s'. I'll try to contain my excitement."
+    [shebang_written]="The shebang is there. I checked. Twice."
+    [chmod_perms]="It's executable. I'm sure it will be a masterpiece."
+    [editor_summon]="Now opening '%s' in %s. Try to make it look like you're busy."
+    [conclusion]="There you go. '%s' is all ready. A triumph of modern automation."
+  )
+
   case "$choice" in
   wizard) for k in "${!WIZARD_TEXT[@]}"; do TEXT["$k"]="${WIZARD_TEXT[$k]}"; done ;;
   glados) for k in "${!GLADOS_TEXT[@]}"; do TEXT["$k"]="${GLADOS_TEXT[$k]}"; done ;;
   dm) for k in "${!DM_TEXT[@]}"; do TEXT["$k"]="${DM_TEXT[$k]}"; done ;;
+  sassy) for k in "${!SASSY_TEXT[@]}"; do TEXT["$k"]="${SASSY_TEXT[$k]}"; done ;;
+  sarcastic) for k in "${!SARCASTIC_TEXT[@]}"; do TEXT["$k"]="${SARCASTIC_TEXT[$k]}"; done ;;
   *)
     printf "${C_RED}Error: Unknown persona '%s'.${C_RESET}\n" "$choice"
     print_usage
