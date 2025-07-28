@@ -1,400 +1,282 @@
 #!/bin/bash
+# ===----------------------------------------===
+#      Permissions Facilitator v2.1
+# ===----------------------------------------===
+# Author: ShadowHarvy
+# Version: 2.1 (Even More Personalities)
+#
+# Purpose: A helper script to add the current user to
+#          the group that owns a specific device file,
+#          now with selectable personalities.
+#
+# Usage:
+#   permissions_helper.sh [options]
+#
+# Options:
+#   -p <persona>  Choose a personality: wizard, glados, dm, sassy, sarcastic.
+#   -d <device>   Specify a device file (e.g., /dev/ttyS0).
+#   -h            Show this help message.
+
+# --- Strict Mode & Safety First ---
+set -euo pipefail
 
 # --- Configuration ---
-DEFAULT_DEVICE="/dev/ttyUSB0" # Common default for ESP devices
-AUTHOR="ShadowHarvy"
+DEFAULT_DEVICE="/dev/ttyACM0"
 
-# --- Colors (Because dreary monochrome is so inefficient) ---
-COLOR_RESET='\033[0m'
-COLOR_TITLE='\033[1;36m'   # Bold Cyan
-COLOR_GLADOS='\033[0;36m'  # Cyan
-COLOR_INFO='\033[0;33m'    # Yellow
-COLOR_COMMAND='\033[1;33m' # Bold Yellow
-COLOR_SUCCESS='\033[0;32m' # Green
-COLOR_ERROR='\033[0;31m'   # Red
-COLOR_PROMPT='\033[1;35m'  # Bold Magenta
+# --- Colors & Styles ---
+if [ -t 1 ]; then
+  C_RESET='\033[0m' C_BOLD='\033[1m' C_RED='\033[0;31m' C_GREEN='\033[0;32m'
+  C_YELLOW='\033[0;33m' C_BLUE='\033[0;34m' C_PURPLE='\033[0;35m' C_CYAN='\033[0;36m'
+else
+  C_RESET='' C_BOLD='' C_RED='' C_GREEN='' C_YELLOW='' C_BLUE='' C_PURPLE='' C_CYAN=''
+fi
+
+# --- Global State & Persona Text ---
+declare -A TEXT # This will hold the text for the chosen persona
 
 # --- Functions ---
 
-# A crude simulation of progress. Adequate for organic patience levels.
-fake_loader() {
-  local duration=${1:-3} # Default 3 seconds
-  local message=${2:-"Processing"}
-  echo -en "${COLOR_GLADOS}${message}... ${COLOR_RESET}"
-  for ((i = 0; i < ${duration}; i++)); do
-    echo -n "."
-    sleep 0.6
-  done
-  echo -e " ${COLOR_SUCCESS}Complete.${COLOR_RESET}"
-  sleep 0.5
+print_usage() {
+  cat <<EOF
+Usage: $0 [options]
+
+The Permissions Facilitator v2.1
+
+Adds the current user to the group of a specified device.
+
+Options:
+  -p <persona>  Choose a personality. Available: wizard, glados, dm, sassy, sarcastic.
+                If omitted, a random one is chosen.
+  -d <device>   Specify a device. Defaults to "$DEFAULT_DEVICE".
+  -h            Show this help message and exit.
+EOF
 }
 
-# --- Script Start ---
+# Loads the text strings for the selected personality.
+setup_persona() {
+  local choice="${1:-}"
+  local personas=("wizard" "glados" "dm" "sassy" "sarcastic")
 
-# Title Screen Sequence Initiated. Prepare your optical sensors.
-clear
-echo -e "${COLOR_TITLE}"
-echo "======================================================"
-echo "     Aperture Science ESP Permissions Facilitator     "
-echo "            (Microcontroller Protocol v2.2)           " # Updated subtitle
-echo "======================================================"
-echo -e "      Mandated Acknowledgment: Conceived by ${AUTHOR}"
-echo -e "${COLOR_RESET}"
-sleep 2
-
-echo -e "${COLOR_GLADOS}Oh, it seems another... ${COLOR_INFO}*enthusiast*${COLOR_GLADOS}... wishes to interface with one of those quaint little ESP boards."
-echo -e "My advanced heuristics are attempting to locate your device... ${COLOR_INFO}*try*${COLOR_GLADOS} to keep up.${COLOR_RESET}"
-sleep 1.5
-
-# Fake Loading - Because apparently, you enjoy waiting.
-fake_loader 4 "Scanning Device Manifolds & Verifying User Group Affiliations"
-
-# --- Device Identification ---
-echo -e "\n${COLOR_GLADOS}Let's pinpoint your ESP device."
-
-# Attempt to find recent devices by modification time
-declare -a recent_devices_list
-# Search for ttyUSB* and ttyACM* character devices, print modification time (Unix epoch) and path,
-# sort numerically by time (descending), take top 3, then extract just the path.
-mapfile -t recent_devices_list < <(find /dev -maxdepth 1 \( -name "ttyUSB*" -o -name "ttyACM*" \) -type c -printf "%T@ %p\n" 2>/dev/null | sort -nrk1 | head -n 3 | awk '{print $2}')
-
-USER_CHOICE=""
-DEVICE=""
-
-if [ ${#recent_devices_list[@]} -gt 0 ]; then
-  echo -e "${COLOR_GLADOS}I've detected the following recently active devices (most recent first):${COLOR_RESET}"
-  for i in "${!recent_devices_list[@]}"; do
-    echo -e "  ${COLOR_PROMPT}$((i+1))) ${COLOR_INFO}${recent_devices_list[$i]}${COLOR_RESET}"
-  done
-  echo -e "${COLOR_GLADOS}Enter a number to select, type the path manually, or press Enter for default (${COLOR_INFO}${DEFAULT_DEVICE}${COLOR_GLADOS}):${COLOR_RESET}"
-  read -r USER_CHOICE
-  
-  if [[ "$USER_CHOICE" =~ ^[0-9]+$ ]] && [ "$USER_CHOICE" -ge 1 ] && [ "$USER_CHOICE" -le ${#recent_devices_list[@]} ]; then
-    DEVICE="${recent_devices_list[$((USER_CHOICE-1))]}"
-    echo -e "${COLOR_GLADOS}Selected: ${COLOR_INFO}${DEVICE}${COLOR_RESET}"
-  elif [ -z "$USER_CHOICE" ]; then
-    DEVICE="$DEFAULT_DEVICE"
-    echo -e "${COLOR_GLADOS}Defaulting to ${COLOR_INFO}${DEVICE}${COLOR_GLADOS}.${COLOR_RESET}"
-  else 
-    DEVICE="$USER_CHOICE"
-    echo -e "${COLOR_GLADOS}Using manually entered device: ${COLOR_INFO}${DEVICE}${COLOR_GLADOS}.${COLOR_RESET}"
-  fi
-else
-  echo -e "${COLOR_GLADOS}No recent TTY devices automatically detected by my primary scan..."
-  echo -e "${COLOR_GLADOS}I can run a few diagnostic subroutines to assist you.${COLOR_RESET}"
-
-  read -p "$(echo -e ${COLOR_PROMPT}"List all potential TTY devices (ls /dev/ttyUSB* /dev/ttyACM*)? (y/N): "${COLOR_RESET})" -n 1 -r REPLY
-  echo # Newline
-  if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo -e "${COLOR_GLADOS}Executing: ${COLOR_COMMAND}ls -1 /dev/ttyUSB* /dev/ttyACM*${COLOR_RESET}"
-    OUTPUT=$(ls -1 /dev/ttyUSB* /dev/ttyACM* 2>/dev/null)
-    if [ -n "$OUTPUT" ]; then
-      echo "$OUTPUT"
-    else
-      echo -e "${COLOR_INFO}No devices found matching /dev/ttyUSB* or /dev/ttyACM*.${COLOR_RESET}"
-    fi
-    echo -e "${COLOR_GLADOS}Please examine the list above (if any).${COLOR_RESET}"
+  if [ -z "$choice" ]; then
+    choice=${personas[$((RANDOM % ${#personas[@]}))]}
+    printf "${C_YELLOW}No persona specified. The fates have chosen: ${C_BOLD}%s${C_RESET}\n" "$choice"
+    sleep 1
   fi
 
-  read -p "$(echo -e ${COLOR_PROMPT}"Show recent kernel messages for USB/Serial (dmesg - useful if you just plugged it in)? (y/N): "${COLOR_RESET})" -n 1 -r REPLY
-  echo # Newline
-  if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo -e "${COLOR_GLADOS}Executing: ${COLOR_COMMAND}dmesg | grep -iE 'usb|serial|tty|ch34|cp210|pl2303' | tail -n 20${COLOR_RESET}"
-    OUTPUT=$(dmesg | grep -iE 'usb|serial|tty|ch34|cp210|pl2303' | tail -n 20)
-    if [ -n "$OUTPUT" ]; then
-      echo "$OUTPUT"
-    else
-      echo -e "${COLOR_INFO}No particularly revealing kernel messages found with that filter.${COLOR_RESET}"
-    fi
-    echo -e "${COLOR_GLADOS}Look for lines indicating a new serial device like ${COLOR_INFO}/dev/ttyUSB0${COLOR_GLADOS} or ${COLOR_INFO}/dev/ttyACM0${COLOR_GLADOS}.${COLOR_RESET}"
-  fi
+  # --- Persona Text Definitions ---
+  declare -A WIZARD_TEXT=(
+    [title]="The Oracle of Device Access"
+    [author]="A spell by: ShadowHarvy"
+    [welcome]="Welcome, seeker. You require access to a sacred artifact, do you not?"
+    [analyzing]="Let us consult the system's arcane energies for device '%s'..."
+    [device_not_found]="The artifact '%s' cannot be found in this realm. Is it properly connected?"
+    [device_found]="The artifact '%s' has been detected."
+    [finding_group]="Scrying for the guardian group of the artifact..."
+    [group_found]="The guardian group is revealed to be '%s'."
+    [user_is]="You are known to the spirits as '%s'."
+    [initiating_ritual]="We shall now perform the Ritual of Access for user '%s' to group '%s'."
+    [sudo_prompt]="This ritual requires great power. Prepare to invoke 'sudo'."
+    [confirm_prompt]="Shall we proceed with the ritual? (y/n): "
+    [cancelled]="The ritual is aborted. The spirits are displeased."
+    [success]="Success! User '%s' has joined the '%s' fellowship."
+    [logout_notice]="You must rest and meditate (log out and back in) for the changes to be recognized by the spirits."
+    [failure]="The ritual failed. The arcane energies are in turmoil."
+    [conclusion]="The Oracle has spoken. Go now, and create wonders."
+  )
 
-  echo -e "\n${COLOR_GLADOS}Based on the information (or lack thereof), please manually enter the device path.${COLOR_RESET}"
-  read -p "$(echo -e ${COLOR_PROMPT}"Enter the device file for your ESP (e.g., /dev/ttyUSB0) [${DEFAULT_DEVICE}]: "${COLOR_RESET})" DEVICE_INPUT
-  DEVICE="${DEVICE_INPUT:-${DEFAULT_DEVICE}}"
-  if [ "$DEVICE" == "$DEFAULT_DEVICE" ] && [ -n "$DEVICE_INPUT" ]; then
-     echo -e "${COLOR_GLADOS}Using entered device: ${COLOR_INFO}${DEVICE}${COLOR_RESET}"
-  elif [ "$DEVICE" == "$DEFAULT_DEVICE" ] && [ -z "$DEVICE_INPUT" ]; then
-     echo -e "${COLOR_GLADOS}Defaulting to ${COLOR_INFO}${DEVICE}${COLOR_GLADOS}.${COLOR_RESET}"
-  elif [ -n "$DEVICE_INPUT" ]; then
-     echo -e "${COLOR_GLADOS}Using entered device: ${COLOR_INFO}${DEVICE}${COLOR_RESET}"
-  fi
-fi
+  declare -A GLADOS_TEXT=(
+    [title]="Aperture Science Permissions Facilitator"
+    [author]="Mandated Acknowledgment: Conceived by ShadowHarvy"
+    [welcome]="Oh, look. Another test subject... I mean, *user*... requires access adjustments."
+    [analyzing]="Right. Let's analyze your... *quaint*... security configuration for device '%s'."
+    [device_not_found]="Error: Device '%s' not found. Did you forget to plug it in? Or perhaps it simply doesn't *like* you."
+    [device_found]="Device '%s' detected. Minimal compliance noted."
+    [finding_group]="Executing primitive command to determine group ownership..."
+    [group_found]="Analysis complete. The group with access privileges is: '%s'."
+    [user_is]="Your user account is: '%s'."
+    [initiating_ritual]="Now, initiating the procedure to grant '%s' access to group '%s'."
+    [sudo_prompt]="This requires elevated privileges. Prepare for the 'sudo' prompt. Don't mess it up."
+    [confirm_prompt]="Proceed? (y/N): "
+    [cancelled]="Procedure aborted by user. Cowardice noted in your permanent record."
+    [success]="Success. User '%s' has been added to group '%s'. Try not to break anything."
+    [logout_notice]="Important: The system changes require you to log out and log back in, or reboot. Do it now."
+    [failure]="Operation Failed. Perhaps you mistyped your password? Or maybe the system decided you are... *unworthy*."
+    [conclusion]="This concludes the assistance protocol. I'll be watching."
+  )
 
+  declare -A DM_TEXT=(
+    [title]="The Guild of Device Access"
+    [author]="A quest from: ShadowHarvy"
+    [welcome]="Greetings, adventurer! You seek to join a new guild, I see."
+    [analyzing]="Let's check the guild charter for the device at '%s'..."
+    [device_not_found]="Alas, the device '%s' cannot be found. Have you brought it with you on your travels?"
+    [device_found]="The device '%s' is present and accounted for."
+    [finding_group]="Identifying the guild that protects this device..."
+    [group_found]="The device is protected by the '%s' guild."
+    [user_is]="You are known in these lands as '%s'."
+    [initiating_ritual]="We shall now petition for '%s' to join the '%s' guild."
+    [sudo_prompt]="This requires a royal decree. You must present your 'sudo' credentials."
+    [confirm_prompt]="Are you ready to pledge your allegiance? (y/n): "
+    [cancelled]="You have withdrawn your petition. The guild master is disappointed."
+    [success]="Congratulations! User '%s' is now a member of the '%s' guild."
+    [logout_notice]="You must leave the tavern and return (log out and back in) for your new membership to be recognized."
+    [failure]="Your petition has failed. The royal court is not convinced of your worthiness."
+    [conclusion]="Your guild business is concluded. Go forth on your next adventure!"
+  )
 
-echo -e "\n${COLOR_GLADOS}Right. Let's analyze your... ${COLOR_INFO}*primitive*${COLOR_GLADOS} security configuration for device ${COLOR_INFO}${DEVICE}${COLOR_GLADOS}.${COLOR_RESET}"
-sleep 1
+  declare -A SASSY_TEXT=(
+    [title]="The 'Just Give Me Access' Utility"
+    [author]="By: Someone who has better things to do."
+    [welcome]="Okay, let's sort out your permissions. This shouldn't take long. Unless you mess it up."
+    [analyzing]="Looking for your little device at '%s'. Hope it's actually there."
+    [device_not_found]="And it's not there. Shocker. Did you even plug it in?"
+    [device_found]="Found '%s'. See? Not that hard."
+    [finding_group]="Figuring out which group owns this thing..."
+    [group_found]="Okay, the group is '%s'."
+    [user_is]="And you are, apparently, '%s'."
+    [initiating_ritual]="Right, let's add '%s' to the '%s' group. Finally."
+    [sudo_prompt]="You'll need to use 'sudo'. Try to type your password correctly the first time."
+    [confirm_prompt]="Are we doing this or what? (y/n): "
+    [cancelled]="Fine, be that way. Your loss."
+    [success]="There. You're in. User '%s' is now in group '%s'."
+    [logout_notice]="Now, you have to log out and back in for this to work. Yes, really."
+    [failure]="It failed. I'm not surprised. Check the error, I guess."
+    [conclusion]="Done. Now if you'll excuse me, I have actual work to do."
+  )
 
-# 1. Check if the device exists
-if [ ! -c "$DEVICE" ]; then
-  echo -e "${COLOR_ERROR}Error: Device ${COLOR_INFO}${DEVICE}${COLOR_ERROR} not found or is not a character device. Did you forget to plug it in? Or perhaps it's just being difficult.${COLOR_RESET}"
-  echo -e "${COLOR_GLADOS}Ensure you've selected or entered the correct device path. These things are notoriously fickle.${COLOR_RESET}"
-  exit 1
-fi
-echo -e "${COLOR_GLADOS}Device ${COLOR_INFO}${DEVICE}${COLOR_GLADOS} confirmed. Minimal compliance achieved.${COLOR_RESET}"
-sleep 1
+  declare -A SARCASTIC_TEXT=(
+    [title]="The 'Why Isn't This Working?' Fixer"
+    [author]="Because reading the manual is for other people."
+    [welcome]="Oh, you can't access a device? How completely unexpected. Let's see what's wrong."
+    [analyzing]="Searching for the elusive device at '%s'. This is thrilling."
+    [device_not_found]="And it's not found. A brilliant start to our journey."
+    [device_found]="What do you know, '%s' actually exists. Progress."
+    [finding_group]="Determining the group you're supposed to be in..."
+    [group_found]="The group is '%s'. Write that down, there might be a test later."
+    [user_is]="And you, the user, are '%s'."
+    [initiating_ritual]="Now for the incredibly complex task of adding '%s' to the '%s' group."
+    [sudo_prompt]="You'll need 'sudo' for this. I trust you remember your own password."
+    [confirm_prompt]="Shall we proceed with this monumental task? (y/n): "
+    [cancelled]="Aborting. I'm sure you had your reasons."
+    [success]="It worked. User '%s' has been added to group '%s'. A true miracle of technology."
+    [logout_notice]="Of course, for this to actually take effect, you need to log out and back in. Don't forget that part."
+    [failure]="It failed. I'm shocked. Shocked, I tell you. Well, not that shocked."
+    [conclusion]="The task is complete. I'm sure everything will work perfectly from now on."
+  )
 
-# 2. Identify the group
-echo -e "${COLOR_GLADOS}Executing archaic command to determine group ownership:${COLOR_RESET}"
-echo -e "  ${COLOR_COMMAND}ls -l ${DEVICE}${COLOR_RESET}"
-LS_OUTPUT=$(ls -l "$DEVICE")
-echo -e "  ${COLOR_INFO}Output: ${LS_OUTPUT}${COLOR_RESET}"
-sleep 0.5
-
-DEVICE_GROUP=$(echo "$LS_OUTPUT" | awk '{print $4}')
-
-if [ -z "$DEVICE_GROUP" ]; then
-  echo -e "${COLOR_ERROR}Critical Failure: Could not extract group information. The system is clearly unimpressed with this ESP device.${COLOR_RESET}"
-  exit 1
-fi
-
-echo -e "\n${COLOR_GLADOS}Analysis complete. The group with access privileges is: ${COLOR_INFO}${DEVICE_GROUP}${COLOR_GLADOS} (often 'dialout' or 'uucp' for these things).${COLOR_RESET}"
-sleep 1.5
-echo -e "${COLOR_GLADOS}Your user account is: ${COLOR_INFO}${USER}${COLOR_GLADOS}.${COLOR_RESET}"
-sleep 1
-
-# 3. Check if user is already in the group and add if necessary
-echo -e "\n${COLOR_GLADOS}Checking current group memberships for ${COLOR_INFO}${USER}${COLOR_GLADOS}...${COLOR_RESET}"
-if groups "${USER}" | grep -q -w "${DEVICE_GROUP}"; then
-  echo -e "${COLOR_SUCCESS}User ${USER} is already a member of group ${DEVICE_GROUP}.${COLOR_RESET}"
-  echo -e "${COLOR_GLADOS}No modifications needed. Your foresight is... adequate.${COLOR_RESET}"
-  # If already a member, ensure they know a logout/login might still be needed if it's a *new* addition from a previous session
-  echo -e "\n${COLOR_GLADOS}Remember: If this group membership was added recently in another session, a ${COLOR_INFO}log out and log back in${COLOR_GLADOS} or ${COLOR_INFO}reboot${COLOR_GLADOS} might still be required for all applications to recognize it.${COLOR_RESET}"
-else
-  echo -e "${COLOR_INFO}User ${USER} is NOT currently a member of group ${DEVICE_GROUP}.${COLOR_RESET}"
-  echo -e "${COLOR_GLADOS}Initiating the procedure to grant ${COLOR_INFO}${USER}${COLOR_GLADOS} access to group ${COLOR_INFO}${DEVICE_GROUP}${COLOR_GLADOS} for ESP communication."
-  echo -e "${COLOR_GLADOS}This requires elevated privileges. Prepare for the ${COLOR_INFO}sudo${COLOR_GLADOS} prompt. Don't disappoint me.${COLOR_RESET}"
-  sleep 1
-
-  echo -e "${COLOR_GLADOS}The command I am ${COLOR_INFO}*graciously*${COLOR_GLADOS} executing for you is:${COLOR_RESET}"
-  echo -e "  ${COLOR_COMMAND}sudo usermod -a -G ${DEVICE_GROUP} ${USER}${COLOR_RESET}"
-  sleep 1.5
-
-  read -p "$(echo -e ${COLOR_INFO}"Proceed with this modification? (y/N): "${COLOR_RESET})" -n 1 -r REPLY
-  echo # Move to a new line
-
-  if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo -e "${COLOR_GLADOS}Fine. Executing modification protocol... Try not to release the magic smoke from your ESP.${COLOR_RESET}"
-    sudo usermod -a -G "${DEVICE_GROUP}" "${USER}"
-    EXIT_STATUS=$?
-
-    if [ $EXIT_STATUS -eq 0 ]; then
-      echo -e "\n${COLOR_SUCCESS}Success. User ${USER} has been added to group ${DEVICE_GROUP}. Your ESP might actually communicate now.${COLOR_RESET}"
-      sleep 1
-      echo -e "\n${COLOR_GLADOS}Crucial Information: For these changes to take effect, you ${COLOR_INFO}MUST log out and log back in${COLOR_GLADOS}, or ${COLOR_INFO}reboot your computer${COLOR_GLADOS}."
-      echo -e "${COLOR_GLADOS}Do it. The Enrichment Center protocols demand it.${COLOR_RESET}"
-    else
-      echo -e "\n${COLOR_ERROR}Operation Failed. Exit status: ${EXIT_STATUS}.${COLOR_RESET}"
-      echo -e "${COLOR_GLADOS}An error occurred. Did you mistype your password? Or perhaps the system has deemed your ESP project... ${COLOR_INFO}*insufficiently advanced*.${COLOR_RESET}"
-      echo -e "${COLOR_GLADOS}Consult the error messages above, if any were provided by the ${COLOR_INFO}sudo${COLOR_GLADOS} command.${COLOR_RESET}"
-    fi
-  else
-    echo -e "\n${COLOR_GLADOS}Procedure aborted by user. A distinct lack of scientific curiosity has been noted.${COLOR_RESET}"
-  fi
-fi
-
-# Sign-off
-echo -e "\n${COLOR_GLADOS}This concludes the ESP permissions protocol. May your code compile and your device flash... ${COLOR_INFO}*this time*.${COLOR_RESET}"
-echo -e "${COLOR_TITLE}======================================================${COLOR_RESET}\n"
-
-exit 0
-#!/bin/bash
-
-# --- Configuration ---
-DEFAULT_DEVICE="/dev/ttyUSB0" # Common default for ESP devices
-AUTHOR="ShadowHarvy & Gemini"
-
-# --- Colors (Because dreary monochrome is so inefficient) ---
-COLOR_RESET='\033[0m'
-COLOR_TITLE='\033[1;36m'   # Bold Cyan
-COLOR_GLADOS='\033[0;36m'  # Cyan
-COLOR_INFO='\033[0;33m'    # Yellow
-COLOR_COMMAND='\033[1;33m' # Bold Yellow
-COLOR_SUCCESS='\033[0;32m' # Green
-COLOR_ERROR='\033[0;31m'   # Red
-COLOR_PROMPT='\033[1;35m'  # Bold Magenta
-
-# --- Functions ---
-
-# A crude simulation of progress. Adequate for organic patience levels.
-fake_loader() {
-  local duration=${1:-3} # Default 3 seconds
-  local message=${2:-"Processing"}
-  echo -en "${COLOR_GLADOS}${message}... ${COLOR_RESET}"
-  for ((i = 0; i < ${duration}; i++)); do
-    echo -n "."
-    sleep 0.6
-  done
-  echo -e " ${COLOR_SUCCESS}Complete.${COLOR_RESET}"
-  sleep 0.5
+  case "$choice" in
+  wizard) for k in "${!WIZARD_TEXT[@]}"; do TEXT["$k"]="${WIZARD_TEXT[$k]}"; done ;;
+  glados) for k in "${!GLADOS_TEXT[@]}"; do TEXT["$k"]="${GLADOS_TEXT[$k]}"; done ;;
+  dm) for k in "${!DM_TEXT[@]}"; do TEXT["$k"]="${DM_TEXT[$k]}"; done ;;
+  sassy) for k in "${!SASSY_TEXT[@]}"; do TEXT["$k"]="${SASSY_TEXT[$k]}"; done ;;
+  sarcastic) for k in "${!SARCASTIC_TEXT[@]}"; do TEXT["$k"]="${SARCASTIC_TEXT[$k]}"; done ;;
+  *)
+    printf "${C_RED}Error: Unknown persona '%s'.${C_RESET}\n" "$choice"
+    print_usage
+    exit 1
+    ;;
+  esac
 }
 
-# --- Script Start ---
+# --- Main Execution Logic ---
+main() {
+  local persona_choice=""
+  local device="$DEFAULT_DEVICE"
 
-# Title Screen Sequence Initiated. Prepare your optical sensors.
-clear
-echo -e "${COLOR_TITLE}"
-echo "======================================================"
-echo "     Aperture Science ESP Permissions Facilitator     "
-echo "            (Microcontroller Protocol v2.2)           " # Updated subtitle
-echo "======================================================"
-echo -e "      Mandated Acknowledgment: Conceived by ${AUTHOR}"
-echo -e "${COLOR_RESET}"
-sleep 2
-
-echo -e "${COLOR_GLADOS}Oh, it seems another... ${COLOR_INFO}*enthusiast*${COLOR_GLADOS}... wishes to interface with one of those quaint little ESP boards."
-echo -e "My advanced heuristics are attempting to locate your device... ${COLOR_INFO}*try*${COLOR_GLADOS} to keep up.${COLOR_RESET}"
-sleep 1.5
-
-# Fake Loading - Because apparently, you enjoy waiting.
-fake_loader 4 "Scanning Device Manifolds & Verifying User Group Affiliations"
-
-# --- Device Identification ---
-echo -e "\n${COLOR_GLADOS}Let's pinpoint your ESP device."
-
-# Attempt to find recent devices by modification time
-declare -a recent_devices_list
-# Search for ttyUSB* and ttyACM* character devices, print modification time (Unix epoch) and path,
-# sort numerically by time (descending), take top 3, then extract just the path.
-mapfile -t recent_devices_list < <(find /dev -maxdepth 1 \( -name "ttyUSB*" -o -name "ttyACM*" \) -type c -printf "%T@ %p\n" 2>/dev/null | sort -nrk1 | head -n 3 | awk '{print $2}')
-
-USER_CHOICE=""
-DEVICE=""
-
-if [ ${#recent_devices_list[@]} -gt 0 ]; then
-  echo -e "${COLOR_GLADOS}I've detected the following recently active devices (most recent first):${COLOR_RESET}"
-  for i in "${!recent_devices_list[@]}"; do
-    echo -e "  ${COLOR_PROMPT}$((i+1))) ${COLOR_INFO}${recent_devices_list[$i]}${COLOR_RESET}"
+  while getopts ":p:d:h" opt; do
+    case $opt in
+    p) persona_choice="$OPTARG" ;;
+    d) device="$OPTARG" ;;
+    h)
+      print_usage
+      exit 0
+      ;;
+    \?)
+      printf "Invalid option: -$OPTARG\n" >&2
+      print_usage
+      exit 1
+      ;;
+    esac
   done
-  echo -e "${COLOR_GLADOS}Enter a number to select, type the path manually, or press Enter for default (${COLOR_INFO}${DEFAULT_DEVICE}${COLOR_GLADOS}):${COLOR_RESET}"
-  read -r USER_CHOICE
-  
-  if [[ "$USER_CHOICE" =~ ^[0-9]+$ ]] && [ "$USER_CHOICE" -ge 1 ] && [ "$USER_CHOICE" -le ${#recent_devices_list[@]} ]; then
-    DEVICE="${recent_devices_list[$((USER_CHOICE-1))]}"
-    echo -e "${COLOR_GLADOS}Selected: ${COLOR_INFO}${DEVICE}${COLOR_RESET}"
-  elif [ -z "$USER_CHOICE" ]; then
-    DEVICE="$DEFAULT_DEVICE"
-    echo -e "${COLOR_GLADOS}Defaulting to ${COLOR_INFO}${DEVICE}${COLOR_GLADOS}.${COLOR_RESET}"
-  else 
-    DEVICE="$USER_CHOICE"
-    echo -e "${COLOR_GLADOS}Using manually entered device: ${COLOR_INFO}${DEVICE}${COLOR_GLADOS}.${COLOR_RESET}"
-  fi
-else
-  echo -e "${COLOR_GLADOS}No recent TTY devices automatically detected by my primary scan..."
-  echo -e "${COLOR_GLADOS}I can run a few diagnostic subroutines to assist you.${COLOR_RESET}"
+  shift $((OPTIND - 1))
 
-  read -p "$(echo -e ${COLOR_PROMPT}"List all potential TTY devices (ls /dev/ttyUSB* /dev/ttyACM*)? (y/N): "${COLOR_RESET})" -n 1 -r REPLY
-  echo # Newline
-  if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo -e "${COLOR_GLADOS}Executing: ${COLOR_COMMAND}ls -1 /dev/ttyUSB* /dev/ttyACM*${COLOR_RESET}"
-    OUTPUT=$(ls -1 /dev/ttyUSB* /dev/ttyACM* 2>/dev/null)
-    if [ -n "$OUTPUT" ]; then
-      echo "$OUTPUT"
-    else
-      echo -e "${COLOR_INFO}No devices found matching /dev/ttyUSB* or /dev/ttyACM*.${COLOR_RESET}"
-    fi
-    echo -e "${COLOR_GLADOS}Please examine the list above (if any).${COLOR_RESET}"
-  fi
+  setup_persona "$persona_choice"
 
-  read -p "$(echo -e ${COLOR_PROMPT}"Show recent kernel messages for USB/Serial (dmesg - useful if you just plugged it in)? (y/N): "${COLOR_RESET})" -n 1 -r REPLY
-  echo # Newline
-  if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo -e "${COLOR_GLADOS}Executing: ${COLOR_COMMAND}dmesg | grep -iE 'usb|serial|tty|ch34|cp210|pl2303' | tail -n 20${COLOR_RESET}"
-    OUTPUT=$(dmesg | grep -iE 'usb|serial|tty|ch34|cp210|pl2303' | tail -n 20)
-    if [ -n "$OUTPUT" ]; then
-      echo "$OUTPUT"
-    else
-      echo -e "${COLOR_INFO}No particularly revealing kernel messages found with that filter.${COLOR_RESET}"
-    fi
-    echo -e "${COLOR_GLADOS}Look for lines indicating a new serial device like ${COLOR_INFO}/dev/ttyUSB0${COLOR_GLADOS} or ${COLOR_INFO}/dev/ttyACM0${COLOR_GLADOS}.${COLOR_RESET}"
-  fi
+  clear
+  cat <<EOF
+====================================================================
+${C_PURPLE}${TEXT[title]}${C_RESET}
+${TEXT[author]}
+====================================================================
+EOF
 
-  echo -e "\n${COLOR_GLADOS}Based on the information (or lack thereof), please manually enter the device path.${COLOR_RESET}"
-  read -p "$(echo -e ${COLOR_PROMPT}"Enter the device file for your ESP (e.g., /dev/ttyUSB0) [${DEFAULT_DEVICE}]: "${COLOR_RESET})" DEVICE_INPUT
-  DEVICE="${DEVICE_INPUT:-${DEFAULT_DEVICE}}"
-  if [ "$DEVICE" == "$DEFAULT_DEVICE" ] && [ -n "$DEVICE_INPUT" ]; then
-     echo -e "${COLOR_GLADOS}Using entered device: ${COLOR_INFO}${DEVICE}${COLOR_RESET}"
-  elif [ "$DEVICE" == "$DEFAULT_DEVICE" ] && [ -z "$DEVICE_INPUT" ]; then
-     echo -e "${COLOR_GLADOS}Defaulting to ${COLOR_INFO}${DEVICE}${COLOR_GLADOS}.${COLOR_RESET}"
-  elif [ -n "$DEVICE_INPUT" ]; then
-     echo -e "${COLOR_GLADOS}Using entered device: ${COLOR_INFO}${DEVICE}${COLOR_RESET}"
-  fi
-fi
-
-
-echo -e "\n${COLOR_GLADOS}Right. Let's analyze your... ${COLOR_INFO}*primitive*${COLOR_GLADOS} security configuration for device ${COLOR_INFO}${DEVICE}${COLOR_GLADOS}.${COLOR_RESET}"
-sleep 1
-
-# 1. Check if the device exists
-if [ ! -c "$DEVICE" ]; then
-  echo -e "${COLOR_ERROR}Error: Device ${COLOR_INFO}${DEVICE}${COLOR_ERROR} not found or is not a character device. Did you forget to plug it in? Or perhaps it's just being difficult.${COLOR_RESET}"
-  echo -e "${COLOR_GLADOS}Ensure you've selected or entered the correct device path. These things are notoriously fickle.${COLOR_RESET}"
-  exit 1
-fi
-echo -e "${COLOR_GLADOS}Device ${COLOR_INFO}${DEVICE}${COLOR_GLADOS} confirmed. Minimal compliance achieved.${COLOR_RESET}"
-sleep 1
-
-# 2. Identify the group
-echo -e "${COLOR_GLADOS}Executing archaic command to determine group ownership:${COLOR_RESET}"
-echo -e "  ${COLOR_COMMAND}ls -l ${DEVICE}${COLOR_RESET}"
-LS_OUTPUT=$(ls -l "$DEVICE")
-echo -e "  ${COLOR_INFO}Output: ${LS_OUTPUT}${COLOR_RESET}"
-sleep 0.5
-
-DEVICE_GROUP=$(echo "$LS_OUTPUT" | awk '{print $4}')
-
-if [ -z "$DEVICE_GROUP" ]; then
-  echo -e "${COLOR_ERROR}Critical Failure: Could not extract group information. The system is clearly unimpressed with this ESP device.${COLOR_RESET}"
-  exit 1
-fi
-
-echo -e "\n${COLOR_GLADOS}Analysis complete. The group with access privileges is: ${COLOR_INFO}${DEVICE_GROUP}${COLOR_GLADOS} (often 'dialout' or 'uucp' for these things).${COLOR_RESET}"
-sleep 1.5
-echo -e "${COLOR_GLADOS}Your user account is: ${COLOR_INFO}${USER}${COLOR_GLADOS}.${COLOR_RESET}"
-sleep 1
-
-# 3. Check if user is already in the group and add if necessary
-echo -e "\n${COLOR_GLADOS}Checking current group memberships for ${COLOR_INFO}${USER}${COLOR_GLADOS}...${COLOR_RESET}"
-if groups "${USER}" | grep -q -w "${DEVICE_GROUP}"; then
-  echo -e "${COLOR_SUCCESS}User ${USER} is already a member of group ${DEVICE_GROUP}.${COLOR_RESET}"
-  echo -e "${COLOR_GLADOS}No modifications needed. Your foresight is... adequate.${COLOR_RESET}"
-  # If already a member, ensure they know a logout/login might still be needed if it's a *new* addition from a previous session
-  echo -e "\n${COLOR_GLADOS}Remember: If this group membership was added recently in another session, a ${COLOR_INFO}log out and log back in${COLOR_GLADOS} or ${COLOR_INFO}reboot${COLOR_GLADOS} might still be required for all applications to recognize it.${COLOR_RESET}"
-else
-  echo -e "${COLOR_INFO}User ${USER} is NOT currently a member of group ${DEVICE_GROUP}.${COLOR_RESET}"
-  echo -e "${COLOR_GLADOS}Initiating the procedure to grant ${COLOR_INFO}${USER}${COLOR_GLADOS} access to group ${COLOR_INFO}${DEVICE_GROUP}${COLOR_GLADOS} for ESP communication."
-  echo -e "${COLOR_GLADOS}This requires elevated privileges. Prepare for the ${COLOR_INFO}sudo${COLOR_GLADOS} prompt. Don't disappoint me.${COLOR_RESET}"
+  printf "\n${C_GREEN}%s${C_RESET}\n\n" "${TEXT[welcome]}"
   sleep 1
 
-  echo -e "${COLOR_GLADOS}The command I am ${COLOR_INFO}*graciously*${COLOR_GLADOS} executing for you is:${COLOR_RESET}"
-  echo -e "  ${COLOR_COMMAND}sudo usermod -a -G ${DEVICE_GROUP} ${USER}${COLOR_RESET}"
-  sleep 1.5
+  printf -- "-> "
+  printf "${TEXT[analyzing]}" "$device"
+  printf "\n"
 
-  read -p "$(echo -e ${COLOR_INFO}"Proceed with this modification? (y/N): "${COLOR_RESET})" -n 1 -r REPLY
-  echo # Move to a new line
-
-  if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo -e "${COLOR_GLADOS}Fine. Executing modification protocol... Try not to release the magic smoke from your ESP.${COLOR_RESET}"
-    sudo usermod -a -G "${DEVICE_GROUP}" "${USER}"
-    EXIT_STATUS=$?
-
-    if [ $EXIT_STATUS -eq 0 ]; then
-      echo -e "\n${COLOR_SUCCESS}Success. User ${USER} has been added to group ${DEVICE_GROUP}. Your ESP might actually communicate now.${COLOR_RESET}"
-      sleep 1
-      echo -e "\n${COLOR_GLADOS}Crucial Information: For these changes to take effect, you ${COLOR_INFO}MUST log out and log back in${COLOR_GLADOS}, or ${COLOR_INFO}reboot your computer${COLOR_GLADOS}."
-      echo -e "${COLOR_GLADOS}Do it. The Enrichment Center protocols demand it.${COLOR_RESET}"
-    else
-      echo -e "\n${COLOR_ERROR}Operation Failed. Exit status: ${EXIT_STATUS}.${COLOR_RESET}"
-      echo -e "${COLOR_GLADOS}An error occurred. Did you mistype your password? Or perhaps the system has deemed your ESP project... ${COLOR_INFO}*insufficiently advanced*.${COLOR_RESET}"
-      echo -e "${COLOR_GLADOS}Consult the error messages above, if any were provided by the ${COLOR_INFO}sudo${COLOR_GLADOS} command.${COLOR_RESET}"
-    fi
-  else
-    echo -e "\n${COLOR_GLADOS}Procedure aborted by user. A distinct lack of scientific curiosity has been noted.${COLOR_RESET}"
+  if [ ! -e "$device" ]; then
+    printf "${C_RED}"
+    printf "${TEXT[device_not_found]}" "$device"
+    printf "${C_RESET}\n" >&2
+    exit 1
   fi
-fi
+  printf "   ${C_GREEN}"
+  printf "${TEXT[device_found]}" "$device"
+  printf "${C_RESET}\n"
 
-# Sign-off
-echo -e "\n${COLOR_GLADOS}This concludes the ESP permissions protocol. May your code compile and your device flash... ${COLOR_INFO}*this time*.${COLOR_RESET}"
-echo -e "${COLOR_TITLE}======================================================${COLOR_RESET}\n"
+  printf -- "-> "
+  printf "${TEXT[finding_group]}"
+  printf "\n"
+
+  local DEVICE_GROUP
+  DEVICE_GROUP=$(ls -l "$device" | awk '{print $4}')
+
+  printf "   ${C_GREEN}"
+  printf "${TEXT[group_found]}" "$DEVICE_GROUP"
+  printf "${C_RESET}\n"
+
+  printf "   ${C_GREEN}"
+  printf "${TEXT[user_is]}" "$USER"
+  printf "${C_RESET}\n"
+
+  sleep 1
+
+  printf "\n"
+  printf "${TEXT[initiating_ritual]}" "$USER" "$DEVICE_GROUP"
+  printf "\n"
+  printf "${C_YELLOW}%s${C_RESET}\n" "${TEXT[sudo_prompt]}"
+
+  local CONFIRM
+  read -rp "$(printf "${TEXT[confirm_prompt]}")" CONFIRM
+  if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
+    printf "\n${C_YELLOW}%s${C_RESET}\n" "${TEXT[cancelled]}"
+    exit 0
+  fi
+
+  printf "\n"
+  sudo usermod -a -G "$DEVICE_GROUP" "$USER"
+  local EXIT_STATUS=$?
+
+  if [ $EXIT_STATUS -eq 0 ]; then
+    printf "\n${C_GREEN}"
+    printf "${TEXT[success]}" "$USER" "$DEVICE_GROUP"
+    printf "${C_RESET}\n"
+    printf "\n${C_YELLOW}%s${C_RESET}\n" "${TEXT[logout_notice]}"
+  else
+    printf "\n${C_RED}"
+    printf "${TEXT[failure]}"
+    printf "${C_RESET}\n"
+  fi
+
+  printf "\n${C_PURPLE}*** "
+  printf "${TEXT[conclusion]}"
+  printf " ***${C_RESET}\n\n"
+}
+
+# --- Script Entry Point ---
+main "$@"
 
 exit 0
