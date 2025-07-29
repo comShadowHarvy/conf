@@ -1,9 +1,9 @@
 #!/bin/bash
 # ===--------------------------------------------------===
-#      The Grand Repo Wrangler & Backupinator 9001
+#     The Grand Repo Wrangler & Backupinator 9001
 # ===--------------------------------------------------===
 # Author: ShadowHarvy (The Git Whisperer)
-# Version: 3.3 (Final Bug Hunt Edition)
+# Version: 3.4 (Community Fix Edition)
 #
 # Purpose: Scours configured realms for git repositories,
 #          bravely attempts to update them, and meticulously
@@ -11,7 +11,7 @@
 #          Now with selectable personalities for varied flavor!
 #
 # Usage:
-#   ./repo_manager_script_v3.sh [options]
+#   ./repo_manager_script_v4.sh [options]
 #
 # Options:
 #   -p <persona>  Choose a personality: wizard, glados, dm.
@@ -170,14 +170,14 @@ setup_persona() {
   )
 
   case "$choice" in
-  wizard) for k in "${!WIZARD_TEXT[@]}"; do TEXT["$k"]="${WIZARD_TEXT[$k]}"; done ;;
-  glados) for k in "${!GLADOS_TEXT[@]}"; do TEXT["$k"]="${GLADOS_TEXT[$k]}"; done ;;
-  dm) for k in "${!DM_TEXT[@]}"; do TEXT["$k"]="${DM_TEXT[$k]}"; done ;;
-  *)
-    printf "${C_RED}Error: Unknown persona '%s'.${C_RESET}\n" "$choice"
-    print_usage
-    exit 1
-    ;;
+    wizard) for k in "${!WIZARD_TEXT[@]}"; do TEXT["$k"]="${WIZARD_TEXT[$k]}"; done ;;
+    glados) for k in "${!GLADOS_TEXT[@]}"; do TEXT["$k"]="${GLADOS_TEXT[$k]}"; done ;;
+    dm) for k in "${!DM_TEXT[@]}"; do TEXT["$k"]="${DM_TEXT[$k]}"; done ;;
+    *)
+      printf "${C_RED}Error: Unknown persona '%s'.${C_RESET}\n" "$choice"
+      print_usage
+      exit 1
+      ;;
   esac
 }
 
@@ -188,7 +188,7 @@ print_header() {
 initial_loader() {
   if [ "$SKIP_THEATRICS" -eq 1 ]; then return; fi
   printf "\n"
-  local spinner=('⚙️    ' '⚙️⚙️   ' '⚙️⚙️⚙️  ' ' ⚙️⚙️⚙️ ' '  ⚙️⚙️⚙️' '   ⚙️⚙️' '    ⚙️' '     ')
+  local spinner=('⚙️   ' '⚙️⚙️  ' '⚙️⚙️⚙️ ' ' ⚙️⚙️⚙️' '  ⚙️⚙️⚙️' '   ⚙️⚙️' '    ⚙️' '     ')
   for i in {1..20}; do
     printf "\r ${C_CYAN}[*] %s ${spinner[i % ${#spinner[@]}]}${C_RESET}" "${TEXT[intro_start]}"
     sleep 0.2
@@ -215,7 +215,7 @@ process_repositories_in_dir() {
   find_output=$(find "$target_dir" -maxdepth 2 -name ".git" -type d -prune 2>/dev/null || true)
 
   if [ -z "$find_output" ]; then
-    printf "    -> "
+    printf "   -> "
     printf "${TEXT[no_repos_found]}" "$dir_name"
     printf "\n"
     return
@@ -233,7 +233,7 @@ process_repositories_in_dir() {
     printf "${C_RESET}\n"
 
     if ! pushd "$repo_dir" >/dev/null; then
-      printf "   ${C_RED}!! ERROR: Couldn't warp into '%s'. Skipping.${C_RESET}\n" "$repo_dir"
+      printf "  ${C_RED}!! ERROR: Couldn't warp into '%s'. Skipping.${C_RESET}\n" "$repo_dir"
       skipped_count=$((skipped_count + 1))
       continue
     fi
@@ -242,51 +242,51 @@ process_repositories_in_dir() {
     repo_url=$(git config --get remote.origin.url || true)
 
     if [ -z "$repo_url" ]; then
-      printf "   ${C_YELLOW}!! WARNING: No remote 'origin' found. Cannot update or reliably back up.${C_RESET}\n"
+      printf "  ${C_YELLOW}!! WARNING: No remote 'origin' found. Cannot update or reliably back up.${C_RESET}\n"
       skipped_count=$((skipped_count + 1))
     else
-      printf "      -> "
+      printf "     -> "
       printf "${TEXT[remote_url]}" "$repo_url"
       printf "\n"
       local entry_key="${repo_url},${repo_basename}"
 
-      if [ -z "${SCROLL_ENTRIES[$entry_key]}" ]; then
-        printf "      -> ${C_GREEN}"
+      # === FIX APPLIED HERE ===
+      # Use `[[ ! -v ... ]]` to safely check for key existence with `set -u`.
+      if [[ ! -v SCROLL_ENTRIES[$entry_key] ]]; then
+        printf "     -> ${C_GREEN}"
         printf "${TEXT[new_inscription]}" "$repo_basename"
         printf "${C_RESET}\n"
         SCROLL_ENTRIES["$entry_key"]=1
         REPOS_NEWLY_ADDED=$((REPOS_NEWLY_ADDED + 1))
       else
-        printf "      -> %s\n" "${TEXT[known_to_scroll]}"
+        printf "     -> %s\n" "${TEXT[known_to_scroll]}"
       fi
 
-      printf "      -> %s\n" "${TEXT[update_attempt]}"
+      printf "     -> %s\n" "${TEXT[update_attempt]}"
       if ! git fetch --quiet; then
-        printf "   ${C_YELLOW}!! WARNING: "
+        printf "  ${C_YELLOW}!! WARNING: "
         printf "${TEXT[fetch_fail]}" "$repo_basename"
         printf "${C_RESET}\n"
       else
         local status
         status=$(git status --short --branch)
-        # BUGFIX: Corrected the conditional logic for checking git status.
-        # The previous version had a syntax error in the 'diverged' check.
-        # This version uses correct glob patterns and a more logical order.
-        if [[ "$status" == *"[diverged"* ]]; then
-          printf "         -> ${C_YELLOW}%s${C_RESET}\n" "${TEXT[diverged]}"
+        # The order is critical: check for the most complex case (diverged) first.
+        if [[ "$status" == *"[ahead "*","*" behind "*"]"* ]]; then
+            printf "     -> ${C_YELLOW}%s${C_RESET}\n" "${TEXT[diverged]}"
         elif [[ "$status" == *"[behind "*"]"* ]]; then
-          printf "         -> %s\n" "${TEXT[behind_remote]}"
-          if git pull --quiet; then
-            printf "         -> ${C_GREEN}%s${C_RESET}\n" "${TEXT[pull_success]}"
+            printf "     -> %s\n" "${TEXT[behind_remote]}"
+            if git pull --quiet; then
+            printf "     -> ${C_GREEN}%s${C_RESET}\n" "${TEXT[pull_success]}"
             REPOS_WITH_UPDATES=$((REPOS_WITH_UPDATES + 1))
-          else
-            printf "         -> ${C_RED}%s${C_RESET}\n" "${TEXT[pull_fail]}"
-          fi
+            else
+            printf "     -> ${C_RED}%s${C_RESET}\n" "${TEXT[pull_fail]}"
+            fi
         elif [[ "$status" == *"[ahead "*"]"* ]]; then
-          printf "         -> %s\n" "${TEXT[ahead_remote]}"
-        elif [[ "$status" == *"..."* ]]; then # This means it has a remote tracking branch
-          printf "         -> ${C_GREEN}%s${C_RESET}\n" "${TEXT[up_to_date]}"
+            printf "     -> %s\n" "${TEXT[ahead_remote]}"
+        elif [[ "$status" == *"..."* ]]; then # The "..." indicates a tracking branch is set
+            printf "     -> ${C_GREEN}%s${C_RESET}\n" "${TEXT[up_to_date]}"
         else
-          printf "         -> %s\n" "${TEXT[no_tracking]}"
+            printf "     -> %s\n" "${TEXT[no_tracking]}"
         fi
       fi
     fi
@@ -325,7 +325,6 @@ EOF
   initial_loader
 
   print_header "${TEXT[corral_setup]}"
-  # ... (Directory setup and scroll reading logic remains the same)
   local made_dir=0
   for dir_to_check in "${SEARCH_DIRS[@]}" "$BACKUP_DIR"; do
     if [ ! -d "$dir_to_check" ]; then
@@ -342,9 +341,6 @@ EOF
     printf " -> Found existing backup scroll. Reading known lore...\n"
     original_conjured_date=$(grep -m1 "^# Conjured on:" "$BACKUP_FILE" | sed 's/# Conjured on: //' || true)
 
-    # FIX 2.0: Read filtered file content into a variable first, then loop
-    # over it using a here-string. This is more robust than process substitution
-    # and can prevent certain classes of subshell-related errors.
     local file_content
     file_content=$(grep -v '^#' "$BACKUP_FILE" | grep ',' || true)
     if [ -n "$file_content" ]; then
