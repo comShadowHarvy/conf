@@ -1,403 +1,138 @@
 #!/bin/bash
-# ===----------------------------------------===
-#         F3 Helper Script v2.1
-# ===----------------------------------------===
-# Author: ShadowHarvy
-# Version: 2.1 (Even More Personalities)
-#
-# Purpose: A helper script to interact with the F3
-#          (Fight Flash Fraud) tool suite, now with
-#          selectable personalities for a more engaging
-#          drive-testing experience.
-#
-# Usage:
-#   f3_helper.sh [options]
-#
-# Options:
-#   -p <persona>  Choose a personality: wizard, glados, dm, sassy, sarcastic.
-#   -h            Show this help message.
 
-# --- Strict Mode & Safety First ---
-set -euo pipefail
+# Color definitions
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+RESET='\033[0m'
 
-# --- Colors & Styles ---
-if [ -t 1 ]; then
-  C_RESET='\033[0m' C_BOLD='\033[1m' C_RED='\033[0;31m' C_GREEN='\033[0;32m'
-  C_YELLOW='\033[0;33m' C_BLUE='\033[0;34m' C_PURPLE='\033[0;35m' C_CYAN='\033[0;36m'
-else
-  C_RESET='' C_BOLD='' C_RED='' C_GREEN='' C_YELLOW='' C_BLUE='' C_PURPLE='' C_CYAN=''
-fi
-
-# --- Global State & Persona Text ---
-declare -A TEXT # This will hold the text for the chosen persona
-DRIVE_NAME=""
-MOUNT_POINT=""
-
-# --- Functions ---
-
-print_usage() {
-  cat <<EOF
-Usage: $0 [options]
-
-The F3 Helper Script v2.1
-
-A wrapper for the F3 tool suite to test storage drives.
-
-Options:
-  -p <persona>  Choose a personality. Available: wizard, glados, dm, sassy, sarcastic.
-                If omitted, a random one is chosen.
-  -h            Show this help message and exit.
-EOF
-}
-
-# Loads the text strings for the selected personality.
-setup_persona() {
-  local choice="${1:-}"
-  local personas=("wizard" "glados" "dm" "sassy" "sarcastic")
-
-  if [ -z "$choice" ]; then
-    choice=${personas[$((RANDOM % ${#personas[@]}))]}
-    printf "${C_YELLOW}No persona specified. The fates have chosen: ${C_BOLD}%s${C_RESET}\n" "$choice"
-    sleep 1
-  fi
-
-  # --- Persona Text Definitions ---
-  declare -A WIZARD_TEXT=(
-    [title]="The Grand Storage-Orb Diviner"
-    [welcome]="Welcome, seeker, to the Divination Chamber!"
-    [listing_drives]="Scrying the ethereal planes for storage orbs..."
-    [usb_drives]="Portable Magical Orbs:"
-    [all_drives]="All Detected Orbs:"
-    [available_drives]="Available Orbs for Divination:"
-    [select_prompt]="Select an orb by its number to divine its secrets: "
-    [invalid_selection]="That is not a valid choice, seeker. The spirits are confused."
-    [selected_drive]="You have chosen the orb known as /dev/%s."
-    [confirm_prompt]="Are you certain you wish to divine the secrets of /dev/%s? (y/n): "
-    [cancelled]="The ritual is cancelled."
-    [probing]="Casting the 'Probe Authenticity' spell on /dev/%s..."
-    [counterfeit]="This orb's aura is deceptive! It may be a counterfeit."
-    [fix_prompt]="Would you like to cast a 'Restoration' spell upon the orb? (y/n): "
-    [fixing]="Casting 'f3fix' on /dev/%s with a focus of --last-sec=%s..."
-    [fix_success]="The orb's energies have been realigned. You must re-enchant (reformat) it before use."
-    [fix_fail]="The 'Restoration' spell failed. The required focus could not be determined."
-    [genuine]="The orb's aura is true. It appears to be genuine."
-    [test_prompt]="Would you like to perform a full 'Integrity Test' on the orb? (y/n): "
-    [finding_mount]="Seeking the orb's anchor point to this realm..."
-    [mount_fail]="Failed to find or establish an anchor point. The ritual cannot proceed."
-    [mount_success]="Anchor point found at: %s"
-    [writing]="Inscribing test runes onto the orb at %s..."
-    [reading]="Reading the test runes from the orb at %s..."
-    [test_complete]="The 'Integrity Test' is complete."
-    [complete]="All divinations are complete. May your data be ever safe."
-  )
-
-  declare -A GLADOS_TEXT=(
-    [title]="Aperture Science Storage Medium Integrity Testing System"
-    [welcome]="Welcome, test subject, to the Storage Annex."
-    [listing_drives]="Analyzing all connected storage mediums..."
-    [usb_drives]="Portable Test Subjects:"
-    [all_drives]="All Available Test Subjects:"
-    [available_drives]="Available subjects for testing:"
-    [select_prompt]="Select a test subject by number: "
-    [invalid_selection]="Invalid selection. That was a test. You failed."
-    [selected_drive]="Test Subject /dev/%s has been selected for mandatory testing."
-    [confirm_prompt]="Are you sure you want to proceed with testing /dev/%s? (y/n): "
-    [cancelled]="Operation canceled. A note has been made on your permanent record."
-    [probing]="Initiating structural integrity scan on /dev/%s..."
-    [counterfeit]="Warning: Test subject appears to be a counterfeit. This is highly irregular."
-    [fix_prompt]="A corrective procedure ('f3fix') is available. Do you wish to apply it? (y/n): "
-    [fixing]="Applying corrective procedure to /dev/%s using parameter --last-sec=%s..."
-    [fix_success]="Corrective procedure applied. The subject must be re-initialized (reformatted)."
-    [fix_fail]="Could not determine the required parameter for the corrective procedure. Manual intervention required."
-    [genuine]="Test subject appears to be within acceptable manufacturing parameters."
-    [test_prompt]="Do you wish to perform a full data write/read cycle test? (y/n): "
-    [finding_mount]="Locating data interface point..."
-    [mount_fail]="Failed to establish a data interface. Test aborted."
-    [mount_success]="Data interface established at: %s"
-    [writing]="Initiating data write cycle at %s..."
-    [reading]="Initiating data read verification at %s..."
-    [test_complete]="Write/read cycle test completed."
-    [complete]="All tests are complete. You may now return to your assigned duties."
-  )
-
-  declare -A DM_TEXT=(
-    [title]="The Cartographer's Disk-Mapping Expedition"
-    [welcome]="Welcome, adventurer! Ready to map some new lands?"
-    [listing_drives]="Scouting the surrounding area for new continents..."
-    [usb_drives]="Caravans (USB Drives):"
-    [all_drives]="All Discovered Continents:"
-    [available_drives]="Continents available for expedition:"
-    [select_prompt]="Choose a continent to map by number: "
-    [invalid_selection]="Invalid choice. That continent is not on our maps."
-    [selected_drive]="You have chosen to lead an expedition to the continent of /dev/%s."
-    [confirm_prompt]="Are you sure you wish to begin the expedition to /dev/%s? (y/n): "
-    [cancelled]="The expedition has been called off."
-    [probing]="Sending a scout ahead to survey the lands of /dev/%s..."
-    [counterfeit]="The scout reports the land is treacherous and not as it seems! It may be an illusion."
-    [fix_prompt]="Would you like to send a party to remap the true boundaries of this land? (y/n): "
-    [fixing]="Remapping the continent of /dev/%s to its true last sector of %s..."
-    [fix_success]="The continent has been remapped. You must now rebuild (reformat) on the stable ground."
-    [fix_fail]="The scout could not determine the true boundaries. The land remains treacherous."
-    [genuine]="The scout reports the land is stable and as described on the maps."
-    [test_prompt]="Would you like to perform a full stress test of the terrain? (y/n): "
-    [finding_mount]="Establishing a base camp..."
-    [mount_fail]="Failed to establish a base camp. The expedition cannot proceed."
-    [mount_success]="Base camp established at: %s"
-    [writing]="Building test structures at %s..."
-    [reading]="Checking the integrity of the test structures at %s..."
-    [test_complete]="The terrain stress test is complete."
-    [complete]="The expedition is over. Well done, cartographer!"
-  )
-
-  declare -A SASSY_TEXT=(
-    [title]="The Flawless Drive Checker 5000"
-    [welcome]="Alright, let's see what you've got. Try to keep up."
-    [listing_drives]="Scanning for drives. Don't blink, you might miss it."
-    [usb_drives]="Whatever these are:"
-    [all_drives]="All the things you plugged in:"
-    [available_drives]="Okay, pick one. Chop chop."
-    [select_prompt]="Pick a drive by number, I guess. It's not like I have all day: "
-    [invalid_selection]="Seriously? That's not a number on the list. Try again."
-    [selected_drive]="Fine, we'll look at /dev/%s. Happy now?"
-    [confirm_prompt]="You *sure* you want to mess with /dev/%s? Your funeral. (y/n): "
-    [cancelled]="Yeah, yeah, cancelled. Whatever."
-    [probing]="Ugh, fine. Checking if /dev/%s is even real..."
-    [counterfeit]="Oh, look. It's a fake. Shocker. You get what you pay for."
-    [fix_prompt]="Want me to try and fix your cheap drive? (y/n): "
-    [fixing]="Trying to work some magic on /dev/%s with --last-sec=%s. Don't get your hopes up."
-    [fix_success]="Okay, it's 'fixed'. You still need to format it, obviously."
-    [fix_fail]="Couldn't figure out how to fix it. Big surprise."
-    [genuine]="Wow, it's actually real. I'm impressed. For once."
-    [test_prompt]="Do you want to waste more time with a full write/read test? (y/n): "
-    [finding_mount]="Trying to figure out where this thing is mounted..."
-    [mount_fail]="Couldn't mount it. Not my problem."
-    [mount_success]="Found it at %s. Finally."
-    [writing]="Scribbling a bunch of data to %s..."
-    [reading]="Making sure the data I just wrote is still there..."
-    [test_complete]="The test is done. Can I go now?"
-    [complete]="Done. Was that so hard? Now go do... whatever it is you do."
-  )
-
-  declare -A SARCASTIC_TEXT=(
-    [title]="The 'Is It Real?' Drive Questioner"
-    [welcome]="Oh, joy. Another drive to test. Let's get this over with."
-    [listing_drives]="Beginning the thrilling process of looking for storage devices."
-    [usb_drives]="Portable Sources of Disappointment:"
-    [all_drives]="All Potential Problems:"
-    [available_drives]="Here are your candidates. Choose wisely. Or don't."
-    [select_prompt]="Just point to the drive you want me to look at. I'll wait: "
-    [invalid_selection]="That's not one of the options. A stellar start."
-    [selected_drive]="Great choice. /dev/%s it is. I'm sure this will be fascinating."
-    [confirm_prompt]="You're absolutely positive you want me to do this to /dev/%s? Okay then. (y/n): "
-    [cancelled]="Operation cancelled. My day is marginally better now."
-    [probing]="Probing /dev/%s. I'll try to contain my excitement."
-    [counterfeit]="Congratulations, it's a counterfeit. I'm sure you got a great deal on it."
-    [fix_prompt]="I can *try* to fix it, I suppose. Your call. (y/n): "
-    [fixing]="Attempting a fix on /dev/%s with --last-sec=%s. This should be interesting."
-    [fix_success]="It's been 'fixed'. You'll need to format it, but you probably knew that."
-    [fix_fail]="Couldn't determine the fix parameters. How unfortunate."
-    [genuine]="Well, what do you know. It appears to be a genuine drive. Miracles never cease."
-    [test_prompt]="Do you want to perform the exhaustive write and read test now? (y/n): "
-    [finding_mount]="Searching for a mount point. The suspense is palpable."
-    [mount_fail]="Could not find or create a mount point. Tragic."
-    [mount_success]="The mount point is %s. Thrilling."
-    [writing]="Writing files to %s. This is the exciting part."
-    [reading]="Reading the files from %s. I hope you're on the edge of your seat."
-    [test_complete]="The write/read test has concluded."
-    [complete]="It's done. The drive has been tested. You're welcome."
-  )
-
-  case "$choice" in
-  wizard) for k in "${!WIZARD_TEXT[@]}"; do TEXT["$k"]="${WIZARD_TEXT[$k]}"; done ;;
-  glados) for k in "${!GLADOS_TEXT[@]}"; do TEXT["$k"]="${GLADOS_TEXT[$k]}"; done ;;
-  dm) for k in "${!DM_TEXT[@]}"; do TEXT["$k"]="${DM_TEXT[$k]}"; done ;;
-  sassy) for k in "${!SASSY_TEXT[@]}"; do TEXT["$k"]="${SASSY_TEXT[$k]}"; done ;;
-  sarcastic) for k in "${!SARCASTIC_TEXT[@]}"; do TEXT["$k"]="${SARCASTIC_TEXT[$k]}"; done ;;
-  *)
-    printf "${C_RED}Error: Unknown persona '%s'.${C_RESET}\n" "$choice"
-    print_usage
-    exit 1
-    ;;
-  esac
-}
-
+# Function to list drives
 list_drives() {
-  printf "${C_BLUE}%s${C_RESET}\n\n" "${TEXT[listing_drives]}"
+    echo -e "${BLUE}Listing all drives and identifying potential USB thumb drives:${RESET}"
+    echo
 
-  printf "${C_GREEN}%s${C_RESET}\n" "${TEXT[usb_drives]}"
-  lsblk -d -o NAME,SIZE,MODEL,TRAN | awk '
+    # List USB drives first
+    echo -e "${GREEN}USB Drives:${RESET}"
+    lsblk -d -o NAME,SIZE,MODEL,TRAN | awk '
         BEGIN { printf "%-10s %-10s %-20s %-10s\n", "NAME", "SIZE", "MODEL", "TRAN"; print "---------------------------------------------------" }
         $4 ~ /usb/ { printf "%-10s %-10s %-20s %-10s\n", $1, $2, $3, $4 }
     '
 
-  mapfile -t USB_DRIVES < <(lsblk -d -o NAME,TRAN | awk '$2 ~ /usb/ {print $1}')
+    # Store USB drives for numeric selection
+    mapfile -t USB_DRIVES < <(lsblk -d -o NAME,SIZE,MODEL,TRAN | grep usb | awk '{print $1, $2, $3, $4}')
 
-  printf "\n${C_CYAN}%s${C_RESET}\n" "${TEXT[all_drives]}"
-  lsblk -d -o NAME,SIZE,MODEL,TRAN | awk '
+    # List all drives, highlighting USB ones
+    echo -e "\n${CYAN}All Drives:${RESET}"
+    lsblk -d -o NAME,SIZE,MODEL,TRAN | awk '
         BEGIN { printf "%-10s %-10s %-20s %-10s\n", "NAME", "SIZE", "MODEL", "TRAN"; print "---------------------------------------------------" }
         $1 != "NAME" { printf "%-10s %-10s %-20s %-10s\n", $1, $2, $3, $4 }
     '
 
-  mapfile -t ALL_DRIVES < <(lsblk -d -o NAME,SIZE,MODEL | awk '$1 != "NAME" {print $1, $2, $3}')
+    # Store all drives for numeric selection
+    mapfile -t ALL_DRIVES < <(lsblk -d -o NAME,SIZE,MODEL,TRAN | grep -v NAME | awk '{print $1, $2, $3, $4}')
 
-  if [ ${#ALL_DRIVES[@]} -eq 0 ]; then
-    printf "${C_RED}No drives found. Exiting.${C_RESET}\n"
-    exit 1
-  fi
-
-  printf "\n${C_GREEN}%s${C_RESET}\n" "${TEXT[available_drives]}"
-  for i in "${!ALL_DRIVES[@]}"; do
-    local drive_name_only
-    drive_name_only=$(echo "${ALL_DRIVES[$i]}" | awk '{print $1}')
-    local is_usb=false
-    for usb_drive in "${USB_DRIVES[@]}"; do
-      if [[ "$drive_name_only" == "$usb_drive" ]]; then
-        is_usb=true
-        break
-      fi
+    echo -e "\n${GREEN}Available drives:${RESET}"
+    for i in "${!ALL_DRIVES[@]}"; do
+        DRIVE_INFO="${ALL_DRIVES[$i]}"
+        if [[ " ${USB_DRIVES[*]} " == *"${ALL_DRIVES[$i]}"* ]]; then
+            echo -e "${CYAN}$((i + 1))) $DRIVE_INFO (USB)${RESET}"
+        else
+            echo -e "${CYAN}$((i + 1))) $DRIVE_INFO${RESET}"
+        fi
     done
 
-    if $is_usb; then
-      printf "${C_CYAN}%s) %s (USB)${C_RESET}\n" "$((i + 1))" "${ALL_DRIVES[$i]}"
-    else
-      printf "${C_CYAN}%s) %s${C_RESET}\n" "$((i + 1))" "${ALL_DRIVES[$i]}"
+    # Prompt user to select a drive
+    read -p "Select a drive by number: " DRIVE_NUM
+    if [[ ! $DRIVE_NUM =~ ^[0-9]+$ ]] || ((DRIVE_NUM < 1 || DRIVE_NUM > ${#ALL_DRIVES[@]})); then
+        echo -e "${RED}Invalid selection. Exiting.${RESET}"
+        exit 1
     fi
-  done
 
-  local DRIVE_NUM
-  read -rp "${TEXT[select_prompt]}" DRIVE_NUM
-  if [[ ! $DRIVE_NUM =~ ^[0-9]+$ ]] || ((DRIVE_NUM < 1 || DRIVE_NUM > ${#ALL_DRIVES[@]})); then
-    printf "${C_RED}%s${C_RESET}\n" "${TEXT[invalid_selection]}"
-    exit 1
-  fi
-
-  DRIVE_NAME=$(echo "${ALL_DRIVES[$((DRIVE_NUM - 1))]}" | awk '{print $1}')
-  printf "${C_GREEN}"
-  printf "${TEXT[selected_drive]}" "$DRIVE_NAME"
-  printf "${C_RESET}\n"
+    DRIVE_NAME=$(echo "${ALL_DRIVES[$((DRIVE_NUM - 1))]}" | awk '{print $1}')
+    echo -e "${GREEN}Selected drive: /dev/${DRIVE_NAME}${RESET}"
 }
 
+# Function to find mount point
 find_mount_point() {
-  printf "${C_BLUE}%s${C_RESET}\n" "${TEXT[finding_mount]}"
-  local partition
-  # Find the first partition of the selected drive
-  partition=$(lsblk -ln -o NAME "/dev/$DRIVE_NAME" | sed -n 2p)
-
-  if [ -z "$partition" ]; then
-    printf "${C_RED}No partitions found on /dev/%s. Cannot mount.${C_RESET}\n" "$DRIVE_NAME"
-    exit 1
-  fi
-
-  MOUNT_POINT=$(lsblk -ln -o MOUNTPOINT "/dev/$partition")
-  if [[ -z "$MOUNT_POINT" ]]; then
-    udisksctl mount -b "/dev/$partition" >/dev/null 2>&1 || true
-    MOUNT_POINT=$(lsblk -ln -o MOUNTPOINT "/dev/$partition")
-  fi
-
-  if [[ -z "$MOUNT_POINT" ]]; then
-    printf "${C_RED}%s${C_RESET}\n" "${TEXT[mount_fail]}"
-    exit 1
-  fi
-
-  printf "${C_GREEN}"
-  printf "${TEXT[mount_success]}" "$MOUNT_POINT"
-  printf "${C_RESET}\n"
-}
-
-confirm_action() {
-  local CONFIRM
-  read -rp "$(printf "${TEXT[confirm_prompt]}" "$DRIVE_NAME")" CONFIRM
-  if [[ "$CONFIRM" != "y" ]]; then
-    printf "${C_RED}%s${C_RESET}\n" "${TEXT[cancelled]}"
-    exit 1
-  fi
-}
-
-probe_drive() {
-  printf "${C_BLUE}"
-  printf "${TEXT[probing]}" "$DRIVE_NAME"
-  printf "${C_RESET}\n"
-
-  local PROBE_OUTPUT
-  PROBE_OUTPUT=$(sudo f3probe --time-ops "/dev/$DRIVE_NAME" 2>&1)
-  echo "$PROBE_OUTPUT"
-
-  if echo "$PROBE_OUTPUT" | grep -q "is a counterfeit"; then
-    local LAST_SEC
-    LAST_SEC=$(echo "$PROBE_OUTPUT" | grep -oP 'f3fix --last-sec=\K[0-9]+')
-    printf "${C_YELLOW}%s${C_RESET}\n" "${TEXT[counterfeit]}"
-    local FIX_DRIVE
-    read -rp "${TEXT[fix_prompt]}" FIX_DRIVE
-    if [[ "$FIX_DRIVE" == "y" ]]; then
-      if [ -n "$LAST_SEC" ]; then
-        printf "${C_BLUE}"
-        printf "${TEXT[fixing]}" "$DRIVE_NAME" "$LAST_SEC"
-        printf "${C_RESET}\n"
-        sudo f3fix --last-sec="$LAST_SEC" "/dev/$DRIVE_NAME"
-        printf "${C_GREEN}%s${C_RESET}\n" "${TEXT[fix_success]}"
-      else
-        printf "${C_RED}%s${C_RESET}\n" "${TEXT[fix_fail]}"
-      fi
+    MOUNT_POINT=$(lsblk -o NAME,MOUNTPOINT | grep "^$DRIVE_NAME " | awk '{print $2}')
+    if [[ -z "$MOUNT_POINT" ]]; then
+        echo -e "${YELLOW}Drive is not mounted. Attempting to mount...${RESET}"
+        udisksctl mount -b "/dev/$DRIVE_NAME" >/dev/null 2>&1
+        MOUNT_POINT=$(lsblk -o NAME,MOUNTPOINT | grep "^$DRIVE_NAME " | awk '{print $2}')
     fi
-  else
-    printf "${C_GREEN}%s${C_RESET}\n" "${TEXT[genuine]}"
-  fi
+
+    if [[ -z "$MOUNT_POINT" ]]; then
+        echo -e "${RED}Failed to find or mount the drive. Exiting.${RESET}"
+        exit 1
+    fi
+
+    echo -e "${GREEN}Drive mount point: $MOUNT_POINT${RESET}"
 }
 
+# Function to confirm action
+confirm_action() {
+    read -p "Are you sure you want to continue with /dev/$DRIVE_NAME? (y/n): " CONFIRM
+    if [[ "$CONFIRM" != "y" ]]; then
+        echo -e "${RED}Operation canceled.${RESET}"
+        exit 1
+    fi
+}
+
+# Function to probe the drive
+probe_drive() {
+    echo -e "${BLUE}Running f3probe on /dev/$DRIVE_NAME...${RESET}"
+    PROBE_OUTPUT=$(sudo f3probe --time-ops "/dev/$DRIVE_NAME" 2>&1)
+    echo "$PROBE_OUTPUT"
+
+    if echo "$PROBE_OUTPUT" | grep -q "is a counterfeit"; then
+        LAST_SEC=$(echo "$PROBE_OUTPUT" | grep -oP 'f3fix --last-sec=\K[0-9]+')
+        echo -e "${YELLOW}Drive might be counterfeit!${RESET}"
+        read -p "Would you like to attempt to fix the drive with f3fix? (y/n): " FIX_DRIVE
+        if [[ "$FIX_DRIVE" == "y" ]]; then
+            if [ -n "$LAST_SEC" ]; then
+                echo -e "${BLUE}Running f3fix on /dev/$DRIVE_NAME with --last-sec=$LAST_SEC...${RESET}"
+                sudo f3fix --last-sec="$LAST_SEC" "/dev/$DRIVE_NAME"
+                echo -e "${GREEN}Drive has been fixed. Please reformat it before use.${RESET}"
+            else
+                echo -e "${RED}Unable to determine the required --last-sec value. Please check manually.${RESET}"
+            fi
+        else
+            echo -e "${YELLOW}Skipping fix operation.${RESET}"
+        fi
+    else
+        echo -e "${GREEN}Drive appears to be genuine.${RESET}"
+    fi
+}
+
+# Function to conduct write-read test
 write_read_test() {
-  local TEST_CHOICE
-  read -rp "${TEXT[test_prompt]}" TEST_CHOICE
-  if [[ "$TEST_CHOICE" == "y" ]]; then
-    find_mount_point
+    read -p "Would you like to perform a write-read test on /dev/$DRIVE_NAME? (y/n): " TEST_CHOICE
+    if [[ "$TEST_CHOICE" == "y" ]]; then
+        find_mount_point
 
-    printf "${C_BLUE}"
-    printf "${TEXT[writing]}" "$MOUNT_POINT"
-    printf "${C_RESET}\n"
-    sudo f3write "$MOUNT_POINT"
+        echo -e "${BLUE}Running f3write on $MOUNT_POINT...${RESET}"
+        sudo f3write "$MOUNT_POINT"
 
-    printf "${C_BLUE}"
-    printf "${TEXT[reading]}" "$MOUNT_POINT"
-    printf "${C_RESET}\n"
-    sudo f3read "$MOUNT_POINT"
+        echo -e "${BLUE}Running f3read on $MOUNT_POINT...${RESET}"
+        sudo f3read "$MOUNT_POINT"
 
-    printf "${C_GREEN}%s${C_RESET}\n" "${TEXT[test_complete]}"
-  fi
+        echo -e "${GREEN}Write-read test completed.${RESET}"
+    else
+        echo -e "${YELLOW}Skipping write-read test.${RESET}"
+    fi
 }
 
-# --- Main Execution Logic ---
-main() {
-  local persona_choice=""
-  while getopts ":p:h" opt; do
-    case $opt in
-    p) persona_choice="$OPTARG" ;;
-    h)
-      print_usage
-      exit 0
-      ;;
-    \?)
-      printf "Invalid option: -$OPTARG\n" >&2
-      print_usage
-      exit 1
-      ;;
-    esac
-  done
-  shift $((OPTIND - 1))
+# Main script execution
+echo -e "${CYAN}Welcome to the F3 Helper Script!${RESET}"
+list_drives
+confirm_action
 
-  setup_persona "$persona_choice"
+# Automatically probe the drive
+probe_drive
 
-  clear
-  printf "${C_CYAN}%s${C_RESET}\n" "${TEXT[title]}"
-  printf "${C_GREEN}%s${C_RESET}\n\n" "${TEXT[welcome]}"
+# Conduct write-read test if required
+write_read_test
 
-  list_drives
-  confirm_action
-  probe_drive
-  write_read_test
-
-  printf "\n${C_GREEN}%s${C_RESET}\n\n" "${TEXT[complete]}"
-}
-
-# --- Script Entry Point ---
-main "$@"
-
-exit 0
+echo -e "${GREEN}Drive tests completed. Exiting.${RESET}"

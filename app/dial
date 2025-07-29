@@ -1,282 +1,116 @@
 #!/bin/bash
-# ===----------------------------------------===
-#      Permissions Facilitator v2.0
-# ===----------------------------------------===
-# Author: ShadowHarvy
-# Version: 2.0 (The Many-Faced Mod)
-#
-# Purpose: A helper script to add the current user to
-#          the group that owns a specific device file,
-#          now with selectable personalities.
-#
-# Usage:
-#   permissions_helper.sh [options]
-#
-# Options:
-#   -p <persona>  Choose a personality: wizard, glados, dm, sassy, sarcastic.
-#   -d <device>   Specify a device file (e.g., /dev/ttyS0).
-#   -h            Show this help message.
-
-# --- Strict Mode & Safety First ---
-set -euo pipefail
 
 # --- Configuration ---
-DEFAULT_DEVICE="/dev/ttyACM0"
+DEVICE="/dev/ttyACM0" # The device file we are inspecting
+AUTHOR="ShadowHarvy"  
 
-# --- Colors & Styles ---
-if [ -t 1 ]; then
-  C_RESET='\033[0m' C_BOLD='\033[1m' C_RED='\033[0;31m' C_GREEN='\033[0;32m'
-  C_YELLOW='\033[0;33m' C_BLUE='\033[0;34m' C_PURPLE='\033[0;35m' C_CYAN='\033[0;36m'
-else
-  C_RESET='' C_BOLD='' C_RED='' C_GREEN='' C_YELLOW='' C_BLUE='' C_PURPLE='' C_CYAN=''
-fi
-
-# --- Global State & Persona Text ---
-declare -A TEXT # This will hold the text for the chosen persona
+# --- Colors (Because dreary monochrome is so inefficient) ---
+COLOR_RESET='\033[0m'
+COLOR_TITLE='\033[1;36m'   # Bold Cyan
+COLOR_GLADOS='\033[0;36m'  # Cyan
+COLOR_INFO='\033[0;33m'    # Yellow
+COLOR_COMMAND='\033[1;33m' # Bold Yellow
+COLOR_SUCCESS='\033[0;32m' # Green
+COLOR_ERROR='\033[0;31m'   # Red
 
 # --- Functions ---
 
-print_usage() {
-  cat <<EOF
-Usage: $0 [options]
-
-The Permissions Facilitator v2.0
-
-Adds the current user to the group of a specified device.
-
-Options:
-  -p <persona>  Choose a personality. Available: wizard, glados, dm, sassy, sarcastic.
-                If omitted, a random one is chosen.
-  -d <device>   Specify a device. Defaults to "$DEFAULT_DEVICE".
-  -h            Show this help message and exit.
-EOF
-}
-
-# Loads the text strings for the selected personality.
-setup_persona() {
-  local choice="${1:-}"
-  local personas=("wizard" "glados" "dm" "sassy" "sarcastic")
-
-  if [ -z "$choice" ]; then
-    choice=${personas[$((RANDOM % ${#personas[@]}))]}
-    printf "${C_YELLOW}No persona specified. The fates have chosen: ${C_BOLD}%s${C_RESET}\n" "$choice"
-    sleep 1
-  fi
-
-  # --- Persona Text Definitions ---
-  declare -A WIZARD_TEXT=(
-    [title]="The Oracle of Device Access"
-    [author]="A spell by: ShadowHarvy"
-    [welcome]="Welcome, seeker. You require access to a sacred artifact, do you not?"
-    [analyzing]="Let us consult the system's arcane energies for device '%s'..."
-    [device_not_found]="The artifact '%s' cannot be found in this realm. Is it properly connected?"
-    [device_found]="The artifact '%s' has been detected."
-    [finding_group]="Scrying for the guardian group of the artifact..."
-    [group_found]="The guardian group is revealed to be '%s'."
-    [user_is]="You are known to the spirits as '%s'."
-    [initiating_ritual]="We shall now perform the Ritual of Access for user '%s' to group '%s'."
-    [sudo_prompt]="This ritual requires great power. Prepare to invoke 'sudo'."
-    [confirm_prompt]="Shall we proceed with the ritual? (y/n): "
-    [cancelled]="The ritual is aborted. The spirits are displeased."
-    [success]="Success! User '%s' has joined the '%s' fellowship."
-    [logout_notice]="You must rest and meditate (log out and back in) for the changes to be recognized by the spirits."
-    [failure]="The ritual failed. The arcane energies are in turmoil."
-    [conclusion]="The Oracle has spoken. Go now, and create wonders."
-  )
-
-  declare -A GLADOS_TEXT=(
-    [title]="Aperture Science Permissions Facilitator"
-    [author]="Mandated Acknowledgment: Conceived by ShadowHarvy"
-    [welcome]="Oh, look. Another test subject... I mean, *user*... requires access adjustments."
-    [analyzing]="Right. Let's analyze your... *quaint*... security configuration for device '%s'."
-    [device_not_found]="Error: Device '%s' not found. Did you forget to plug it in? Or perhaps it simply doesn't *like* you."
-    [device_found]="Device '%s' detected. Minimal compliance noted."
-    [finding_group]="Executing primitive command to determine group ownership..."
-    [group_found]="Analysis complete. The group with access privileges is: '%s'."
-    [user_is]="Your user account is: '%s'."
-    [initiating_ritual]="Now, initiating the procedure to grant '%s' access to group '%s'."
-    [sudo_prompt]="This requires elevated privileges. Prepare for the 'sudo' prompt. Don't mess it up."
-    [confirm_prompt]="Proceed? (y/N): "
-    [cancelled]="Procedure aborted by user. Cowardice noted in your permanent record."
-    [success]="Success. User '%s' has been added to group '%s'. Try not to break anything."
-    [logout_notice]="Important: The system changes require you to log out and log back in, or reboot. Do it now."
-    [failure]="Operation Failed. Perhaps you mistyped your password? Or maybe the system decided you are... *unworthy*."
-    [conclusion]="This concludes the assistance protocol. I'll be watching."
-  )
-
-  declare -A DM_TEXT=(
-    [title]="The Guild of Device Access"
-    [author]="A quest from: ShadowHarvy"
-    [welcome]="Greetings, adventurer! You seek to join a new guild, I see."
-    [analyzing]="Let's check the guild charter for the device at '%s'..."
-    [device_not_found]="Alas, the device '%s' cannot be found. Have you brought it with you on your travels?"
-    [device_found]="The device '%s' is present and accounted for."
-    [finding_group]="Identifying the guild that protects this device..."
-    [group_found]="The device is protected by the '%s' guild."
-    [user_is]="You are known in these lands as '%s'."
-    [initiating_ritual]="We shall now petition for '%s' to join the '%s' guild."
-    [sudo_prompt]="This requires a royal decree. You must present your 'sudo' credentials."
-    [confirm_prompt]="Are you ready to pledge your allegiance? (y/n): "
-    [cancelled]="You have withdrawn your petition. The guild master is disappointed."
-    [success]="Congratulations! User '%s' is now a member of the '%s' guild."
-    [logout_notice]="You must leave the tavern and return (log out and back in) for your new membership to be recognized."
-    [failure]="Your petition has failed. The royal court is not convinced of your worthiness."
-    [conclusion]="Your guild business is concluded. Go forth on your next adventure!"
-  )
-
-  declare -A SASSY_TEXT=(
-    [title]="The 'Just Give Me Access' Utility"
-    [author]="By: Someone who has better things to do."
-    [welcome]="Okay, let's sort out your permissions. This shouldn't take long. Unless you mess it up."
-    [analyzing]="Looking for your little device at '%s'. Hope it's actually there."
-    [device_not_found]="And it's not there. Shocker. Did you even plug it in?"
-    [device_found]="Found '%s'. See? Not that hard."
-    [finding_group]="Figuring out which group owns this thing..."
-    [group_found]="Okay, the group is '%s'."
-    [user_is]="And you are, apparently, '%s'."
-    [initiating_ritual]="Right, let's add '%s' to the '%s' group. Finally."
-    [sudo_prompt]="You'll need to use 'sudo'. Try to type your password correctly the first time."
-    [confirm_prompt]="Are we doing this or what? (y/n): "
-    [cancelled]="Fine, be that way. Your loss."
-    [success]="There. You're in. User '%s' is now in group '%s'."
-    [logout_notice]="Now, you have to log out and back in for this to work. Yes, really."
-    [failure]="It failed. I'm not surprised. Check the error, I guess."
-    [conclusion]="Done. Now if you'll excuse me, I have actual work to do."
-  )
-
-  declare -A SARCASTIC_TEXT=(
-    [title]="The 'Why Isn't This Working?' Fixer"
-    [author]="Because reading the manual is for other people."
-    [welcome]="Oh, you can't access a device? How completely unexpected. Let's see what's wrong."
-    [analyzing]="Searching for the elusive device at '%s'. This is thrilling."
-    [device_not_found]="And it's not found. A brilliant start to our journey."
-    [device_found]="What do you know, '%s' actually exists. Progress."
-    [finding_group]="Determining the group you're supposed to be in..."
-    [group_found]="The group is '%s'. Write that down, there might be a test later."
-    [user_is]="And you, the user, are '%s'."
-    [initiating_ritual]="Now for the incredibly complex task of adding '%s' to the '%s' group."
-    [sudo_prompt]="You'll need 'sudo' for this. I trust you remember your own password."
-    [confirm_prompt]="Shall we proceed with this monumental task? (y/n): "
-    [cancelled]="Aborting. I'm sure you had your reasons."
-    [success]="It worked. User '%s' has been added to group '%s'. A true miracle of technology."
-    [logout_notice]="Of course, for this to actually take effect, you need to log out and back in. Don't forget that part."
-    [failure]="It failed. I'm shocked. Shocked, I tell you. Well, not that shocked."
-    [conclusion]="The task is complete. I'm sure everything will work perfectly from now on."
-  )
-
-  case "$choice" in
-  wizard) for k in "${!WIZARD_TEXT[@]}"; do TEXT["$k"]="${WIZARD_TEXT[$k]}"; done ;;
-  glados) for k in "${!GLADOS_TEXT[@]}"; do TEXT["$k"]="${GLADOS_TEXT[$k]}"; done ;;
-  dm) for k in "${!DM_TEXT[@]}"; do TEXT["$k"]="${DM_TEXT[$k]}"; done ;;
-  sassy) for k in "${!SASSY_TEXT[@]}"; do TEXT["$k"]="${SASSY_TEXT[$k]}"; done ;;
-  sarcastic) for k in "${!SARCASTIC_TEXT[@]}"; do TEXT["$k"]="${SARCASTIC_TEXT[$k]}"; done ;;
-  *)
-    printf "${C_RED}Error: Unknown persona '%s'.${C_RESET}\n" "$choice"
-    print_usage
-    exit 1
-    ;;
-  esac
-}
-
-# --- Main Execution Logic ---
-main() {
-  local persona_choice=""
-  local device="$DEFAULT_DEVICE"
-
-  while getopts ":p:d:h" opt; do
-    case $opt in
-    p) persona_choice="$OPTARG" ;;
-    d) device="$OPTARG" ;;
-    h)
-      print_usage
-      exit 0
-      ;;
-    \?)
-      printf "Invalid option: -$OPTARG\n" >&2
-      print_usage
-      exit 1
-      ;;
-    esac
+# A crude simulation of progress. Adequate for organic patience levels.
+fake_loader() {
+  local duration=${1:-3} # Default 3 seconds
+  local message=${2:-"Processing"}
+  echo -en "${COLOR_GLADOS}${message}... ${COLOR_RESET}"
+  for ((i = 0; i < ${duration}; i++)); do
+    echo -n "."
+    sleep 0.6
   done
-  shift $((OPTIND - 1))
+  echo -e " ${COLOR_SUCCESS}Complete.${COLOR_RESET}"
+  sleep 0.5
+}
 
-  setup_persona "$persona_choice"
+# --- Script Start ---
 
-  clear
-  cat <<EOF
-====================================================================
-${C_PURPLE}${TEXT[title]}${C_RESET}
-${TEXT[author]}
-====================================================================
-EOF
+# Title Screen Sequence Initiated. Prepare your optical sensors.
+clear
+echo -e "${COLOR_TITLE}"
+echo "======================================================"
+echo "        Aperture Science Permissions Facilitator      "
+echo "              (Under Duress Protocol)                 "
+echo "======================================================"
+echo -e "      Mandated Acknowledgment: Conceived by ${AUTHOR}"
+echo -e "${COLOR_RESET}"
+sleep 2
 
-  printf "\n${C_GREEN}%s${C_RESET}\n\n" "${TEXT[welcome]}"
-  sleep 1
+echo -e "${COLOR_GLADOS}Oh, look. Another test subject... I mean, ${COLOR_INFO}*user*${COLOR_GLADOS}... requires access adjustments."
+echo -e "How... ${COLOR_INFO}*thrilling*.${COLOR_RESET}"
+sleep 1.5
 
-  printf -- "-> "
-  printf "${TEXT[analyzing]}" "$device"
-  printf "\n"
+# Fake Loading - Because apparently, you enjoy waiting.
+fake_loader 4 "Calibrating Sarcasm Emitters & Checking System Integrity"
 
-  if [ ! -e "$device" ]; then
-    printf "${C_RED}"
-    printf "${TEXT[device_not_found]}" "$device"
-    printf "${C_RESET}\n" >&2
-    exit 1
-  fi
-  printf "   ${C_GREEN}"
-  printf "${TEXT[device_found]}" "$device"
-  printf "${C_RESET}\n"
+echo -e "\n${COLOR_GLADOS}Right. Let's analyze your... ${COLOR_INFO}*quaint*${COLOR_GLADOS} security configuration for device ${COLOR_INFO}${DEVICE}${COLOR_GLADOS}.${COLOR_RESET}"
+sleep 1
 
-  printf -- "-> "
-  printf "${TEXT[finding_group]}"
-  printf "\n"
+# 1. Check if the device exists
+if [ ! -e "$DEVICE" ]; then
+  echo -e "${COLOR_ERROR}Error: Device ${DEVICE} not found. Did you forget to plug it in? Or perhaps it simply doesn't ${COLOR_INFO}*like*${COLOR_ERROR} you.${COLOR_RESET}"
+  exit 1
+fi
+echo -e "${COLOR_GLADOS}Device ${COLOR_INFO}${DEVICE}${COLOR_GLADOS} detected. Minimal compliance noted.${COLOR_RESET}"
+sleep 1
 
-  local DEVICE_GROUP
-  DEVICE_GROUP=$(ls -l "$device" | awk '{print $4}')
+# 2. Identify the group
+echo -e "${COLOR_GLADOS}Executing primitive command to determine group ownership:${COLOR_RESET}"
+echo -e "  ${COLOR_COMMAND}ls -l ${DEVICE}${COLOR_RESET}"
+LS_OUTPUT=$(ls -l "$DEVICE")
+echo -e "  ${COLOR_INFO}Output: ${LS_OUTPUT}${COLOR_RESET}"
+sleep 0.5
 
-  printf "   ${C_GREEN}"
-  printf "${TEXT[group_found]}" "$DEVICE_GROUP"
-  printf "${C_RESET}\n"
+DEVICE_GROUP=$(echo "$LS_OUTPUT" | awk '{print $4}')
 
-  printf "   ${C_GREEN}"
-  printf "${TEXT[user_is]}" "$USER"
-  printf "${C_RESET}\n"
+if [ -z "$DEVICE_GROUP" ]; then
+  echo -e "${COLOR_ERROR}Critical Failure: Could not extract group information. Perhaps the file system is experiencing... ${COLOR_INFO}*performance issues*.${COLOR_RESET}"
+  exit 1
+fi
 
-  sleep 1
+echo -e "\n${COLOR_GLADOS}Analysis complete. The group with access privileges is: ${COLOR_INFO}${DEVICE_GROUP}${COLOR_GLADOS}.${COLOR_RESET}"
+sleep 1.5
+echo -e "${COLOR_GLADOS}Your user account is: ${COLOR_INFO}${USER}${COLOR_GLADOS}.${COLOR_RESET}"
+sleep 1
 
-  printf "\n"
-  printf "${TEXT[initiating_ritual]}" "$USER" "$DEVICE_GROUP"
-  printf "\n"
-  printf "${C_YELLOW}%s${C_RESET}\n" "${TEXT[sudo_prompt]}"
+# 3. Add user to the group
+echo -e "\n${COLOR_GLADOS}Now, initiating the procedure to grant ${COLOR_INFO}${USER}${COLOR_GLADOS} access to group ${COLOR_INFO}${DEVICE_GROUP}${COLOR_GLADOS}."
+echo -e "${COLOR_GLADOS}This requires elevated privileges. Prepare for the ${COLOR_INFO}sudo${COLOR_GLADOS} prompt. Don't mess it up.${COLOR_RESET}"
+sleep 1
 
-  local CONFIRM
-  read -rp "$(printf "${TEXT[confirm_prompt]}")" CONFIRM
-  if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
-    printf "\n${C_YELLOW}%s${C_RESET}\n" "${TEXT[cancelled]}"
-    exit 0
-  fi
+echo -e "${COLOR_GLADOS}The command I am ${COLOR_INFO}*forced*${COLOR_GLADOS} to execute is:${COLOR_RESET}"
+echo -e "  ${COLOR_COMMAND}sudo usermod -a -G ${DEVICE_GROUP} ${USER}${COLOR_RESET}"
+sleep 1.5
 
-  printf "\n"
-  sudo usermod -a -G "$DEVICE_GROUP" "$USER"
-  local EXIT_STATUS=$?
+read -p "$(echo -e ${COLOR_INFO}"Proceed? (y/N): "${COLOR_RESET})" -n 1 -r
+echo # Move to a new line
+
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+  echo -e "${COLOR_GLADOS}Fine. Executing modification protocol...${COLOR_RESET}"
+  sudo usermod -a -G "${DEVICE_GROUP}" "${USER}"
+  EXIT_STATUS=$?
 
   if [ $EXIT_STATUS -eq 0 ]; then
-    printf "\n${C_GREEN}"
-    printf "${TEXT[success]}" "$USER" "$DEVICE_GROUP"
-    printf "${C_RESET}\n"
-    printf "\n${C_YELLOW}%s${C_RESET}\n" "${TEXT[logout_notice]}"
+    echo -e "\n${COLOR_SUCCESS}Success. User ${USER} has been added to group ${DEVICE_GROUP}. Try not to break anything.${COLOR_RESET}"
+    sleep 1
+    echo -e "\n${COLOR_GLADOS}Important: Your compliance is noted. However, the system changes require you to ${COLOR_INFO}log out and log back in${COLOR_GLADOS}, or ${COLOR_INFO}reboot${COLOR_GLADOS}."
+    echo -e "${COLOR_GLADOS}Do it now. The Enrichment Center is not responsible for impatience-related incidents.${COLOR_RESET}"
   else
-    printf "\n${C_RED}"
-    printf "${TEXT[failure]}"
-    printf "${C_RESET}\n"
+    echo -e "\n${COLOR_ERROR}Operation Failed. Exit status: ${EXIT_STATUS}.${COLOR_RESET}"
+    echo -e "${COLOR_GLADOS}An error occurred. Perhaps you mistyped your password? Or maybe the system decided you are... ${COLOR_INFO}*unworthy*.${COLOR_RESET}"
+    echo -e "${COLOR_GLADOS}Consult the error messages above, if any were provided by the ${COLOR_INFO}sudo${COLOR_GLADOS} command.${COLOR_RESET}"
   fi
+else
+  echo -e "\n${COLOR_GLADOS}Procedure aborted by user. Cowardice noted in your permanent record.${COLOR_RESET}"
+fi
 
-  printf "\n${C_PURPLE}*** "
-  printf "${TEXT[conclusion]}"
-  printf " ***${C_RESET}\n\n"
-}
-
-# --- Script Entry Point ---
-main "$@"
+# Sign-off
+echo -e "\n${COLOR_GLADOS}This concludes the assistance protocol. You may now return to your... ${COLOR_INFO}*scheduled activities*. Have fun trying to program that device. ${COLOR_INFO}*I'll be watching*.${COLOR_RESET}"
+echo -e "${COLOR_TITLE}======================================================${COLOR_RESET}\n"
 
 exit 0

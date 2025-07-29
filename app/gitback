@@ -170,14 +170,14 @@ setup_persona() {
   )
 
   case "$choice" in
-    wizard) for k in "${!WIZARD_TEXT[@]}"; do TEXT["$k"]="${WIZARD_TEXT[$k]}"; done ;;
-    glados) for k in "${!GLADOS_TEXT[@]}"; do TEXT["$k"]="${GLADOS_TEXT[$k]}"; done ;;
-    dm) for k in "${!DM_TEXT[@]}"; do TEXT["$k"]="${DM_TEXT[$k]}"; done ;;
-    *)
-      printf "${C_RED}Error: Unknown persona '%s'.${C_RESET}\n" "$choice"
-      print_usage
-      exit 1
-      ;;
+  wizard) for k in "${!WIZARD_TEXT[@]}"; do TEXT["$k"]="${WIZARD_TEXT[$k]}"; done ;;
+  glados) for k in "${!GLADOS_TEXT[@]}"; do TEXT["$k"]="${GLADOS_TEXT[$k]}"; done ;;
+  dm) for k in "${!DM_TEXT[@]}"; do TEXT["$k"]="${DM_TEXT[$k]}"; done ;;
+  *)
+    printf "${C_RED}Error: Unknown persona '%s'.${C_RESET}\n" "$choice"
+    print_usage
+    exit 1
+    ;;
   esac
 }
 
@@ -272,21 +272,21 @@ process_repositories_in_dir() {
         status=$(git status --short --branch)
         # The order is critical: check for the most complex case (diverged) first.
         if [[ "$status" == *"[ahead "*","*" behind "*"]"* ]]; then
-            printf "     -> ${C_YELLOW}%s${C_RESET}\n" "${TEXT[diverged]}"
+          printf "     -> ${C_YELLOW}%s${C_RESET}\n" "${TEXT[diverged]}"
         elif [[ "$status" == *"[behind "*"]"* ]]; then
-            printf "     -> %s\n" "${TEXT[behind_remote]}"
-            if git pull --quiet; then
+          printf "     -> %s\n" "${TEXT[behind_remote]}"
+          if git pull --quiet; then
             printf "     -> ${C_GREEN}%s${C_RESET}\n" "${TEXT[pull_success]}"
             REPOS_WITH_UPDATES=$((REPOS_WITH_UPDATES + 1))
-            else
+          else
             printf "     -> ${C_RED}%s${C_RESET}\n" "${TEXT[pull_fail]}"
-            fi
+          fi
         elif [[ "$status" == *"[ahead "*"]"* ]]; then
-            printf "     -> %s\n" "${TEXT[ahead_remote]}"
+          printf "     -> %s\n" "${TEXT[ahead_remote]}"
         elif [[ "$status" == *"..."* ]]; then # The "..." indicates a tracking branch is set
-            printf "     -> ${C_GREEN}%s${C_RESET}\n" "${TEXT[up_to_date]}"
+          printf "     -> ${C_GREEN}%s${C_RESET}\n" "${TEXT[up_to_date]}"
         else
-            printf "     -> %s\n" "${TEXT[no_tracking]}"
+          printf "     -> %s\n" "${TEXT[no_tracking]}"
         fi
       fi
     fi
