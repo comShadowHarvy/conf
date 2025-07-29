@@ -1,6 +1,6 @@
 # === Sacred Repository Backup Scroll ===
 # Conjured on: Sat May 10 07:37:55 AM EDT 2025
-# Last Full Scan: Mon Jul 28 08:33:16 AM EDT 2025
+# Last Full Scan: Tue Jul 29 06:35:03 PM EDT 2025
 # Format: repository_url,directory_name
 # This scroll is updated on each run, preserving existing entries.
 
@@ -68,6 +68,7 @@ https://github.com/k4zmu2a/SpaceCadetPinball,SpaceCadetPinball
 https://github.com/karlstav/cava,cava
 https://github.com/keland/USB-Rubber-Ducky,USB-Rubber-Ducky
 https://github.com/kevthehermit/DuckToolkit,DuckToolkit
+https://github.com/kkrypt0nn/wordlists,wordlists
 https://github.com/LierB/fastfetch,fastfetch
 https://github.com/lockfale/osint-framework,osint-framework
 https://github.com/loxsmoke/stakeholder.git,stakeholder
