@@ -1,0 +1,49 @@
+##!/bin/bash
+
+# This script connects to the Flipper Zero CLI.
+# It attempts to find the serial port automatically.
+
+FLIPPER_PORT=""
+
+# Try to find the Flipper Zero using /dev/serial/by-id/
+# This is the most reliable method.
+FLIPPER_ID_PATH="/dev/serial/by-id/usb-Flipper_Devices_Inc._Flipper_"
+POTENTIAL_PORTS=$(ls -d ${FLIPPER_ID_PATH}*flip*-if00 2>/dev/null)
+
+if [ -n "$POTENTIAL_PORTS" ]; then
+  # If multiple Flippers are connected, pick the first one found.
+  # You might want to add more sophisticated logic here if you have multiple Flippers
+  # and need to select a specific one (e.g., based on NAME).
+  FLIPPER_PORT=$(echo "$POTENTIAL_PORTS" | head -n 1)
+else
+  # Fallback to /dev/ttyACM0 if /dev/serial/by-id/ doesn't work.
+  # This is less reliable as /dev/ttyACM0 can be assigned to other devices.
+  if [ -e "/dev/ttyACM0" ]; then
+    echo "Warning: Flipper Zero not found via /dev/serial/by-id/. Attempting to use /dev/ttyACM0."
+    FLIPPER_PORT="/dev/ttyACM0"
+  else
+    echo "Error: Flipper Zero serial port not found. Make sure it's connected and qFlipper is not running."
+    exit 1
+  fi
+fi
+
+if [ -z "$FLIPPER_PORT" ]; then
+  echo "Error: Could not determine Flipper Zero serial port."
+  echo "Please connect your Flipper Zero and ensure qFlipper is not running."
+  echo "You might need to manually find the port using 'ls /dev/serial/by-id/' or 'ls /dev/tty*'"
+  exit 1
+fi
+
+echo "Connecting to Flipper Zero on port: $FLIPPER_PORT"
+
+# Check if screen is installed, otherwise suggest minicom
+if command -v screen &>/dev/null; then
+  echo "Using 'screen' to connect. Press Ctrl+A, then K, then Y to quit."
+  screen "$FLIPPER_PORT" 230400
+elif command -v minicom &>/dev/null; then
+  echo "Using 'minicom' to connect. Press Ctrl+A, then X, then Return to quit."
+  minicom -D "$FLIPPER_PORT" -b 230400
+else
+  echo "Error: 'screen' or 'minicom' not found. Please install one of them (e.g., sudo apt install screen or sudo apt install minicom)."
+  exit 1
+fi

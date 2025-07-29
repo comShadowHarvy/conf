@@ -1,0 +1,102 @@
+#!/bin/bash
+
+# A script to automate WPA/WPA2 cracking with Hashcat.
+# Corrected logic to use ALL available default wordlist directories sequentially.
+#
+# Usage:
+#   ./crack_wpa.sh <capture_file.cap>
+#   ./crack_wpa.sh <capture_file.cap> <wordlist.txt>
+
+# --- Configuration ---
+# List of default wordlist directories to check, in order of priority.
+# The script will try ALL of them in a single Hashcat session.
+DEFAULT_WORDLIST_DIRS=(
+  "~/git/wordlists/wordlists/passwords"
+  "/usr/share/seclists/Passwords"
+)
+
+# The file where cracked credentials (ESSID:Password) will be saved.
+CRACKED_FILE="~/cracked.log"
+
+# --- Safety & Input Checks ---
+if [ "$#" -ne 1 ] && [ "$#" -ne 2 ]; then
+  echo "Usage: $0 <capture_file.cap> [wordlist_file_or_dir]"
+  echo "If no wordlist is provided, it checks default directories in order."
+  exit 1
+fi
+
+CAPTURE_FILE="$1"
+HASH_FILE="handshake.hc22000"
+WORDLIST_INPUT=""
+
+# Determine which wordlist(s) to use
+if [ "$#" -eq 2 ]; then
+  # Use the user-specified wordlist file or directory
+  WORDLIST_INPUT="$2"
+  echo "[*] Using specified wordlist path: $WORDLIST_INPUT"
+  if [ ! -f "$WORDLIST_INPUT" ] && [ ! -d "$WORDLIST_INPUT" ]; then
+    echo "[!] Error: Specified wordlist path not found at '$WORDLIST_INPUT'"
+    exit 1
+  fi
+else
+  # Find all available default directories and build a list for Hashcat
+  echo "[*] No wordlist specified. Locating all default wordlist directories..."
+  VALID_WORDLIST_PATHS=()
+  for dir in "${DEFAULT_WORDLIST_DIRS[@]}"; do
+    expanded_dir=$(eval echo "$dir")
+    if [ -d "$expanded_dir" ]; then
+      echo "[+] Adding directory to session: $expanded_dir"
+      VALID_WORDLIST_PATHS+=("$expanded_dir")
+    fi
+  done
+
+  # If no valid directories were found after checking all defaults
+  if [ ${#VALID_WORDLIST_PATHS[@]} -eq 0 ]; then
+    echo "[!] Error: None of the default wordlist directories were found."
+    echo "    Please provide a path manually or ensure one of these exists:"
+    for dir in "${DEFAULT_WORDLIST_DIRS[@]}"; do
+      echo "    - $dir"
+    done
+    exit 1
+  fi
+  WORDLIST_INPUT="${VALID_WORDLIST_PATHS[@]}"
+fi
+
+# --- Tool & File Checks ---
+if ! command -v hashcat &>/dev/null; then
+  echo "[!] Error: hashcat is not installed or not in your PATH."
+  exit 1
+fi
+
+if ! command -v hcxpcapngtool &>/dev/null; then
+  echo "[!] Error: hcxtools is not installed or not in your PATH."
+  exit 1
+fi
+
+if [ ! -f "$CAPTURE_FILE" ]; then
+  echo "[!] Error: Capture file not found at '$CAPTURE_FILE'"
+  exit 1
+fi
+
+# --- Step 1: Convert .cap to .hc22000 ---
+echo "[*] Converting $CAPTURE_FILE to $HASH_FILE..."
+hcxpcapngtool -o "$HASH_FILE" "$CAPTURE_FILE" >/dev/null 2>&1
+if [ $? -ne 0 ]; then
+  echo "[!] Conversion failed. The capture file might not contain a valid handshake."
+  exit 1
+fi
+echo "[+] Conversion successful."
+
+# --- Step 2: Run Hashcat with Logging ---
+CRACKED_FILE_EXPANDED=$(eval echo "$CRACKED_FILE")
+echo "[*] Starting Hashcat attack. Cracked keys will be saved to $CRACKED_FILE_EXPANDED"
+echo "[*] Press 's' for status, 'q' to quit."
+
+# Pass all wordlist paths to hashcat
+hashcat -m 22000 -a 0 "$HASH_FILE" $WORDLIST_INPUT --outfile-format=2 --outfile "$CRACKED_FILE_EXPANDED"
+
+# --- Clean Up ---
+# Consider uncommenting the line below to automatically delete the hash file.
+# rm "$HASH_FILE"
+
+echo "[+] Cracking process finished. Check $CRACKED_FILE_EXPANDED for results."
