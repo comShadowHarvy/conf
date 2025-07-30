@@ -1,0 +1,52 @@
+#!/bin/bash
+
+# Load the program list from the input file
+if [ $# -eq 1 ]; then
+    INPUT_FILE=$1
+else
+    echo "Error: Please provide a YAML or TXT file as the first argument."
+    exit 1
+fi
+
+PROGRAMS=()
+if [ "${INPUT_FILE##*.}" == "yaml" ] || [ "${INPUT_FILE##*.}" == "yml" ]; then
+    yamllint ${INPUT_FILE} > /dev/null 2>&1 && PROGRAMS=$(yq e ".[] | @text" ${INPUT_FILE})
+elif [ "${INPUT_FILE##*.}" == "txt" ]; then
+    PROGRAMS=($(cat ${INPUT_FILE}))
+fi
+
+# Zorvath the Wise: The Instigator
+function install_programs() {
+    if [ ${#PROGRAMS[@]} -eq 0 ]; then
+        echo "No programs to install. Aborting."
+        exit 1
+    fi
+    for program in "${PROGRAMS[@]}"; do
+        yay -y --needed $program || {
+            echo "Failed to install: $program"
+            exit 1
+        }
+    done
+}
+
+# Grimbold Ironfist: The DM (Decision Maker)
+function get_user_input() {
+    while true; do
+        read -p "Are you sure you want to continue? [y/N] " response
+        case ${response} in
+            [Yy]* ) install_programs && break ;;
+            *      ) echo "Aborting." && exit 1 ;;
+        esac
+    done
+}
+
+# GLaDOS-3000: The Sarcastic One (Error Handler)
+function handle_errors() {
+    if [ $? -ne 0 ]; then
+        echo "Something went horribly wrong. Try again, mortal."
+        get_user_input
+    fi
+}
+
+# Main flow:
+install_programs || { handle_errors; }
