@@ -1,6 +1,6 @@
 # === Sacred Repository Backup Scroll ===
 # Conjured on: Sat May 10 07:37:55 AM EDT 2025
-# Last Full Scan: Tue Jul 29 06:35:03 PM EDT 2025
+# Last Full Scan: Tue 12 Aug 18:46:31 EDT 2025
 # Format: repository_url,directory_name
 # This scroll is updated on each run, preserving existing entries.
 
@@ -11,6 +11,7 @@ https://github.com/aaronrausch/ascii-weather,ascii-weather
 https://github.com/Abdess/retroarch_system,retroarch_system
 https://github.com/adi1090x/plymouth-themes,plymouth-themes
 https://github.com/alewmoose/2048-in-terminal,2048-in-terminal
+https://github.com/alexrozanski/LlamaChat.git,LlamaChat
 https://github.com/AngelJumbo/lavat,lavat
 https://github.com/Annex-Engineering/klipper_estimator,klipper_estimator
 https://github.com/archcraft-os/archcraft,archcraft
@@ -20,6 +21,7 @@ https://github.com/badabing2005/PixelFlasher,PixelFlasher
 https://github.com/basecamp/omakub,omakub
 https://github.com/basecamp/omarchy,omarchy
 https://github.com/baskerville/xdo,xdo
+https://github.com/BassT23/Proxmox,proxmoxupdate
 https://github.com/BeardedTinker/Home-Assistant_Config,bearded.config
 https://github.com/binhex/arch-qbittorrentvpn,arch-qbittorrentvpn
 https://github.com/BreadOnPenguins/scripts,scripts
@@ -28,6 +30,7 @@ https://github.com/brenns10/tetris,tetris
 https://github.com/bst04/payloads_flipperZero,payloads_flipperZero
 https://github.com/bytedance/deer-flow,deer-flow
 https://github.com/CedArctic/DigiSpark-Scripts,DigiSpark-Scripts
+https://github.com/charmbracelet/crush,crush
 https://github.com/ClayAmore/ER-Save-Editor,ER-Save-Editor
 https://github.com/cmang/durdraw,durdraw
 https://github.com/cmatsuoka/figlet,figlet
@@ -80,6 +83,7 @@ https://github.com/meh/rust-terminfo,rust-terminfo
 https://github.com/mharjac/bad_ducky,bad_ducky
 https://github.com/mrjones2014/smart-splits.nvim,smart-splits.nvim
 https://github.com/myshell-ai/OpenVoice,OpenVoice
+https://github.com/n4ze3m/page-assist.git,page-assist
 https://github.com/neomutt/neomutt,neomutt
 https://github.com/Next-Flip/Momentum-Firmware.git,Momentum-Firmware
 https://github.com/nielssp/csol,csol
@@ -114,3 +118,4 @@ https://github.com/xillwillx/BashBunny,BashBunny
 https://github.com/ztwAdmin/ZTW-2025,ZTW-2025
 https://gitlab.com/dwt1/dotfiles,dtdot
 https://gitlab.com/kalilinux/packages/theharvester,theharvester
+https://www.github.com/pound-emu/pound.git,pound
