@@ -74,8 +74,8 @@ else
 fi
 
 # Use rsync for cp/mv to get progress bars
-alias cp='rsync -avhP --info=progress2'
-alias mv='rsync -avhP --info=progress2 --remove-source-files'
+alias ccp='rsync -avhP --info=progress2'
+alias mmv='rsync -avhP --info=progress2 --remove-source-files'
 alias mkdir='mkdir -pv'
 
 # Use fd instead of find if it exists
@@ -426,7 +426,7 @@ pkg-install() {
 }
 
 # AI/Ollama Tools
-alias fabric='fabric --fast' # default to fast model
+alias ffabric='fabric --fast' # default to fast model
 alias run_llama3='ollama run llama3:8b'
 
 # Password generator
