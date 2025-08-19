@@ -243,35 +243,41 @@ _run_deferred_startup_visuals() {
     unset -f _run_deferred_startup_visuals
     add-zsh-hook -d precmd _run_deferred_startup_visuals
 
-    # Configure fetch tools with better defaults
-    if [[ -n "$TMUX" ]]; then
-        # Use smaller config in tmux to avoid breaking layout
-        local fastfetch_flags="--pipe --logo-width 10 --structure"
-        local pokemon_flags="--no-title -r --small"
-    else
-        local fastfetch_flags="--pipe --logo-width 20"
-        local pokemon_flags="--no-title -r"
-    fi
-
-    # Create cache directory for configs
-    local config_dir="$XDG_CONFIG_HOME/fastfetch"
-    [[ ! -d "$config_dir" ]] && mkdir -p "$config_dir"
-
     # Show system info based on available tools and configuration
     if [[ "$SHOW_POKEMON" == "true" ]]; then
         if (( $+commands[pokemon-colorscripts] )) && (( $+commands[fastfetch] )); then
-            # Run combined command with optimized flags
-            pokemon-colorscripts $pokemon_flags | fastfetch $fastfetch_flags
+            # Run pokemon first, then fastfetch with compact output
+            pokemon-colorscripts --no-title -r
+            echo # Add spacing
+            if [[ -n "$TMUX" ]]; then
+                # Very compact display for tmux
+                fastfetch --logo none --structure Title:OS:Host:Kernel:Uptime:Memory
+            else
+                # Compact display for regular terminal
+                fastfetch --logo-width 20 --structure Title:OS:Host:Kernel:Uptime:Memory:Shell
+            fi
         elif (( $+commands[pokemon-colorscripts] )); then
-            # Just pokemon
-            pokemon-colorscripts $pokemon_flags
+            # Just pokemon with appropriate size
+            if [[ -n "$TMUX" ]]; then
+                pokemon-colorscripts --no-title -r
+            else
+                pokemon-colorscripts --no-title -r -b
+            fi
         elif (( $+commands[fastfetch] )); then
-            # Just fastfetch
-            fastfetch --structure os:host:kernel:uptime:memory:shell
+            # Just fastfetch with appropriate sizing
+            if [[ -n "$TMUX" ]]; then
+                fastfetch --logo-width 15
+            else
+                fastfetch --logo-width 20
+            fi
         fi
     elif (( $+commands[fastfetch] )); then
-        # Use a simpler fastfetch config for speed
-        fastfetch --structure os:host:kernel:uptime:memory:shell
+        # Use a compact fastfetch config for speed
+        if [[ -n "$TMUX" ]]; then
+            fastfetch --logo none
+        else
+            fastfetch --logo-width 15
+        fi
     elif (( $+commands[neofetch] )); then
         # Use a faster neofetch config
         neofetch --disable packages --disable resolution --color_blocks off
