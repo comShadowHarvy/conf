@@ -236,40 +236,48 @@ _install_if_missing() {
   fi
 }
 #____________________________________________________________________________________________
-# REFACTOR: Defer slow startup visuals to run *after* the first prompt is drawn.
-# This makes the shell feel instantaneous.
+# Defer slow startup visuals to run *after* the first prompt is drawn
+# This makes the shell feel instantaneous
 _run_deferred_startup_visuals() {
-    # STEP 1: Immediately unregister this function so it only runs ONCE per session.
-    # This is the key to the "run only once" trick.
+    # Immediately unregister this function so it only runs ONCE per session
     unset -f _run_deferred_startup_visuals
     add-zsh-hook -d precmd _run_deferred_startup_visuals
 
-    # STEP 2: Place your original logic for showing visuals here.
-    # This will now print *above* your first ready-to-use prompt.
-    if [[ "$SHOW_POKEMON" == "true" ]]; then
-        # Check dependencies first
-        if (( $+commands[pokemon-colorscripts] )) && (( $+commands[fastfetch] )); then
-            # Run your preferred combined command. Using the pipe version as an example.
-            pokemon-colorscripts --no-title -r | fastfetch --pipe
-
-        elif (( $+commands[pokemon-colorscripts] )); then
-            # Fallback to just pokemon if fastfetch is missing
-            pokemon-colorscripts --no-title -r
-
-        elif (( $+commands[fastfetch] )); then
-            # Fallback to just fastfetch if pokemon is missing
-            fastfetch
-        fi
-    elif (( $+commands[fastfetch] )); then
-        # If pokemon is disabled, just show fastfetch
-        fastfetch
-    elif (( $+commands[neofetch] )); then
-        # Fallback to neofetch if fastfetch is missing
-        neofetch
+    # Configure fetch tools with better defaults
+    if [[ -n "$TMUX" ]]; then
+        # Use smaller config in tmux to avoid breaking layout
+        local fastfetch_flags="--pipe --logo-width 10 --structure"
+        local pokemon_flags="--no-title -r --small"
+    else
+        local fastfetch_flags="--pipe --logo-width 20"
+        local pokemon_flags="--no-title -r"
     fi
 
-    # STEP 3 (Optional but Recommended): Redraw the prompt.
-    # When the async command finishes, this ensures the prompt is neatly positioned underneath.
+    # Create cache directory for configs
+    local config_dir="$XDG_CONFIG_HOME/fastfetch"
+    [[ ! -d "$config_dir" ]] && mkdir -p "$config_dir"
+
+    # Show system info based on available tools and configuration
+    if [[ "$SHOW_POKEMON" == "true" ]]; then
+        if (( $+commands[pokemon-colorscripts] )) && (( $+commands[fastfetch] )); then
+            # Run combined command with optimized flags
+            pokemon-colorscripts $pokemon_flags | fastfetch $fastfetch_flags
+        elif (( $+commands[pokemon-colorscripts] )); then
+            # Just pokemon
+            pokemon-colorscripts $pokemon_flags
+        elif (( $+commands[fastfetch] )); then
+            # Just fastfetch
+            fastfetch --structure os:host:kernel:uptime:memory:shell
+        fi
+    elif (( $+commands[fastfetch] )); then
+        # Use a simpler fastfetch config for speed
+        fastfetch --structure os:host:kernel:uptime:memory:shell
+    elif (( $+commands[neofetch] )); then
+        # Use a faster neofetch config
+        neofetch --disable packages --disable resolution --color_blocks off
+    fi
+
+    # Redraw the prompt to ensure it's neatly positioned
     zle && zle .redisplay
 }
 #_____________________________________________________________________________________________
@@ -672,64 +680,67 @@ fi
 
 # --- Terminal Startup Visuals (Run Last Before Prompt) ---
 
-# Run fastfetch or similar (optional, can slow startup)
-# Consider running this *after* the first prompt appears using a hook if speed is critical
-if [[ "$SHOW_POKEMON" == "true" ]]; then
-    # Check dependencies first
-    if (( $+commands[pokemon-colorscripts] )) && (( $+commands[fastfetch] )); then
-        FASTFETCH_CONFIG="$XDG_CONFIG_HOME/fastfetch/config-pokemon.jsonc"
-        # Create default config if missing
-        if [[ ! -f "$FASTFETCH_CONFIG" ]]; then
-            mkdir -p "$(dirname "$FASTFETCH_CONFIG")"
-            # Basic fastfetch config example
-            print -r -- '{
-              "display": { "separator": " ", "colorScheme": "dark" },
-              "modules": ["title", "os", "kernel", "uptime", "packages", "shell", "memory", "cpu", "gpu"]
-            }' > "$FASTFETCH_CONFIG"
-        fi
-        # Run combined command (might be slow)
-        # pokemon-colorscripts --no-title -s -r | fastfetch -c "$FASTFETCH_CONFIG" --logo-type file-raw --logo-height 10 --logo-width 5 --logo -
-        # Alternative: Run fastfetch only, maybe with a different logo source
-        fastfetch --logo-width 15 # Simpler fastfetch call
-    elif (( $+commands[pokemon-colorscripts] )); then
-        # Fallback to just pokemon if fastfetch is missing
-        pokemon-colorscripts --no-title -s -r
-    elif (( $+commands[fastfetch] )); then
-        # Fallback to just fastfetch if pokemon is missing
-        fastfetch
-    fi
-elif (( $+commands[fastfetch] )); then
-    # Show fastfetch even if pokemon is disabled
-    fastfetch
+# Register deferred startup visuals to run after first prompt
+if [[ "$SHOW_POKEMON" == "true" ]] || (( $+commands[fastfetch] )); then
+    add-zsh-hook precmd _run_deferred_startup_visuals
 fi
 
 
 # Welcome message (only if enabled)
 if [[ "$SHOW_WELCOME_MESSAGE" == "true" ]]; then
-  # Get system information efficiently
+  # Cache system info for 24 hours to avoid repeated calls
+  local cache_file="$XDG_CACHE_HOME/zsh/system_info"
+  local cache_dir="$(dirname "$cache_file")"
   local os kernel distro
-  os=$(uname -s)
-  kernel=$(uname -r)
-  # Try os-release first, fallback for macOS/others
-  if [[ -f /etc/os-release ]]; then
-      distro=$(source /etc/os-release && print -r -- "$PRETTY_NAME")
-  elif [[ "$os" == "Darwin" ]]; then
-      distro=$(sw_vers -productName)
+  
+  # Ensure cache directory exists
+  [[ ! -d "$cache_dir" ]] && mkdir -p "$cache_dir"
+  
+  # Use cached data if available and less than 24 hours old
+  if [[ -f "$cache_file" ]] && (( $(date +%s) - $(stat -c %Y "$cache_file" 2>/dev/null || stat -f %m "$cache_file" 2>/dev/null || echo 0) < 86400 )); then
+    source "$cache_file"
   else
+    # Get fresh system information
+    os=$(uname -s)
+    kernel=$(uname -r)
+    # Try os-release first, fallback for macOS/others
+    if [[ -f /etc/os-release ]]; then
+      distro=$(source /etc/os-release && print -r -- "$PRETTY_NAME")
+    elif [[ "$os" == "Darwin" ]]; then
+      distro=$(sw_vers -productName)
+    else
       distro="Unknown"
+    fi
+    
+    # Cache the information
+    echo "os='$os'" > "$cache_file"
+    echo "kernel='$kernel'" >> "$cache_file"
+    echo "distro='$distro'" >> "$cache_file"
   fi
 
+  # Get username and last login time efficiently
+  local username="${USER:-$(whoami)}"
+  local last_login="$(date)"
+
+  # Display welcome message with unicode icons and colors
   print # Empty line
-  print -P "%F{cyan}🚀 Welcome to your optimized Zsh environment!%f"
-  print -P "%F{blue}🖥️  $distro ($os $kernel)%f"
-  print -P "%F{green}🔄 Last login: $(date)%f" # date is relatively fast
-  print -P "%F{yellow}💡 Type 'updateall' to update system (if installed)%f"
-  print -P "%F{yellow}💡 Type 'install-dev-tools' to check/install tools%f"
+  print -P "%F{cyan}🚀 Welcome, %B$username%b, to your optimized Zsh environment!%f"
+  print -P "%F{blue}🖥️  $distro ($kernel)%f"
+  print -P "%F{green}🔄 Last login: $last_login%f"
+  print -P "%F{yellow}💡 Type 'updateall' to update system%f"
+  print -P "%F{yellow}💡 Type 'install-dev-tools' to install missing tools%f"
   print # Empty line
 fi
 
-# Run initial ls/exa command (after welcome message)
-_enhanced_chpwd # Call the chpwd hook manually once at startup
+# Run initial directory listing (after welcome message)
+# Use a separate function to avoid triggering git check on startup
+if (( $+commands[eza] )); then
+    eza --color=always --icons --group-directories-first
+elif (( $+commands[lsd] )); then
+    lsd --color=always --icon=auto
+else
+    ls --color=auto
+fi
 
 # --- Tmux Integration ---
 
@@ -769,16 +780,17 @@ _setup_tmux_config() {
 }
 _setup_tmux_config
 
-# Auto-launch tmux (make this the VERY LAST command if used)
-# Check if tmux exists, we are in an interactive shell, not already in tmux/screen, and TMUX var is not set
-if (( $+commands[tmux] )) && [[ -o INTERACTIVE ]] && [[ -z "$TMUX" ]] && [[ "$TERM" != screen* ]] && [[ "$TERM" != tmux* ]]; then
-  # exec replaces the current shell process with tmux
-  exec tmux
-fi
+# Auto-launch tmux (optional - commented out by default)
+# Uncomment the lines below to auto-launch tmux on shell startup
+# if (( $+commands[tmux] )) && [[ -o INTERACTIVE ]] && [[ -z "$TMUX" ]] && [[ "$TERM" != screen* ]] && [[ "$TERM" != tmux* ]]; then
+#   exec tmux
+# fi
 
 # --- Performance Tracking End (Uncomment to Debug) ---
 # ZSHRC_END_TIME=${EPOCHREALTIME}
 # ZSHRC_ELAPSED=$(($ZSHRC_END_TIME - $ZSHRC_START_TIME))
 # _log_message "INFO" "Zsh initialized in $ZSHRC_ELAPSED seconds"
 # zprof # Print profiling info
+# MCP host aliases
+alias mcphost=mcp-cli
 alias mmcphost=mcp-cli
