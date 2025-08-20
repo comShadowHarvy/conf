@@ -1,6 +1,6 @@
 # === Sacred Repository Backup Scroll ===
 # Conjured on: Sat May 10 07:37:55 AM EDT 2025
-# Last Full Scan: Tue 12 Aug 18:46:31 EDT 2025
+# Last Full Scan: Tue 19 Aug 21:07:13 EDT 2025
 # Format: repository_url,directory_name
 # This scroll is updated on each run, preserving existing entries.
 
@@ -34,6 +34,7 @@ https://github.com/charmbracelet/crush,crush
 https://github.com/ClayAmore/ER-Save-Editor,ER-Save-Editor
 https://github.com/cmang/durdraw,durdraw
 https://github.com/cmatsuoka/figlet,figlet
+https://github.com/coleam00/Archon,Archon
 https://github.com/comShadowHarvy/Atlas,Atlas
 https://github.com/comShadowHarvy/CollectiveGenius-AutoGPT-Agent-Hub,CollectiveGenius-AutoGPT-Agent-Hub
 https://github.com/cyberrumor/ammo,ammo
@@ -47,6 +48,7 @@ https://github.com/elkowar/eww,eww
 https://github.com/emilianavt/OpenSeeFace,OpenSeeFace
 https://github.com/FalsePhilosopher/badusb,badusb
 https://github.com/felddy/foundryvtt-docker,foundryvtt-docker
+https://github.com/FelixFoster/mcp-enhance-prompt,mcp-enhance-prompt
 https://github.com/FergusGriggs/20q,20q
 https://github.com/FergusGriggs/Fegaria-Remastered,Fegaria-Remastered
 https://github.com/FergusGriggs/Feggle,Feggle
@@ -88,6 +90,7 @@ https://github.com/neomutt/neomutt,neomutt
 https://github.com/Next-Flip/Momentum-Firmware.git,Momentum-Firmware
 https://github.com/nielssp/csol,csol
 https://github.com/nkleemann/ascii-rain,ascii-rain
+https://github.com/prayag17/Blink,Blink
 https://github.com/profanity-im/profanity,profanity
 https://github.com/recyclarr/recyclarr,recyclarr
 https://github.com/Rick45/quick-arr-Stack,quick-arr-Stack
