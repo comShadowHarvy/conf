@@ -11,7 +11,10 @@
 
 # Create a directory and cd into it
 mkcd() {
-  [[ -z "$1" ]] && { echo "Usage: mkcd <directory>" >&2; return 1; }
+  [[ -z "$1" ]] && {
+    echo "Usage: mkcd <directory>" >&2
+    return 1
+  }
   mkdir -p "$1" && cd "$1"
 }
 
@@ -33,7 +36,7 @@ up() {
   local limit="${1:-1}"
   # Ensure limit is a positive integer
   [[ ! "$limit" =~ ^[1-9][0-9]*$ ]] && limit=1
-  for ((i=1; i<=limit; i++)); do
+  for ((i = 1; i <= limit; i++)); do
     d+="../"
   done
   # Use pushd/popd logic for safer navigation if available, else cd
@@ -87,19 +90,20 @@ fi
 # Use rsync for cp/mv to get progress bars
 alias ccp='rsync -avhP --info=progress2'
 alias mmv='rsync -avhP --info=progress2 --remove-source-files'
-# FIXED: Changed mmkdir to mkdir for consistency - keeping old name for compatibility
-# alias mmkdir='mkdir -pv'  # OLD - commented for consistency
-alias mkdir='mkdir -pv'     # Enhanced mkdir with verbose and parent creation
+alias mmkdir='mkdir -pv'
 
 # Use fd instead of find if it exists
 if command -v fd &>/dev/null; then
   alias findr='fd'
-  alias find='fd'  # Bold replacement, comment out if you prefer traditional find
+  alias find='fd' # Bold replacement, comment out if you prefer traditional find
 fi
 
 # Find text in files, preferring ripgrep (rg)
 ftext() {
-  [[ $# -eq 0 ]] && { echo "Usage: ftext <pattern> [path]" >&2; return 1; }
+  [[ $# -eq 0 ]] && {
+    echo "Usage: ftext <pattern> [path]" >&2
+    return 1
+  }
   local pattern="$1"
   local path="${2:-.}"
   if command -v rg &>/dev/null; then
@@ -111,7 +115,10 @@ ftext() {
 
 # Find directories by name, preferring fd
 fdir() {
-  [[ -z "$1" ]] && { echo "Usage: fdir <pattern> [depth]" >&2; return 1; }
+  [[ -z "$1" ]] && {
+    echo "Usage: fdir <pattern> [depth]" >&2
+    return 1
+  }
   local pattern="$1"
   local depth="${2:-3}"
   if command -v fd &>/dev/null; then
@@ -123,47 +130,52 @@ fdir() {
 
 # Extract almost any archive format
 extract() {
-  [[ -z "$1" ]] && { echo "Usage: extract <archive_file>" >&2; return 1; }
+  [[ -z "$1" ]] && {
+    echo "Usage: extract <archive_file>" >&2
+    return 1
+  }
   local file="$1"
-  [[ ! -f "$file" ]] && { echo "Error: File '$file' not found." >&2; return 1; }
+  [[ ! -f "$file" ]] && {
+    echo "Error: File '$file' not found." >&2
+    return 1
+  }
 
   echo "Extracting '$file'..."
   case "$file" in
-    *.tar.bz2|*.tbz2|*.tbz) tar xjf "$file" ;;
-    *.tar.gz|*.tgz)        tar xzf "$file" ;;
-    *.tar.xz|*.txz)        tar xJf "$file" ;;
-    *.tar|*.cbt)           tar xf "$file"  ;;
-    *.zip|*.cbz|*.epub)    unzip "$file"   ;;
-    *.rar|*.cbr)           unrar x "$file" ;;
-    *.7z|*.cb7)            7z x "$file"    ;;
-    *.gz)                  gunzip "$file"  ;;
-    *.bz2)                 bunzip2 "$file" ;;
-    *.xz)                  unxz "$file"    ;;
-    *)
-      echo "Error: Unsupported file type: '$file'" >&2
-      return 1
-      ;;
+  *.tar.bz2 | *.tbz2 | *.tbz) tar xjf "$file" ;;
+  *.tar.gz | *.tgz) tar xzf "$file" ;;
+  *.tar.xz | *.txz) tar xJf "$file" ;;
+  *.tar | *.cbt) tar xf "$file" ;;
+  *.zip | *.cbz | *.epub) unzip "$file" ;;
+  *.rar | *.cbr) unrar x "$file" ;;
+  *.7z | *.cb7) 7z x "$file" ;;
+  *.gz) gunzip "$file" ;;
+  *.bz2) bunzip2 "$file" ;;
+  *.xz) unxz "$file" ;;
+  *)
+    echo "Error: Unsupported file type: '$file'" >&2
+    return 1
+    ;;
   esac
 }
 
 # **[FIXED]** Extract all archives in the current directory into their own subdirectories
 extract-all() {
-    for archive in *.tar.bz2 *.tbz2 *.tbz *.tar.gz *.tgz *.tar.xz *.txz *.tar *.cbt *.zip *.cbz *.epub *.rar *.cbr *.7z *.cb7 *.gz *.bz2 *.xz; do
-        if [[ -f "$archive" ]]; then
-            # Create a directory named after the archive, without the extension.
-            # This handles complex extensions like .tar.gz
-            local dest_dir
-            dest_dir=$(basename "$archive" | sed -E 's/(\.tar\.(gz|bz2|xz)|.t(gz|bz2|xz))$//; s/\.[^.]+$//')
-            
-            mkdir -p -- "$dest_dir"
-            echo "--- Extracting $archive to $dest_dir/ ---"
-            # Use a subshell to extract into the new directory without changing the current shell's directory
-            (cd -- "$dest_dir" && tar -xf "../$archive") || echo "Failed to extract $archive" >&2
-        fi
-    done
-    echo "--- All archives processed. ---"
-}
+  for archive in *.tar.bz2 *.tbz2 *.tbz *.tar.gz *.tgz *.tar.xz *.txz *.tar *.cbt *.zip *.cbz *.epub *.rar *.cbr *.7z *.cb7 *.gz *.bz2 *.xz; do
+    if [[ -f "$archive" ]]; then
+      # Create a directory named after the archive, without the extension.
+      # This handles complex extensions like .tar.gz
+      local dest_dir
+      dest_dir=$(basename "$archive" | sed -E 's/(\.tar\.(gz|bz2|xz)|.t(gz|bz2|xz))$//; s/\.[^.]+$//')
 
+      mkdir -p -- "$dest_dir"
+      echo "--- Extracting $archive to $dest_dir/ ---"
+      # Use a subshell to extract into the new directory without changing the current shell's directory
+      (cd -- "$dest_dir" && tar -xf "../$archive") || echo "Failed to extract $archive" >&2
+    fi
+  done
+  echo "--- All archives processed. ---"
+}
 
 # ----------------------------------------------------------------------------
 # Yazi File Manager
@@ -205,7 +217,10 @@ alias tempcheck='sensors | grep -i "core"'
 # Summarize directory contents
 dirsummary() {
   local dir="${1:-.}"
-  [[ ! -d "$dir" ]] && { echo "Error: Directory '$dir' not found." >&2; return 1; }
+  [[ ! -d "$dir" ]] && {
+    echo "Error: Directory '$dir' not found." >&2
+    return 1
+  }
   echo "📂 Directory Summary for: $(realpath "$dir")"
   echo "───────────────────────────────────────"
   local files
@@ -294,11 +309,14 @@ alias nmap-full="sudo nmap -sS -A -v -T4 -p-" # Simplified full scan
 
 # Simple HTTP server for sharing
 share() {
-  [[ ! -e "$1" ]] && { echo "Error: '$1' not found." >&2; return 1; }
+  [[ ! -e "$1" ]] && {
+    echo "Error: '$1' not found." >&2
+    return 1
+  }
   local port="${2:-8000}"
   local ip_addr
   ip_addr=$(hostname -I | awk '{print $1}')
-  
+
   # Use a subshell to prevent directory changes and simplify cleanup
   (
     if [[ -d "$1" ]]; then
@@ -360,7 +378,10 @@ alias gclone="git clone"
 
 # Function to clone a repo and cd into it
 gcc() {
-  [[ -z "$1" ]] && { echo "Usage: gcc <repo_url> [dir_name]" >&2; return 1; }
+  [[ -z "$1" ]] && {
+    echo "Usage: gcc <repo_url> [dir_name]" >&2
+    return 1
+  }
   local repo_url="$1"
   # Smartly derive directory name if not provided
   local dir_name="${2:-$(basename "$repo_url" .git)}"
@@ -369,26 +390,38 @@ gcc() {
 
 # Quickly add, commit, and push all changes
 quickgit() {
-  [[ -z "$1" ]] && { echo "Usage: quickgit <commit message>" >&2; return 1; }
-  git rev-parse --is-inside-work-tree &>/dev/null || { echo "Error: Not a git repository." >&2; return 1; }
+  [[ -z "$1" ]] && {
+    echo "Usage: quickgit <commit message>" >&2
+    return 1
+  }
+  git rev-parse --is-inside-work-tree &>/dev/null || {
+    echo "Error: Not a git repository." >&2
+    return 1
+  }
 
   git add -A && git commit -m "$*" && git push
 }
 
 # A robust git pull using rebase and handling stashing
 gitupdate() {
-  git rev-parse --is-inside-work-tree &>/dev/null || { echo "Error: Not a git repository." >&2; return 1; }
-  
+  git rev-parse --is-inside-work-tree &>/dev/null || {
+    echo "Error: Not a git repository." >&2
+    return 1
+  }
+
   local stashed=false
   # Only stash if there are uncommitted changes
   if ! git diff --quiet || ! git diff --cached --quiet; then
-      echo "Stashing local changes..."
-      git stash push -u # -u includes untracked files
-      stashed=true
+    echo "Stashing local changes..."
+    git stash push -u # -u includes untracked files
+    stashed=true
   fi
 
   echo "Fetching latest changes..."
-  git fetch --all --prune || { $stashed && git stash pop; return 1; }
+  git fetch --all --prune || {
+    $stashed && git stash pop
+    return 1
+  }
 
   local current_branch
   current_branch=$(git rev-parse --abbrev-ref HEAD)
@@ -397,11 +430,15 @@ gitupdate() {
 
   if [[ -n "$upstream" ]]; then
     echo "Rebasing onto '$upstream'..."
-    git rebase "$upstream" || { echo "Error: Rebase failed. Local changes remain stashed." >&2; $stashed && git stash pop; return 1; }
+    git rebase "$upstream" || {
+      echo "Error: Rebase failed. Local changes remain stashed." >&2
+      $stashed && git stash pop
+      return 1
+    }
   else
     echo "No upstream branch configured for '$current_branch'. Skipping rebase."
   fi
-  
+
   $stashed && echo "Applying stashed changes..." && git stash pop
   echo "✅ Update complete!"
 }
@@ -470,8 +507,14 @@ alias christitus='curl -fsSL christitus.com/linux | sh'
 alias christitusdev='curl -fsSL https://christitus.com/linuxdev | sh'
 
 pkg-install() {
-  [[ -z "$1" ]] && { echo "Usage: pkg-install <package> [--verbose]" >&2; return 1; }
-  [[ -f ~/install.sh ]] && ~/install.sh "$@" || { echo "Error: install.sh not found." >&2; return 1; }
+  [[ -z "$1" ]] && {
+    echo "Usage: pkg-install <package> [--verbose]" >&2
+    return 1
+  }
+  [[ -f ~/install.sh ]] && ~/install.sh "$@" || {
+    echo "Error: install.sh not found." >&2
+    return 1
+  }
 }
 
 # AI/Ollama Tools
@@ -481,9 +524,13 @@ alias run_llama3='ollama run llama3:8b'
 # Password generator
 genpass() {
   local length="${1:-16}"
-  [[ ! "$length" =~ ^[0-9]+$ || "$length" -lt 8 ]] && { echo "Specify a valid length (min 8)" >&2; return 1; }
+  [[ ! "$length" =~ ^[0-9]+$ || "$length" -lt 8 ]] && {
+    echo "Specify a valid length (min 8)" >&2
+    return 1
+  }
   # Use a more robust character set and avoid special chars that cause issues in URLs/shells
-  LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c "$length" ; echo
+  LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c "$length"
+  echo
 }
 
 # Modern alternatives and enhancements
@@ -509,18 +556,18 @@ alias yesterday='date -d yesterday "+%Y-%m-%d"'
 alias tomorrow='date -d tomorrow "+%Y-%m-%d"'
 alias timestamp='date +%s'
 alias tb="nc termbin.com 9999"
-alias ix="curl -F 'f:1=<-' ix.io"  # Another pastebin service
+alias ix="curl -F 'f:1=<-' ix.io" # Another pastebin service
 alias bc="bc -l"
-alias calc='qalc'  # Better calculator if available
+alias calc='qalc' # Better calculator if available
 alias sha1="openssl sha1"
 alias sha256="openssl sha256"
 alias md5="openssl md5"
-alias base64='base64 -w 0'  # No line wrapping
+alias base64='base64 -w 0' # No line wrapping
 alias urlencode='python3 -c "import sys, urllib.parse as ul; print(ul.quote_plus(sys.argv[1]))"'
 alias urldecode='python3 -c "import sys, urllib.parse as ul; print(ul.unquote_plus(sys.argv[1]))"'
 alias flushmcd='echo "flush_all" | nc 10.10.27.11 11211'
 alias jctl="journalctl -p 3 -xb"
-alias jctlf="journalctl -f"  # Follow journal
+alias jctlf="journalctl -f" # Follow journal
 alias gpg-check="gpg2 --keyserver-options auto-key-retrieve --verify"
 alias gpg-retrieve="gpg2 --keyserver-options auto-key-retrieve --receive-keys"
 
@@ -531,7 +578,7 @@ if command -v xclip &>/dev/null; then
 elif command -v xsel &>/dev/null; then
   alias pbcopy='xsel --clipboard --input'
   alias pbpaste='xsel --clipboard --output'
-elif command -v wl-copy &>/dev/null; then  # Wayland
+elif command -v wl-copy &>/dev/null; then # Wayland
   alias pbcopy='wl-copy'
   alias pbpaste='wl-paste'
 fi
@@ -556,8 +603,8 @@ alias jc='journalctl'
 alias jcu='journalctl --user'
 
 # Modern file management
-command -v trash-put &>/dev/null && alias rm='trash-put'  # Use trash instead of rm
-command -v rg &>/dev/null && alias grep='rg'  # Use ripgrep instead of grep
+command -v trash-put &>/dev/null && alias rm='trash-put' # Use trash instead of rm
+command -v rg &>/dev/null && alias grep='rg'             # Use ripgrep instead of grep
 
 # ----------------------------------------------------------------------------
 # Productivity Functions & Advanced Utilities
@@ -565,8 +612,14 @@ command -v rg &>/dev/null && alias grep='rg'  # Use ripgrep instead of grep
 
 # Create a backup of a file with timestamp
 backup() {
-  [[ -z "$1" ]] && { echo "Usage: backup <file>" >&2; return 1; }
-  [[ ! -f "$1" ]] && { echo "Error: File '$1' not found." >&2; return 1; }
+  [[ -z "$1" ]] && {
+    echo "Usage: backup <file>" >&2
+    return 1
+  }
+  [[ ! -f "$1" ]] && {
+    echo "Error: File '$1' not found." >&2
+    return 1
+  }
   cp "$1" "$1.backup.$(date +%Y%m%d_%H%M%S)"
   echo "Backup created: $1.backup.$(date +%Y%m%d_%H%M%S)"
 }
@@ -576,13 +629,13 @@ note() {
   local notes_dir="$HOME/notes"
   local notes_file="$notes_dir/$(date +%Y-%m-%d).md"
   mkdir -p "$notes_dir"
-  
+
   if [[ $# -eq 0 ]]; then
     # Open today's notes file
     "${EDITOR:-nvim}" "$notes_file"
   else
     # Append note with timestamp
-    echo "## $(date '+%H:%M:%S') - $*" >> "$notes_file"
+    echo "## $(date '+%H:%M:%S') - $*" >>"$notes_file"
     echo "Note added to $(basename "$notes_file")"
   fi
 }
@@ -593,7 +646,7 @@ todo() {
   if [[ $# -eq 0 ]]; then
     [[ -f "$todo_file" ]] && cat "$todo_file" || echo "No todos yet. Add one with: todo <task>"
   else
-    echo "[ ] $* ($(date '+%Y-%m-%d'))" >> "$todo_file"
+    echo "[ ] $* ($(date '+%Y-%m-%d'))" >>"$todo_file"
     echo "Todo added: $*"
   fi
 }
@@ -601,8 +654,11 @@ todo() {
 # Mark todo as done
 todo-done() {
   local todo_file="$HOME/.todo.txt"
-  [[ ! -f "$todo_file" ]] && { echo "No todo file found." >&2; return 1; }
-  
+  [[ ! -f "$todo_file" ]] && {
+    echo "No todo file found." >&2
+    return 1
+  }
+
   if [[ -z "$1" ]]; then
     echo "Current todos:"
     nl "$todo_file"
@@ -611,7 +667,7 @@ todo-done() {
   else
     num="$1"
   fi
-  
+
   if [[ "$num" =~ ^[0-9]+$ ]]; then
     sed -i "${num}s/\[ \]/[x]/" "$todo_file"
     echo "Todo $num marked as done!"
@@ -622,9 +678,12 @@ todo-done() {
 
 # Find and replace in files
 freplace() {
-  [[ $# -lt 2 ]] && { echo "Usage: freplace <find> <replace> [file_pattern]" >&2; return 1; }
+  [[ $# -lt 2 ]] && {
+    echo "Usage: freplace <find> <replace> [file_pattern]" >&2
+    return 1
+  }
   local find_text="$1" replace_text="$2" pattern="${3:-*}"
-  
+
   if command -v rg &>/dev/null && command -v sed &>/dev/null; then
     rg -l "$find_text" --glob="$pattern" | xargs sed -i "s/$find_text/$replace_text/g"
     echo "Replaced '$find_text' with '$replace_text' in files matching '$pattern'"
@@ -636,7 +695,10 @@ freplace() {
 
 # Process management helpers
 killport() {
-  [[ -z "$1" ]] && { echo "Usage: killport <port>" >&2; return 1; }
+  [[ -z "$1" ]] && {
+    echo "Usage: killport <port>" >&2
+    return 1
+  }
   local pid
   pid=$(lsof -ti:"$1")
   if [[ -n "$pid" ]]; then
@@ -649,15 +711,21 @@ killport() {
 
 # Find and kill processes by name
 killname() {
-  [[ -z "$1" ]] && { echo "Usage: killname <process_name>" >&2; return 1; }
+  [[ -z "$1" ]] && {
+    echo "Usage: killname <process_name>" >&2
+    return 1
+  }
   pkill -f "$1" && echo "Killed processes matching '$1'" || echo "No processes found matching '$1'"
 }
 
 # System monitoring functions
 watchdir() {
-  [[ -z "$1" ]] && { echo "Usage: watchdir <directory> [command]" >&2; return 1; }
+  [[ -z "$1" ]] && {
+    echo "Usage: watchdir <directory> [command]" >&2
+    return 1
+  }
   local dir="$1" cmd="${2:-echo 'Directory changed'}"
-  
+
   if command -v inotifywait &>/dev/null; then
     echo "Watching $dir for changes..."
     while inotifywait -r -e modify,create,delete "$dir" &>/dev/null; do
@@ -679,21 +747,27 @@ mktemp-cd() {
 
 # File comparison helpers
 diffdir() {
-  [[ $# -ne 2 ]] && { echo "Usage: diffdir <dir1> <dir2>" >&2; return 1; }
+  [[ $# -ne 2 ]] && {
+    echo "Usage: diffdir <dir1> <dir2>" >&2
+    return 1
+  }
   diff -r "$1" "$2"
 }
 
 # Quick archive creation
 archive() {
-  [[ -z "$1" ]] && { echo "Usage: archive <file_or_directory> [archive_name]" >&2; return 1; }
+  [[ -z "$1" ]] && {
+    echo "Usage: archive <file_or_directory> [archive_name]" >&2
+    return 1
+  }
   local source="$1"
   local archive_name="${2:-$(basename "$source")_$(date +%Y%m%d_%H%M%S)}"
-  
+
   if [[ -d "$source" ]]; then
     tar -czf "${archive_name}.tar.gz" "$source"
     echo "Directory archived to: ${archive_name}.tar.gz"
   elif [[ -f "$source" ]]; then
-    gzip -c "$source" > "${archive_name}.gz"
+    gzip -c "$source" >"${archive_name}.gz"
     echo "File archived to: ${archive_name}.gz"
   else
     echo "Error: '$source' not found." >&2
@@ -703,7 +777,10 @@ archive() {
 
 # Network utilities
 whosonport() {
-  [[ -z "$1" ]] && { echo "Usage: whosonport <port>" >&2; return 1; }
+  [[ -z "$1" ]] && {
+    echo "Usage: whosonport <port>" >&2
+    return 1
+  }
   lsof -i :"$1"
 }
 
@@ -721,7 +798,10 @@ ping-test() {
 
 # Generate QR code for text
 qr() {
-  [[ -z "$1" ]] && { echo "Usage: qr <text>" >&2; return 1; }
+  [[ -z "$1" ]] && {
+    echo "Usage: qr <text>" >&2
+    return 1
+  }
   if command -v qrencode &>/dev/null; then
     qrencode -t ansiutf8 "$1"
   else
@@ -738,12 +818,12 @@ biggest() {
 
 # Git helpers
 git-size() {
-  git rev-list --objects --all | 
-    git cat-file --batch-check='%(objecttype) %(objectname) %(objectsize) %(rest)' | 
-    sed -n 's/^blob //p' | 
-    sort --numeric-sort --key=2 | 
-    tail -20 | 
-    cut -c 1-12,41- | 
+  git rev-list --objects --all |
+    git cat-file --batch-check='%(objecttype) %(objectname) %(objectsize) %(rest)' |
+    sed -n 's/^blob //p' |
+    sort --numeric-sort --key=2 |
+    tail -20 |
+    cut -c 1-12,41- |
     $(command -v gnumfmt || echo numfmt) --field=2 --to=iec-i --suffix=B --padding=7 --round=nearest
 }
 
@@ -755,15 +835,15 @@ sys-full() {
   echo "🔹 Kernel: $(uname -srm)"
   echo "🔹 Uptime: $(uptime -p)"
   echo "🔹 Load: $(uptime | awk -F'load average:' '{print $2}')"
-  
+
   if command -v free &>/dev/null; then
     echo "🔹 Memory: $(free -h | awk '/^Mem:/ {printf "%s used / %s total (%.1f%% free)", $3, $2, ($4/$2)*100}')"
   fi
-  
+
   if command -v df &>/dev/null; then
     echo "🔹 Root disk: $(df -h / | awk 'NR==2 {printf "%s used / %s total (%s full)", $3, $2, $5}')"
   fi
-  
+
   if command -v sensors &>/dev/null; then
     local temp
     temp=$(sensors 2>/dev/null | grep -i 'core 0' | awk '{print $3}' | head -1)
@@ -777,8 +857,8 @@ sys-full() {
 
 # Zoxide shortcuts (if available)
 command -v zoxide &>/dev/null && {
-  alias z='cd'  # Since zoxide replaces cd
-  alias zi='cdi'  # Interactive mode
+  alias z='cd'   # Since zoxide replaces cd
+  alias zi='cdi' # Interactive mode
 }
 
 # FZF powered functions
@@ -790,7 +870,7 @@ if command -v fzf &>/dev/null; then
     [[ -n "$file" ]] && "${EDITOR:-nvim}" "$file"
   }
   alias fe='fzf-edit'
-  
+
   # Change directory with fzf
   fzf-cd() {
     local dir
@@ -798,7 +878,7 @@ if command -v fzf &>/dev/null; then
     [[ -n "$dir" ]] && cd "$dir"
   }
   alias fcd='fzf-cd'
-  
+
   # Kill process with fzf
   fzf-kill() {
     local pid
@@ -819,13 +899,13 @@ alias find='fd' 2>/dev/null || alias find='find'
 # Convert seconds to human readable
 sec2time() {
   local T="$1"
-  local D=$((T/60/60/24))
-  local H=$((T/60/60%24))
-  local M=$((T/60%60))
-  local S=$((T%60))
-  (( D > 0 )) && printf '%d days ' $D
-  (( H > 0 )) && printf '%d hours ' $H
-  (( M > 0 )) && printf '%d minutes ' $M
+  local D=$((T / 60 / 60 / 24))
+  local H=$((T / 60 / 60 % 24))
+  local M=$((T / 60 % 60))
+  local S=$((T % 60))
+  ((D > 0)) && printf '%d days ' $D
+  ((H > 0)) && printf '%d hours ' $H
+  ((M > 0)) && printf '%d minutes ' $M
   printf '%d seconds\n' $S
 }
 
@@ -853,7 +933,10 @@ localscan() {
 
 # Port scanner
 portscan() {
-  [[ -z "$1" ]] && { echo "Usage: portscan <host> [port_range]" >&2; return 1; }
+  [[ -z "$1" ]] && {
+    echo "Usage: portscan <host> [port_range]" >&2
+    return 1
+  }
   local host="$1" ports="${2:-1-1000}"
   nmap -Pn "$host" -p "$ports"
 }
