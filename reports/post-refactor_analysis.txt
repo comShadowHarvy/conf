@@ -1,0 +1,9 @@
+
+In .zshrc line 1:
+#!/usr/bin/env zsh
+^-- SC1071 (error): ShellCheck only supports sh/bash/dash/ksh/'busybox sh' scripts. Sorry!
+
+For more information:
+  https://www.shellcheck.net/wiki/SC1071 -- ShellCheck only supports sh/bash/...
+ShellCheck exit code: 1
+Shell config analyzer not found - skipping
