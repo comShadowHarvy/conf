@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
 # ============================================================================
 #
-#         Optimized & Refactored Shell Aliases and Functions
+#         Enhanced Shell Aliases and Functions
+#         CachyOS Linux Optimized - Compatible with Bash & Zsh
+#
+# ============================================================================
+#
+# Performance: Lazy loading, command checks, and smart fallbacks
+# Compatibility: POSIX-compliant functions work across shells
+# Features: Modern CLI tools, enhanced workflows, productivity helpers
 #
 # ============================================================================
 
@@ -231,31 +238,49 @@ sysinfo() {
 }
 
 # ----------------------------------------------------------------------------
-# Package Management (Arch Linux)
+# Package Management (CachyOS/Arch Linux Optimized)
 # ----------------------------------------------------------------------------
 
-# Pacman
-alias pacsyu='sudo pacman -Syu'
-alias pacs='sudo pacman -S'
-alias pacr='sudo pacman -Rns'
-alias pacq='pacman -Q'
-alias pacqs='pacman -Qs'
-alias pacss='pacman -Ss'
-alias pacsi='pacman -Si'
-alias pacqi='pacman -Qi'
-alias pacqo='pacman -Qo'
-alias pacclean='sudo pacman -Scc' # Use with caution
+# Core Pacman aliases
+alias pacsyu='sudo pacman -Syu'  # System update
+alias pacs='sudo pacman -S'      # Install package
+alias pacr='sudo pacman -Rns'    # Remove package with deps
+alias pacss='pacman -Ss'         # Search packages
+alias pacsi='pacman -Si'         # Package info
+alias pacq='pacman -Q'           # Query installed
+alias pacqs='pacman -Qs'         # Search installed
+alias pacqi='pacman -Qi'         # Installed package info
+alias pacqo='pacman -Qo'         # Package owns file
+alias pacql='pacman -Ql'         # Package file list
+alias pacqdt='pacman -Qdt'       # List orphaned packages
+alias paclog='tail -f /var/log/pacman.log'  # Watch pacman log
 
-# Paru (AUR Helper)
-if command -v paru &>/dev/null; then
-  alias parsua='paru -Sua --noconfirm'
-  alias parsyu='paru -Syu --noconfirm'
-  alias pars='paru' # Just use paru as the base command
-  alias parr='paru -Rns'
-  alias parqs='paru -Qs'
-  alias parss='paru -Ss'
-  alias parqi='paru -Qi'
+# CachyOS-specific optimizations
+if command -v cachyos-hello &>/dev/null; then
+  alias cachy='cachyos-hello'    # CachyOS welcome app
 fi
+
+# Enhanced AUR helpers (Paru preferred, yay fallback)
+if command -v paru &>/dev/null; then
+  alias aurinstall='paru -S'     # Install AUR package
+  alias aurupdate='paru -Sua'    # Update AUR packages only
+  alias aursync='paru -Syu'      # Full system update
+  alias aursearch='paru -Ss'     # Search AUR packages
+  alias aurinfo='paru -Si'       # AUR package info
+  alias aurclean='paru -Sc'      # Clean AUR cache
+elif command -v yay &>/dev/null; then
+  alias aurinstall='yay -S'
+  alias aurupdate='yay -Sua'
+  alias aursync='yay -Syu'
+  alias aursearch='yay -Ss'
+  alias aurinfo='yay -Si'
+  alias aurclean='yay -Sc'
+fi
+
+# Package maintenance shortcuts
+alias pacclean='sudo pacman -Scc && sudo pacman -Qtdq | sudo pacman -Rns -'  # Deep clean
+alias pacdeps='pactree'          # Show package dependencies
+alias pacfiles='pkgfile'         # Find which package provides file
 
 # **[SAFER]** Remove orphan packages
 orphan() {
@@ -861,3 +886,321 @@ randstr() {
   local length="${1:-32}"
   LC_ALL=C tr -dc 'A-Za-z0-9!@#$%^&*()_+[]{}|;:,.<>?' </dev/urandom | head -c "$length" && echo
 }
+
+# ----------------------------------------------------------------------------
+# CachyOS & Performance Optimizations
+# ----------------------------------------------------------------------------
+
+# CPU performance and monitoring
+if command -v cpupower &>/dev/null; then
+  alias cpufreq='cpupower frequency-info'
+  alias cpugov='cpupower frequency-info -g'
+  alias cpuperf='sudo cpupower frequency-set -g performance'
+  alias cpusave='sudo cpupower frequency-set -g powersave'
+fi
+
+# System optimization helpers
+alias drop-caches='sudo sync && sudo sysctl vm.drop_caches=3'  # Clear system caches
+alias trim-ssd='sudo fstrim -av'  # Trim all mounted SSDs
+alias rebuild-initramfs='sudo mkinitcpio -P'  # Rebuild initramfs
+
+# CachyOS kernel management
+if [[ -f /etc/cachy-release ]]; then
+  alias kernel-list='ls /boot/vmlinuz-*'
+  alias cachy-version='cat /etc/cachy-release'
+  alias cachy-kernel='uname -r | grep -o cachy'
+fi
+
+# ----------------------------------------------------------------------------
+# Enhanced Development Environment
+# ----------------------------------------------------------------------------
+
+# Modern development tools
+if command -v code &>/dev/null; then
+  alias c='code .'
+  alias code-extensions='code --list-extensions'
+fi
+
+# Enhanced Git workflow
+alias git-tree='git log --graph --pretty=format:"%C(red)%h%C(reset) -%C(yellow)%d%C(reset) %s %C(green)(%cr) %C(blue)<%an>%C(reset)" --abbrev-commit --all'
+alias git-files='git diff --name-only'  # Show changed files
+alias git-stats='git shortlog -sn'       # Contributor stats
+alias git-today='git log --since="midnight" --author="$(git config user.name)"'
+alias git-week='git log --since="1 week ago" --oneline'
+
+# Project management shortcuts
+projectinit() {
+  [[ -z "$1" ]] && { echo "Usage: projectinit <project_name> [template]" >&2; return 1; }
+  local project_name="$1" template="${2:-basic}"
+  
+  mkdir -p "$project_name" && cd "$project_name"
+  git init
+  
+  case "$template" in
+    "python") 
+      echo "# $project_name\n\nA Python project.\n" > README.md
+      echo "*.pyc\n__pycache__/\n.env\nvenv/\n.venv/\n" > .gitignore
+      python3 -m venv venv
+      ;;
+    "node"|"js")
+      echo "# $project_name\n\nA Node.js project.\n" > README.md  
+      echo "node_modules/\n.env\n*.log\ndist/\nbuild/\n" > .gitignore
+      npm init -y
+      ;;
+    *)
+      echo "# $project_name\n\nA new project.\n" > README.md
+      echo ".DS_Store\n*.log\n.env\ntmp/\n" > .gitignore
+      ;;
+  esac
+  
+  git add .
+  git commit -m "Initial commit: Project setup with $template template"
+  echo "✅ Project '$project_name' initialized with $template template"
+}
+
+# ----------------------------------------------------------------------------
+# Modern File Operations & Analysis
+# ----------------------------------------------------------------------------
+
+# Enhanced file analysis
+fileinfo() {
+  [[ -z "$1" ]] && { echo "Usage: fileinfo <file>" >&2; return 1; }
+  local file="$1"
+  [[ ! -e "$file" ]] && { echo "Error: File '$file' not found." >&2; return 1; }
+  
+  echo "📄 File Information: $file"
+  echo "──────────────────────────────────────"
+  echo "📊 Type: $(file "$file" | cut -d: -f2-)"
+  echo "📏 Size: $(du -h "$file" | cut -f1)"
+  echo "📅 Modified: $(stat -c %y "$file" 2>/dev/null || stat -f %Sm "$file")"
+  echo "🔒 Permissions: $(stat -c %A "$file" 2>/dev/null || stat -f %Sp "$file")"
+  
+  if [[ -f "$file" ]]; then
+    echo "📝 Lines: $(wc -l < "$file" 2>/dev/null || echo "N/A")"
+    echo "🔤 Words: $(wc -w < "$file" 2>/dev/null || echo "N/A")"
+    [[ "$file" == *.md || "$file" == *.txt ]] && echo "📖 Characters: $(wc -c < "$file")"
+  fi
+}
+
+# Smart search across different file types
+search() {
+  [[ -z "$1" ]] && { echo "Usage: search <pattern> [path] [--type=ext]" >&2; return 1; }
+  local pattern="$1" path="${2:-.}" type_filter=""
+  
+  # Parse type filter if provided
+  for arg in "$@"; do
+    if [[ "$arg" == --type=* ]]; then
+      type_filter="--type=${arg#*=}"
+    fi
+  done
+  
+  echo "🔍 Searching for '$pattern' in $path"
+  
+  if command -v rg &>/dev/null; then
+    rg --color=always --line-number --heading --smart-case $type_filter "$pattern" "$path"
+  else
+    find "$path" -type f -exec grep -l "$pattern" {} + 2>/dev/null
+  fi
+}
+
+# ----------------------------------------------------------------------------
+# Productivity & Workflow Enhancements
+# ----------------------------------------------------------------------------
+
+# Enhanced system monitoring
+watch-system() {
+  local interval="${1:-2}"
+  watch -n "$interval" 'echo "=== CPU Usage ===" && grep "cpu MHz" /proc/cpuinfo | head -4; 
+  echo -e "\n=== Memory Usage ===" && free -h;
+  echo -e "\n=== Disk Usage ===" && df -h / /home 2>/dev/null | tail -2;
+  echo -e "\n=== Load Average ===" && uptime;
+  echo -e "\n=== Top Processes ===" && ps aux --sort=-%cpu | head -6'
+}
+
+# Smart directory jumping with history
+if command -v zoxide &>/dev/null; then
+  alias j='z'  # Jump to frequent directories
+  alias ji='zi' # Interactive jump
+fi
+
+# Session management
+save-session() {
+  local session_name="${1:-default}"
+  local session_file="$HOME/.shell_sessions/$session_name"
+  mkdir -p "$(dirname "$session_file")"
+  
+  {
+    echo "# Shell session saved: $(date)"
+    echo "cd '$PWD'"
+    history | tail -20 | sed 's/^[[:space:]]*[0-9]*[[:space:]]*//'
+  } > "$session_file"
+  
+  echo "📁 Session '$session_name' saved to $session_file"
+}
+
+load-session() {
+  local session_name="${1:-default}"
+  local session_file="$HOME/.shell_sessions/$session_name"
+  
+  [[ -f "$session_file" ]] && source "$session_file" && echo "📂 Session '$session_name' loaded" || echo "❌ Session '$session_name' not found"
+}
+
+list-sessions() {
+  local sessions_dir="$HOME/.shell_sessions"
+  [[ -d "$sessions_dir" ]] && ls -1 "$sessions_dir" || echo "No saved sessions found"
+}
+
+# ----------------------------------------------------------------------------
+# System Maintenance & Utilities
+# ----------------------------------------------------------------------------
+
+# Comprehensive system update for CachyOS
+full-update() {
+  echo "🚀 Starting comprehensive system update..."
+  
+  # Update package databases and system
+  if command -v paru &>/dev/null; then
+    echo "📦 Updating system with paru..."
+    paru -Syu
+  else
+    echo "📦 Updating system with pacman..."
+    sudo pacman -Syu
+  fi
+  
+  # Update Flatpaks if available
+  if command -v flatpak &>/dev/null; then
+    echo "📱 Updating Flatpak applications..."
+    flatpak update -y
+  fi
+  
+  # Clean up package cache
+  echo "🧹 Cleaning package cache..."
+  if command -v paru &>/dev/null; then
+    paru -Sc --noconfirm
+  else
+    sudo pacman -Sc --noconfirm  
+  fi
+  
+  # Remove orphaned packages
+  echo "🗑️  Removing orphaned packages..."
+  local orphans
+  orphans=$(pacman -Qtdq)
+  [[ -n "$orphans" ]] && sudo pacman -Rns --noconfirm $orphans || echo "No orphaned packages found"
+  
+  # Trim SSDs if available
+  if command -v fstrim &>/dev/null; then
+    echo "✂️  Trimming SSDs..."
+    sudo fstrim -av
+  fi
+  
+  echo "✅ System update complete!"
+}
+
+# Quick system health check
+syshealth() {
+  echo "🏥 System Health Check"
+  echo "════════════════════════════════════════"
+  
+  # Disk space check
+  echo "💾 Disk Usage:"
+  df -h / /home 2>/dev/null | awk 'NR>1 {print "  " $6 ": " $3 "/" $2 " (" $5 " used)"}'  
+  
+  # Memory usage
+  echo -e "\n🧠 Memory Usage:"
+  free -h | awk 'NR==2{printf "  RAM: %s/%s (%.0f%% used)\n", $3,$2,($3/$2)*100}'
+  
+  # Load average
+  echo -e "\n⚡ Load Average:"
+  uptime | awk -F'load average:' '{print "  " $2}'
+  
+  # Failed systemd services
+  echo -e "\n🔧 Failed Services:"
+  local failed_services
+  failed_services=$(systemctl --failed --no-legend --no-pager -q)
+  [[ -n "$failed_services" ]] && echo "$failed_services" || echo "  ✅ No failed services"
+  
+  # Temperature check
+  if command -v sensors &>/dev/null; then
+    echo -e "\n🌡️  Temperature:"
+    sensors | grep -E "(Core|Package|Tctl)" | head -3 | sed 's/^/  /'
+  fi
+  
+  echo -e "\n📊 System Status: $(systemctl is-system-running)"
+}
+
+# ----------------------------------------------------------------------------
+# Modern Development Shortcuts
+# ----------------------------------------------------------------------------
+
+# Language version managers
+if command -v node &>/dev/null; then
+  alias node-version='node --version && npm --version'
+fi
+
+if command -v python3 &>/dev/null; then
+  alias py-version='python3 --version && pip --version'
+  alias venv-create='python3 -m venv venv && source venv/bin/activate'
+  alias venv-activate='source venv/bin/activate || source .venv/bin/activate'
+fi
+
+# Docker shortcuts (enhanced)
+if command -v docker &>/dev/null; then
+  alias docker-clean='docker system prune -af && docker volume prune -f'
+  alias docker-stats='docker stats --no-stream'
+  alias docker-top='docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"'
+fi
+
+# Modern alternatives with fallbacks
+command -v delta &>/dev/null && alias diff='delta'
+command -v tldr &>/dev/null && alias help='tldr'
+command -v hyperfine &>/dev/null && alias benchmark='hyperfine'
+
+# ----------------------------------------------------------------------------
+# Quick Utilities & Shortcuts
+# ----------------------------------------------------------------------------
+
+# URL tools
+open-url() {
+  [[ -z "$1" ]] && { echo "Usage: open-url <url>" >&2; return 1; }
+  local url="$1"
+  [[ ! "$url" =~ ^https?:// ]] && url="https://$url"
+  
+  if command -v xdg-open &>/dev/null; then
+    xdg-open "$url"
+  else
+    echo "URL: $url (no browser opener found)"
+  fi
+}
+
+# Alias suggestions based on command usage
+alias-suggest() {
+  echo "🔍 Most used commands (potential aliases):"
+  history | awk '{print $2}' | sort | uniq -c | sort -rn | head -10 | awk '{printf "  %s\t(used %d times)\n", $2, $1}'
+}
+
+# Quick file server for sharing
+serve-here() {
+  local port="${1:-8080}"
+  local ip
+  ip=$(hostname -I | awk '{print $1}')
+  echo "📡 Serving current directory at http://$ip:$port"
+  echo "🔗 Press Ctrl+C to stop"
+  python3 -m http.server "$port"
+}
+
+# Enhanced clipboard operations (cross-platform)
+clip() {
+  if command -v xclip &>/dev/null; then
+    xclip -selection clipboard
+  elif command -v xsel &>/dev/null; then
+    xsel --clipboard --input
+  elif command -v wl-copy &>/dev/null; then
+    wl-copy
+  else
+    echo "❌ No clipboard tool found"
+    return 1
+  fi
+  echo "📋 Content copied to clipboard"
+}
+
+# EOF marker for enhanced aliases
