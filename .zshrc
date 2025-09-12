@@ -101,19 +101,6 @@ TRUSTED_GIT_DIRS=(
   "$HOME/personal"
   "$HOME/dev"
 )
-
-# Plugin configuration (used by ZimFW and potentially OMZ)
-# Using an associative array for clarity
-typeset -A zplugins
-zplugins=(
-  [git]=true                    # Enable Git plugin features
-  [zoxide]=true                 # Enable zoxide (intelligent cd)
-  [syntax-highlighting]=true    # Enable zsh-syntax-highlighting
-  [autosuggestions]=true        # Enable zsh-autosuggestions
-  [history-substring-search]=true # Enable history substring search
-  [archlinux]=true              # Enable Arch Linux specific aliases/functions (if applicable)
-)
-
 # --- Helper Functions ---
 
 # Log functions - only loaded when needed
@@ -246,16 +233,10 @@ _run_deferred_startup_visuals() {
     # Show system info based on available tools and configuration
     if [[ "$SHOW_POKEMON" == "true" ]]; then
         if (( $+commands[pokemon-colorscripts] )) && (( $+commands[fastfetch] )); then
-            # Run pokemon first, then fastfetch with compact output
-            pokemon-colorscripts --no-title -r
-            echo # Add spacing
-            if [[ -n "$TMUX" ]]; then
-                # Very compact display for tmux
-                fastfetch --logo none --structure Title:OS:Host:Kernel:Uptime:Memory
-            else
-                # Compact display for regular terminal
-                fastfetch --logo-width 20 --structure Title:OS:Host:Kernel:Uptime:Memory:Shell
-            fi
+            # Run pokemon piped to fastfetch with custom config
+            pokemon-colorscripts --no-title -s -r | \
+            fastfetch -c "$HOME/.config/fastfetch/config-pokemon.jsonc" \
+                      --logo-type file-raw --logo-height 10 --logo-width 5 --logo -
         elif (( $+commands[pokemon-colorscripts] )); then
             # Just pokemon with appropriate size
             if [[ -n "$TMUX" ]]; then
@@ -305,39 +286,8 @@ zstyle ':completion:*' group-name '' # Group completions by type
 zstyle ':completion:*:descriptions' format '%F{yellow}%B--- %d%b%f' # Format descriptions
 zstyle ':completion:*' verbose yes # Provide detailed completion messages
 
-# --- ZimFW (Plugin Manager) ---
-ZIM_HOME="$XDG_DATA_HOME/zim"
-# Download zimfw.zsh if missing
-if [[ ! -f "$ZIM_HOME/zimfw.zsh" ]]; then
-  # Ensure curl or wget is available
-  if ! (( $+commands[curl] )) && ! (( $+commands[wget] )); then
-    _log_message "ERROR" "Cannot install ZimFW: curl or wget is required."
-  else
-    _safe_download \
-      "https://github.com/zimfw/zimfw/releases/latest/download/zimfw.zsh" \
-      "$ZIM_HOME/zimfw.zsh" "Downloading ZimFW..."
-  fi
-fi
 # Initialize ZimFW if the file exists
 [[ -f "$ZIM_HOME/.zimrc" ]] && source "$ZIM_HOME/zimrc"
-
-# --- Configure Zim Modules (Plugins/Themes) ---
-# Define modules to be managed by ZimFW based on our zplugins array
-zmodules=()
-(( ${zplugins[git]} )) && zmodules+=("git")
-(( ${zplugins[syntax-highlighting]} )) && zmodules+=("zsh-users/zsh-syntax-highlighting")
-(( ${zplugins[autosuggestions]} )) && zmodules+=("zsh-users/zsh-autosuggestions")
-(( ${zplugins[history-substring-search]} )) && zmodules+=("zsh-users/zsh-history-substring-search")
-(( ${zplugins[archlinux]} )) && zmodules+=("archlinux") # Assuming this is a Zim module
-
-# Add other desired Zim modules here, e.g., themes, completions
-# zmodules+=("prompt") # Example: Add prompt module if needed
-
-# Load Zim modules if the array is not empty
-if (( ${#zmodules[@]} > 0 )); then
-  zimfw install # Install/update modules if needed
-  zimfw load    # Load the modules
-fi
 
 # --- Shell Enhancements ---
 
@@ -798,12 +748,4 @@ _setup_tmux_config
 # _log_message "INFO" "Zsh initialized in $ZSHRC_ELAPSED seconds"
 # zprof # Print profiling info
 # MCP host aliases
-alias mcphost=mcp-cli
 alias mmcphost=mcp-cli
-
-# bun completions
-[ -s "/home/me/.bun/_bun" ] && source "/home/me/.bun/_bun"
-
-# bun
-export BUN_INSTALL="$HOME/.bun"
-export PATH="$BUN_INSTALL/bin:$PATH"
