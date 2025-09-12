@@ -1,16 +1,31 @@
 #!/usr/bin/env zsh
 # =====================================================
-# Optimized Zsh Configuration with ZimFW
-# Organized for performance and functionality
+# Enhanced Optimized Zsh Configuration with ZimFW
+# Organized for performance, maintainability, and functionality
+# Based on comprehensive WARP development standards
 # =====================================================
 
 # --- Performance Tracking (Uncomment to Debug) ---
 # zmodload zsh/zprof
 # ZSHRC_START_TIME=${EPOCHREALTIME} # Use Zsh's high-resolution timer
 
+# --- Core Environment Setup (Set Early) ---
+export ZDOTDIR="${ZDOTDIR:-$HOME}"
+
+# XDG Base Directory Specification (use defaults if not set)
+export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$ZDOTDIR/.config}"
+export XDG_DATA_HOME="${XDG_DATA_HOME:-$ZDOTDIR/.local/share}"
+export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$ZDOTDIR/.cache}"
+
+# ZimFW configuration with readonly exports for performance
+typeset -gxr ZIM_HOME="${ZIM_HOME:-$HOME/.zim}"
+typeset -gxr ZSH_CACHE_DIR="$XDG_CACHE_HOME/zsh"
+
+# Ensure base directories exist
+mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_CACHE_HOME" "$ZSH_CACHE_DIR"
+
 # --- Core Zsh Options (Set Early) ---
-# Exit on error, treat unset variables as errors (be careful with prompts/completions), exit on pipe failures
-# Consider removing 'u' if it causes issues with plugins/themes: setopt NO_UNSET
+# History configuration
 setopt BANG_HIST                      # Treat '!' specially during history expansion
 setopt EXTENDED_HISTORY               # Write the history file in the ':start:elapsed;command' format.
 setopt INC_APPEND_HISTORY             # Write to the history file immediately, not when the shell exits.
@@ -23,11 +38,15 @@ setopt HIST_IGNORE_SPACE              # Don't record entries starting with a spa
 setopt HIST_SAVE_NO_DUPS              # Don't write duplicate entries in the history file.
 setopt HIST_REDUCE_BLANKS             # Remove superfluous blanks before recording entry.
 setopt HIST_VERIFY                    # Don't execute history expansion commands immediately.
+
+# Directory navigation
 setopt AUTO_CD                        # If command is a path to a directory, cd into it.
 setopt AUTO_PUSHD                     # Automatically push directories onto the stack.
 setopt PUSHD_IGNORE_DUPS              # Don't push directories onto the stack if they are already there.
 setopt PUSHD_SILENT                   # Do not print the directory stack after pushd or popd.
 setopt PUSHD_TO_HOME                  # Have pushd with no arguments act like `pushd $HOME`.
+
+# Globbing and completion
 setopt EXTENDED_GLOB                  # Use extended globbing syntax.
 setopt GLOB_DOTS                      # Include hidden files in globbing results.
 setopt NO_BEEP                        # No annoying beeps.
@@ -35,106 +54,149 @@ setopt INTERACTIVE_COMMENTS           # Allow comments in interactive shell.
 setopt COMPLETE_IN_WORD               # Complete from both ends of a word.
 setopt ALWAYS_TO_END                  # Move cursor to the end of a completed word.
 setopt CORRECT                        # Auto-correct commands
-# setopt MULTIOS                      # Allow multiple redirections (can sometimes be surprising)
 
-# History configuration
-HISTFILE="${ZDOTDIR:-$HOME}/.zsh_history"
-HISTSIZE=10000
-SAVEHIST=10000
-# Ignore common commands and duplicates
-#export HISTORY_IGNORE="(ls|cd|pwd|exit|sudo reboot|history|cd -|cd ..| *|&:)" # Ignore duplicates and commands starting with space
-# Zsh-native way to ignore patterns. The `|` acts as an OR.
-# The `&` is for duplicates (already handled by HIST_IGNORE_ALL_DUPS)
-# The leading space is handled by HIST_IGNORE_SPACE
-HIST_IGNORE_PATTERNS="ls|cd|pwd|exit|sudo reboot|history|cd -|cd ..|exa*|lsd*"
+# History settings
+HISTFILE="$ZDOTDIR/.zsh_history"
+HISTSIZE=50000
+SAVEHIST=50000
+HIST_IGNORE_PATTERNS="ls|cd|pwd|exit|sudo reboot|history|cd -|cd ..|eza*|lsd*"
 
-# --- Environment Variables & Paths ---
-# Use ZDOTDIR if set, otherwise default to $HOME
-export ZDOTDIR="${ZDOTDIR:-$HOME}"
+# --- Editor Configuration ---
 export EDITOR="nvim"
-export VISUAL="nvim" # Or 'neovide', 'gvim' etc.
+export VISUAL="nvim"
 
-# XDG Base Directory Specification (use defaults if not set)
-export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$ZDOTDIR/.config}"
-export XDG_DATA_HOME="${XDG_DATA_HOME:-$ZDOTDIR/.local/share}"
-export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$ZDOTDIR/.cache}"
-
-# Ensure base directories exist
-mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_CACHE_HOME"
-
-# Path configuration (using Zsh's typeset -U for uniqueness)
+# --- Path Configuration (using Zsh's typeset -U for uniqueness) ---
 typeset -U path # Ensures path entries are unique
-# Prepend user bin directories
+
+# Build path array with proper precedence
 path=(
   "$HOME/app"                   # Custom applications
   "$HOME/.local/bin"            # Standard user binary location
   "$HOME/bin"                   # Legacy user binary location
-  "$XDG_DATA_HOME/../bin"       # Potential location from install scripts (resolves to ~/.local/bin)
+  "$XDG_DATA_HOME/../bin"       # Potential location from install scripts
   $path                         # Include existing system path
 )
-# Source environment variables from a specific file if it exists
+
+# Add repo app directory to path if it exists and contains executables
+[[ -d "./app" && -x "./app/updateall" ]] && path=("./app" $path)
+
+# Source environment variables from specific file if it exists
 [[ -f "$XDG_DATA_HOME/../bin/env" ]] && source "$XDG_DATA_HOME/../bin/env"
 
-# FZF configuration
-export FZF_DEFAULT_OPTS="--layout=reverse --exact --border=bold --border=rounded --margin=3% --color=dark"
-# Use fd if available for FZF
-if (( $+commands[fd] )); then
-  export FZF_DEFAULT_COMMAND='fd --type f --hidden --follow --exclude .git'
-  export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
-  export FZF_ALT_C_COMMAND='fd --type d --hidden --follow --exclude .git'
-fi
-
-# --- Configuration Options ---
+# --- Configuration Options & Runtime Toggles ---
 # User configuration - easy to customize
-INSTALL_MISSING_TOOLS=true      # Auto-install missing tools (interactively)
-SHOW_POKEMON=true               # Show Pokémon on startup (can impact startup time)
-SHOW_WELCOME_MESSAGE=true       # Show welcome message
-USE_OHMYPOSH=true               # Use Oh My Posh prompt
-AUTO_CHECK_UPDATES=true         # Auto-check for Git updates on cd (only in trusted dirs)
+INSTALL_MISSING_TOOLS=${INSTALL_MISSING_TOOLS:-true}      # Auto-install missing tools (interactively)
+SHOW_POKEMON=${SHOW_POKEMON:-true}                        # Show Pokémon on startup (can impact startup time)
+SHOW_WELCOME_MESSAGE=${SHOW_WELCOME_MESSAGE:-true}        # Show welcome message
+USE_OHMYPOSH=${USE_OHMYPOSH:-true}                        # Use Oh My Posh prompt
+AUTO_CHECK_UPDATES=${AUTO_CHECK_UPDATES:-true}            # Auto-check for Git updates on cd (only in trusted dirs)
+SKIP_ZIMFW=${SKIP_ZIMFW:-false}                           # Skip ZimFW initialization entirely
 
 # Trusted Git directories (prevent auto-updates in untrusted locations)
-# Use $HOME explicitly for clarity, ensure paths exist or handle gracefully if needed
 TRUSTED_GIT_DIRS=(
   "$HOME/git"
   "$HOME/projects"
   "$HOME/work"
-  "$HOME/personal"
+  "$HOME/personal" 
   "$HOME/dev"
 )
+
+# --- Plugin Management System ---
+# Define plugins using associative array for better control
+typeset -A zplugins
+
+# Core plugins - always enabled
+zplugins[environment]=1
+zplugins[utility]=1
+zplugins[input]=1
+zplugins[termtitle]=1
+zplugins[completion]=1
+
+# Navigation and tools
+zplugins[zoxide]=1
+zplugins[fzf]=1
+
+# Development tools (conditionally enabled based on command availability)
+zplugins[git]=1
+zplugins[git-info]=1
+
+# Productivity and visual enhancements
+zplugins[duration-info]=1
+zplugins[auto-notify]=1
+zplugins[alias-tips]=1
+zplugins[colored-man-pages]=1
+
+# Syntax highlighting and autosuggestions (load last for performance)
+zplugins[fast-syntax-highlighting]=1
+zplugins[history-substring-search]=1
+zplugins[autosuggestions]=1
+
+# User can override in ~/.zshrc.local by setting zplugins[plugin_name]=0
+
+# --- FZF Configuration ---
+export FZF_DEFAULT_OPTS="--layout=reverse --exact --border=bold --border-rounded --margin=3% --color=dark --height 60% --multi"
+
+# Use fd/rg if available for FZF with intelligent fallbacks
+if (( $+commands[fd] )); then
+  export FZF_DEFAULT_COMMAND='fd --type f --hidden --follow --exclude .git --exclude node_modules --exclude .cache'
+  export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+  export FZF_ALT_C_COMMAND='fd --type d --hidden --follow --exclude .git --exclude node_modules'
+elif (( $+commands[rg] )); then
+  export FZF_DEFAULT_COMMAND='rg --files --hidden --follow --glob "!.git/*" --glob "!node_modules/*"'
+  export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+fi
+
 # --- Helper Functions ---
 
-# Log functions - only loaded when needed
+# Enhanced logging with proper error handling
 _log_message() {
   local level=$1 message=$2 color
   case $level in
     "INFO")    color="32" ;; # Green
     "WARNING") color="33" ;; # Yellow
     "ERROR")   color="31" ;; # Red
+    "DEBUG")   color="36" ;; # Cyan
     *)         color="37" ;; # White
   esac
-  # Use Zsh's %D{%T} for time format
   print -P "%F{$color}[%D{%T}] [$level] $message%f"
 }
 
-# Safer sourcing
-_safe_source() { [[ -f "$1" ]] && source "$1" }
+# Safer sourcing with debug info
+_safe_source() {
+  [[ -f "$1" ]] && { source "$1"; return 0; } || { [[ -n "$DEBUG_ZSHRC" ]] && _log_message "DEBUG" "File not found: $1"; return 1; }
+}
 
-# Safe download helper (requires curl or wget)
+# Enhanced error handling
+_error_exit() {
+  _log_message "ERROR" "$1"
+  return ${2:-1}
+}
+
+# Robust cache validation helper (24-hour expiry)
+_is_cache_valid() {
+  local cache_file="$1"
+  [[ -f "$cache_file" ]] && (( $(date +%s) - $(stat -c %Y "$cache_file" 2>/dev/null || stat -f %m "$cache_file" 2>/dev/null || echo 0) < 86400 ))
+}
+
+# Safe download helper with progress and retries
 _safe_download() {
-  local url=$1 destination=$2 message=${3:-"Downloading $url"} cmd
-  if [[ ! -f "$destination" ]]; then
-    _log_message "INFO" "$message"
-    mkdir -p "$(dirname "$destination")"
-    if (( $+commands[curl] )); then
-      curl -fLso "$destination" "$url" || { _log_message "ERROR" "curl failed to download $url"; return 1; }
-    elif (( $+commands[wget] )); then
-      wget -qO "$destination" "$url" || { _log_message "ERROR" "wget failed to download $url"; return 1; }
-    else
-      _log_message "ERROR" "Cannot download: curl or wget not found."
-      return 1
-    fi
+  local url="$1" destination="$2" message="${3:-"Downloading $url"}"
+  [[ -f "$destination" ]] && return 0
+  
+  _log_message "INFO" "$message"
+  mkdir -p "$(dirname "$destination")"
+  
+  local cmd
+  if (( $+commands[curl] )); then
+    cmd="curl -fLs --connect-timeout 10 --max-time 30"
+  elif (( $+commands[wget] )); then
+    cmd="wget -qO-"
+  else
+    _error_exit "Cannot download: curl or wget not found."
+    return 1
   fi
-  return 0
+  
+  $cmd "$url" > "$destination" || { _error_exit "Failed to download $url"; return 1; }
 }
 
 # Package manager detection (cached)
@@ -172,19 +234,14 @@ _install_if_missing() {
 
   _log_message "INFO" "Attempting to install $package..."
 
-  # Try custom install script first (if it exists and is executable)
-  local custom_installer="$HOME/development/conf/install.sh" # Use full path
-  if [[ -x "$custom_installer" ]]; then
-      _log_message "INFO" "Using custom installer: $custom_installer"
-      if "$custom_installer" "$package"; then
-          if (( $+commands[$cmd] )); then
-              _log_message "INFO" "$package installed successfully via custom script."
-              return 0
-          else
-              _log_message "WARNING" "Custom install script ran but command '$cmd' still not found."
-          fi
+  # Try custom install script first (proper path resolution)
+  if [[ -x "./install.sh" ]]; then
+      _log_message "INFO" "Using local installer: ./install.sh"
+      if ./install.sh "$package"; then
+          (( $+commands[$cmd] )) && { _log_message "INFO" "$package installed successfully via local script."; return 0; }
+          _log_message "WARNING" "Install script ran but command '$cmd' still not found."
       else
-          _log_message "WARNING" "Custom install script failed for $package."
+          _log_message "WARNING" "Local install script failed for $package."
       fi
   fi
 
@@ -267,27 +324,127 @@ _run_deferred_startup_visuals() {
     # Redraw the prompt to ensure it's neatly positioned
     zle && zle .redisplay
 }
+# --- ZimFW Auto-Generation System ---
+_zimrc_autogen() {
+  [[ "$SKIP_ZIMFW" == "true" ]] && return 0
+  
+  local zimrc_file="$HOME/.zimrc"
+  local zimrc_tmp="$ZSH_CACHE_DIR/.zimrc.tmp"
+  
+  # Create temporary .zimrc based on zplugins array
+  cat > "$zimrc_tmp" << 'EOF'
+# Auto-generated .zimrc - DO NOT EDIT DIRECTLY
+# Edit zplugins array in .zshrc instead
+
+# Core modules (always enabled)
+zmodule environment
+zmodule utility  
+zmodule input
+zmodule termtitle
+
+# Completion system
+zmodule completion
+zmodule zsh-users/zsh-completions
+
+EOF
+
+  # Add conditional modules based on zplugins array
+  (( ${zplugins[git]:-0} )) && cat >> "$zimrc_tmp" << 'EOF'
+# Git integration
+zmodule git-info
+EOF
+
+  (( ${zplugins[zoxide]:-0} )) && (( $+commands[zoxide] )) && cat >> "$zimrc_tmp" << 'EOF'
+# Smart directory jumping
+zmodule kiesman99/zim-zoxide
+EOF
+
+  (( ${zplugins[fzf]:-0} )) && (( $+commands[fzf] )) && cat >> "$zimrc_tmp" << 'EOF'
+# Fuzzy finder
+zmodule junegunn/fzf
+EOF
+
+  # Add productivity modules
+  (( ${zplugins[duration-info]:-0} )) && echo "zmodule duration-info" >> "$zimrc_tmp"
+  (( ${zplugins[auto-notify]:-0} )) && echo "zmodule MichaelAquilina/zsh-auto-notify" >> "$zimrc_tmp"
+  (( ${zplugins[alias-tips]:-0} )) && echo "zmodule djui/alias-tips" >> "$zimrc_tmp"
+  (( ${zplugins[colored-man-pages]:-0} )) && echo "zmodule ael-code/zsh-colored-man-pages" >> "$zimrc_tmp"
+
+  # Syntax highlighting and suggestions (load last)
+  cat >> "$zimrc_tmp" << 'EOF'
+
+# Syntax highlighting and autosuggestions (load last for performance)
+EOF
+  (( ${zplugins[fast-syntax-highlighting]:-0} )) && echo "zmodule zdharma-continuum/fast-syntax-highlighting" >> "$zimrc_tmp"
+  (( ${zplugins[history-substring-search]:-0} )) && echo "zmodule zsh-users/zsh-history-substring-search" >> "$zimrc_tmp"
+  (( ${zplugins[autosuggestions]:-0} )) && echo "zmodule zsh-users/zsh-autosuggestions" >> "$zimrc_tmp"
+  
+  # Compare with existing .zimrc and update if changed
+  if [[ ! -f "$zimrc_file" ]] || ! diff -q "$zimrc_file" "$zimrc_tmp" >/dev/null 2>&1; then
+    cp "$zimrc_tmp" "$zimrc_file"
+    _log_message "INFO" "Updated .zimrc configuration"
+    
+    # Trigger zimfw build if zimfw is available
+    if (( $+commands[zimfw] )); then
+      _log_message "INFO" "Rebuilding ZimFW modules..."
+      zimfw build >/dev/null 2>&1 || _log_message "WARNING" "zimfw build failed"
+    fi
+  fi
+  
+  rm -f "$zimrc_tmp"
+}
+
+# --- Rollback Functions ---
+_rollback_last() {
+  local backup_file
+  backup_file=$(ls -t .zshrc.orig-* 2>/dev/null | head -1)
+  if [[ -n "$backup_file" ]]; then
+    cp "$backup_file" .zshrc
+    _log_message "INFO" "Rolled back to $backup_file"
+  else
+    _error_exit "No backup files found to rollback to"
+  fi
+}
+
 #_____________________________________________________________________________________________
 # --- Completion System ---
-# Initialize completions; use cache if available and less than 24 hours old
 autoload -Uz compinit
-local compinit_cache_file="$XDG_CACHE_HOME/zsh/zcompdump"
-if [[ -f "$compinit_cache_file" ]] && (( $(date +%s) - $(stat -c %Y "$compinit_cache_file" 2>/dev/null || stat -f %m "$compinit_cache_file" 2>/dev/null || echo 0) < 86400 )); then
+local compinit_cache_file="$ZSH_CACHE_DIR/zcompdump"
+
+if _is_cache_valid "$compinit_cache_file"; then
   compinit -i -C -d "$compinit_cache_file"
 else
-  # Regenerate cache file
   compinit -i -d "$compinit_cache_file"
 fi
-# Basic completion styling
-zstyle ':completion:*' menu select
-zstyle ':completion:*:default' list-colors ${(s.:.)LS_COLORS} # Use LS_COLORS for completion highlighting
-zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}' # Case-insensitive matching
-zstyle ':completion:*' group-name '' # Group completions by type
-zstyle ':completion:*:descriptions' format '%F{yellow}%B--- %d%b%f' # Format descriptions
-zstyle ':completion:*' verbose yes # Provide detailed completion messages
 
-# Initialize ZimFW if the file exists
-[[ -f "$ZIM_HOME/.zimrc" ]] && source "$ZIM_HOME/zimrc"
+# Enhanced completion styling
+zstyle ':completion:*' menu select
+zstyle ':completion:*:default' list-colors ${(s.:.)LS_COLORS}
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}' 'r:|[._-]=* r:|=*' 'l:|=* r:|=*'
+zstyle ':completion:*' group-name ''
+zstyle ':completion:*:descriptions' format '%F{yellow}%B--- %d%b%f'
+zstyle ':completion:*' verbose yes
+zstyle ':completion:*:warnings' format '%F{red}%BNo matches found%b%f'
+
+# --- ZimFW Integration ---
+if [[ "$SKIP_ZIMFW" != "true" ]]; then
+  # Generate .zimrc if needed
+  _zimrc_autogen
+  
+  # Initialize ZimFW if available
+  if [[ -f "$ZIM_HOME/init.zsh" ]]; then
+    source "$ZIM_HOME/init.zsh"
+  elif [[ -f "$ZIM_HOME/zimfw.zsh" ]]; then
+    source "$ZIM_HOME/zimfw.zsh"
+  else
+    # Install ZimFW if not found and auto-install is enabled
+    if [[ "$INSTALL_MISSING_TOOLS" == "true" ]]; then
+      _log_message "INFO" "ZimFW not found. Installing..."
+      curl -fsSL https://raw.githubusercontent.com/zimfw/install/master/install.zsh | zsh
+      source "$ZIM_HOME/init.zsh" 2>/dev/null || _log_message "WARNING" "Failed to initialize ZimFW after installation"
+    fi
+  fi
+fi
 
 # --- Shell Enhancements ---
 
@@ -742,10 +899,22 @@ _setup_tmux_config
 #   exec tmux
 # fi
 
-# --- Performance Tracking End (Uncomment to Debug) ---
+# --- Debug and Development Aliases ---
+alias debug-git="debug_git_check; print 'Trusted dirs:'; printf ' - %s\n' "${TRUSTED_GIT_DIRS[@]}""
+alias debug-zshrc="DEBUG_ZSHRC=1 exec zsh -l"
+alias reload-zsh="exec zsh -l"
+alias rollback-zshrc="_rollback_last && exec zsh -l"
+alias rebuild-zimfw="zimfw build && zimfw update && exec zsh -l"
+
+# Performance profiling helpers
+alias profile-zsh="sed -i 's/# zmodload zsh\/zprof/zmodload zsh\/zprof/' .zshrc && exec zsh -l"
+alias unprofile-zsh="sed -i 's/zmodload zsh\/zprof/# zmodload zsh\/zprof/' .zshrc"
+
+# MCP host alias for convenience
+alias mmcphost=mcp-cli
+
+# --- Performance Tracking End ---
 # ZSHRC_END_TIME=${EPOCHREALTIME}
 # ZSHRC_ELAPSED=$(($ZSHRC_END_TIME - $ZSHRC_START_TIME))
 # _log_message "INFO" "Zsh initialized in $ZSHRC_ELAPSED seconds"
 # zprof # Print profiling info
-# MCP host aliases
-alias mmcphost=mcp-cli

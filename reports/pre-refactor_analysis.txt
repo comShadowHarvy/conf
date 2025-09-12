@@ -1,0 +1,11 @@
+Syntax check exit code: 0
+
+=== ShellCheck Analysis ===
+
+
+In .zshrc line 1:
+#!/usr/bin/env zsh
+^-- SC1071 (error): ShellCheck only supports sh/bash/dash/ksh/'busybox sh' scripts. Sorry!
+
+For more information:
+  https://www.shellcheck.net/wiki/SC1071 -- ShellCheck only supports sh/bash/...
