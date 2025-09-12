@@ -1,0 +1,22 @@
+{
+  "summary": {
+    "total_aliases": 174,
+    "total_functions": 59,
+    "duplicates": 0,
+    "path_issues": 1,
+    "conflicts": 0
+  },
+  "duplicates": [],
+  "path_issues": [
+    {
+      "type": "hardcoded_path",
+      "line": 665,
+      "content": "PYTHON_ENV_PATH=\"/home/me/python_packages_env/bin/activate\"",
+      "issue": "Hardcoded /home/me path - should use $HOME"
+    }
+  ],
+  "conflicts": [],
+  "recommendations": [
+    "Replace hardcoded paths with $HOME and XDG variables"
+  ]
+}

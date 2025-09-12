@@ -1,110 +1,668 @@
-#!/bin/bash
+#!/usr/bin/env python3
+"""
+zipp - Enhanced compression utility with multi-format support
+Backward compatible with original bash version while adding powerful new features.
+"""
 
-# Check if an argument (file or directory to zip) is provided
-if [ -z "$1" ]; then
-  echo "Usage: $0 <file_or_directory_to_zip>"
-  exit 1
-fi
+import argparse
+import configparser
+import fnmatch
+import logging
+import os
+import shlex
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+from abc import ABC, abstractmethod
+from pathlib import Path
+from typing import List, Optional, Tuple, Union
 
-# Get the input file or directory
-TARGET="$1"
 
-# Check if the target exists
-if [ ! -e "$TARGET" ]; then
-  echo "Error: File or directory '$TARGET' not found."
-  exit 1
-fi
+class CompressionError(Exception):
+    """Custom exception for compression-related errors."""
+    pass
 
-# --- Get Original Size ---
-echo "Calculating original size..."
-ORIGINAL_SIZE_BYTES=$(du -sb "$TARGET" | awk '{print $1}')
-ORIGINAL_SIZE_HUMAN=$(du -sh "$TARGET" | awk '{print $1}')
-echo "Original size: $ORIGINAL_SIZE_HUMAN ($ORIGINAL_SIZE_BYTES bytes)"
 
-# --- Determine Archive Name with Safety Check ---
-# Initial proposed archive name: appends .zip to the target name
-# If TARGET is "mydir/", ARCHIVE_NAME becomes "mydir.zip".
-# If TARGET is "myfile.txt", ARCHIVE_NAME becomes "myfile.txt.zip".
-# If TARGET is "myfile.zip" (a file), ARCHIVE_NAME initially becomes "myfile.zip.zip".
-PROPOSED_ARCHIVE_NAME="${TARGET%/}.zip"
-ARCHIVE_NAME="$PROPOSED_ARCHIVE_NAME" # Assume this is fine initially
+class Compressor(ABC):
+    """Abstract base class for compression backends."""
+    
+    def __init__(self, level: int = 6, preserve_timestamps: bool = True, threads: Optional[int] = None):
+        self.level = max(0, min(9, level))  # Clamp to 0-9
+        self.preserve_timestamps = preserve_timestamps
+        self.threads = threads or os.cpu_count()
+    
+    @property
+    @abstractmethod
+    def extensions(self) -> List[str]:
+        """File extensions this compressor handles."""
+        pass
+    
+    @property
+    @abstractmethod
+    def command_name(self) -> str:
+        """Primary command name for this compressor."""
+        pass
+    
+    @abstractmethod
+    def build_command(self, sources: List[str], output: str, excludes: List[str]) -> List[str]:
+        """Build the compression command."""
+        pass
+    
+    @abstractmethod
+    def validate_command(self, archive: str) -> List[str]:
+        """Build command to validate archive integrity."""
+        pass
+    
+    def is_available(self) -> bool:
+        """Check if this compressor is available on the system."""
+        return shutil.which(self.command_name) is not None
+    
+    def get_level_flag(self) -> str:
+        """Convert generic level (0-9) to format-specific flag."""
+        return f"-{self.level}"
 
-# Safety check: if the TARGET is a file AND its name is identical to the PROPOSED_ARCHIVE_NAME
-# This would typically only happen if TARGET was something like "data.zip.zip" and PROPOSED_ARCHIVE_NAME also became "data.zip.zip"
-if [ -f "$TARGET" ] && [ "$TARGET" == "$PROPOSED_ARCHIVE_NAME" ]; then
-  echo "Warning: Proposed archive name '$PROPOSED_ARCHIVE_NAME' is identical to the source file '$TARGET'."
 
-  TARGET_DIR=$(dirname "$PROPOSED_ARCHIVE_NAME")
-  TARGET_FILE=$(basename "$PROPOSED_ARCHIVE_NAME")
+class ZipCompressor(Compressor):
+    """ZIP format compressor using standard zip command."""
+    
+    @property
+    def extensions(self) -> List[str]:
+        return ['.zip']
+    
+    @property
+    def command_name(self) -> str:
+        return 'zip'
+    
+    def build_command(self, sources: List[str], output: str, excludes: List[str]) -> List[str]:
+        cmd = ['zip', self.get_level_flag()]
+        
+        # Add recursive flag if any source is a directory
+        if any(os.path.isdir(src) for src in sources):
+            cmd.append('-r')
+        
+        # Preserve timestamps
+        if self.preserve_timestamps:
+            cmd.append('-X')
+        
+        cmd.append(output)
+        cmd.extend(sources)
+        
+        # Add excludes
+        for pattern in excludes:
+            cmd.extend(['-x', pattern])
+        
+        return cmd
+    
+    def validate_command(self, archive: str) -> List[str]:
+        return ['unzip', '-t', archive]
 
-  # Create a new name, e.g., "file.zip.zip" -> "file.zip_archive.zip"
-  # Remove the trailing ".zip" from the filename part, add "_archive", then add ".zip" back.
-  FILENAME_BASE="${TARGET_FILE%.zip}"
-  ADJUSTED_FILENAME="${FILENAME_BASE}_archive.zip"
 
-  if [ "$TARGET_DIR" == "." ]; then
-    ARCHIVE_NAME="$ADJUSTED_FILENAME"
-  else
-    ARCHIVE_NAME="$TARGET_DIR/$ADJUSTED_FILENAME"
-  fi
-  echo "Adjusted archive name to: '$ARCHIVE_NAME'"
+class TarGzCompressor(Compressor):
+    """TAR.GZ format compressor with pigz fallback to gzip."""
+    
+    @property
+    def extensions(self) -> List[str]:
+        return ['.tar.gz', '.tgz']
+    
+    @property
+    def command_name(self) -> str:
+        return 'tar'
+    
+    def _get_gzip_command(self) -> str:
+        """Get the best available gzip command (pigz preferred for parallel compression)."""
+        if shutil.which('pigz'):
+            return 'pigz'
+        return 'gzip'
+    
+    def build_command(self, sources: List[str], output: str, excludes: List[str]) -> List[str]:
+        gzip_cmd = self._get_gzip_command()
+        
+        # Build exclude patterns for tar
+        exclude_args = []
+        for pattern in excludes:
+            exclude_args.extend(['--exclude', pattern])
+        
+        # Use pigz with threads if available
+        if gzip_cmd == 'pigz':
+            env_var = f"PIGZ=-{self.level} -p{self.threads}"
+            cmd = ['env', env_var, 'tar']
+        else:
+            env_var = f"GZIP=-{self.level}"
+            cmd = ['env', env_var, 'tar']
+        
+        cmd.extend(['-czf', output])
+        cmd.extend(exclude_args)
+        cmd.extend(sources)
+        
+        return cmd
+    
+    def validate_command(self, archive: str) -> List[str]:
+        return ['tar', '-tzf', archive]
 
-  # Final check in case the adjusted name somehow still matches (highly unlikely)
-  if [ "$TARGET" == "$ARCHIVE_NAME" ]; then
-    echo "Error: Could not determine a safe archive name for '$TARGET' even after adjustment."
-    exit 1
-  fi
-fi
 
-# --- Create the Zip Archive ---
-echo "Creating archive '$ARCHIVE_NAME' with maximum compression..."
+class TarXzCompressor(Compressor):
+    """TAR.XZ format compressor."""
+    
+    @property
+    def extensions(self) -> List[str]:
+        return ['.tar.xz', '.txz']
+    
+    @property
+    def command_name(self) -> str:
+        return 'tar'
+    
+    def build_command(self, sources: List[str], output: str, excludes: List[str]) -> List[str]:
+        # XZ compression level mapping (0-9)
+        env_var = f"XZ_OPT=-{self.level} -T{self.threads}"
+        cmd = ['env', env_var, 'tar', '-cJf', output]
+        
+        # Add excludes
+        for pattern in excludes:
+            cmd.extend(['--exclude', pattern])
+        
+        cmd.extend(sources)
+        return cmd
+    
+    def validate_command(self, archive: str) -> List[str]:
+        return ['tar', '-tJf', archive]
 
-# If it's a directory, use -r for recursive zipping
-if [ -d "$TARGET" ]; then
-  zip -9 -r "$ARCHIVE_NAME" "$TARGET"
-else
-  zip -9 "$ARCHIVE_NAME" "$TARGET"
-fi
 
-# Check if zip command was successful
-if [ $? -ne 0 ]; then
-  echo "Error: Zip command failed."
-  # Attempt to remove partially created archive if it exists
-  [ -f "$ARCHIVE_NAME" ] && rm "$ARCHIVE_NAME"
-  exit 1
-fi
+class SevenZCompressor(Compressor):
+    """7-Zip format compressor."""
+    
+    @property
+    def extensions(self) -> List[str]:
+        return ['.7z']
+    
+    @property
+    def command_name(self) -> str:
+        return '7z'
+    
+    def get_level_flag(self) -> str:
+        """7z uses -mx=N format."""
+        return f"-mx={self.level}"
+    
+    def build_command(self, sources: List[str], output: str, excludes: List[str]) -> List[str]:
+        cmd = ['7z', 'a', self.get_level_flag(), f"-mmt={self.threads}"]
+        
+        if self.preserve_timestamps:
+            cmd.append('-mtc=on')
+        
+        cmd.append(output)
+        cmd.extend(sources)
+        
+        # Add excludes using 7z syntax
+        for pattern in excludes:
+            cmd.append(f"-xr!{pattern}")
+        
+        return cmd
+    
+    def validate_command(self, archive: str) -> List[str]:
+        return ['7z', 't', archive]
 
-echo "Archive created successfully."
 
-# --- Get New Size ---
-echo "Calculating new archive size..."
-if [ ! -f "$ARCHIVE_NAME" ]; then
-    echo "Error: Compressed file '$ARCHIVE_NAME' not found after compression."
-    exit 1
-fi
-NEW_SIZE_BYTES=$(du -sb "$ARCHIVE_NAME" | awk '{print $1}')
-NEW_SIZE_HUMAN=$(du -sh "$ARCHIVE_NAME" | awk '{print $1}')
-echo "New archive size: $NEW_SIZE_HUMAN ($NEW_SIZE_BYTES bytes)"
+class ZippConfig:
+    """Configuration management for zipp."""
+    
+    DEFAULT_CONFIG = {
+        'format': 'auto',
+        'level': '6',
+        'preserve_timestamps': 'true',
+        'threads': '0',  # 0 means auto-detect
+        'excludes': '.git/** __pycache__/** *.pyc .DS_Store Thumbs.db'
+    }
+    
+    def __init__(self, config_file: Optional[str] = None):
+        self.config = configparser.ConfigParser()
+        self.config['DEFAULT'] = self.DEFAULT_CONFIG
+        
+        # Try to load config file
+        config_paths = []
+        if config_file:
+            config_paths.append(config_file)
+        
+        # Standard config locations
+        config_paths.extend([
+            os.path.expanduser('~/.config/zipp/config.ini'),
+            os.path.expanduser('~/.zipp.ini'),
+            os.path.join(os.getcwd(), '.zipp.ini')
+        ])
+        
+        for path in config_paths:
+            if os.path.exists(path):
+                self.config.read(path)
+                logging.info(f"Loaded config from: {path}")
+                break
+    
+    def get(self, key: str, fallback=None):
+        """Get configuration value."""
+        return self.config.get('DEFAULT', key, fallback=fallback)
+    
+    def get_excludes(self) -> List[str]:
+        """Get exclude patterns as a list."""
+        excludes_str = self.get('excludes', '')
+        return [pattern.strip() for pattern in excludes_str.split() if pattern.strip()]
+    
+    @classmethod
+    def create_sample_config(cls, path: str):
+        """Create a sample configuration file."""
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        
+        config = configparser.ConfigParser()
+        config['DEFAULT'] = cls.DEFAULT_CONFIG
+        
+        with open(path, 'w') as f:
+            f.write("# Zipp Configuration File\n")
+            f.write("# Format: auto, zip, tar.gz, tar.xz, 7z\n")
+            f.write("# Level: 0-9 (0=fastest, 9=best compression)\n")
+            f.write("# Excludes: space-separated patterns\n\n")
+            config.write(f)
 
-# --- Calculate and Display Difference ---
-DIFFERENCE_BYTES=$((ORIGINAL_SIZE_BYTES - NEW_SIZE_BYTES))
 
-SAVED_PERCENTAGE="0.00" # Default if original size is zero
-if [ "$ORIGINAL_SIZE_BYTES" -ne 0 ]; then
-  SAVED_PERCENTAGE=$(awk "BEGIN {printf \"%.2f\", ($DIFFERENCE_BYTES / $ORIGINAL_SIZE_BYTES) * 100}")
-fi
+class ProgressIndicator:
+    """Handle progress indication during compression."""
+    
+    def __init__(self, enabled: bool = True, use_pv: bool = None):
+        self.enabled = enabled
+        self.use_pv = use_pv if use_pv is not None else shutil.which('pv') is not None
+    
+    def wrap_command(self, cmd: List[str], total_size: Optional[int] = None) -> List[str]:
+        """Wrap command with progress indicator if available and enabled."""
+        if not self.enabled or not self.use_pv:
+            return cmd
+        
+        # Insert pv into the pipeline for tar commands
+        if cmd[0] == 'tar' or (len(cmd) > 1 and cmd[1] == 'tar'):
+            pv_cmd = ['pv']
+            if total_size:
+                pv_cmd.extend(['-s', str(total_size)])
+            # This is a simplified approach - in practice we'd need more complex piping
+            return cmd
+        
+        return cmd
 
-echo "----------------------------------------"
-echo "Compression Summary for '$TARGET':"
-echo "----------------------------------------"
-echo "Original Size   : $ORIGINAL_SIZE_HUMAN ($ORIGINAL_SIZE_BYTES bytes)"
-echo "Compressed Size : $NEW_SIZE_HUMAN ($NEW_SIZE_BYTES bytes)"
-if [ "$DIFFERENCE_BYTES" -lt 0 ]; then
-    echo "Space Increased By: $(numfmt --to=iec-i --suffix=B ${DIFFERENCE_BYTES#-} | sed 's/ //g') (${DIFFERENCE_BYTES#-} bytes) (Note: Archive is LARGER)"
-else
-    echo "Space Saved     : $(numfmt --to=iec-i --suffix=B $DIFFERENCE_BYTES | sed 's/ //g') ($DIFFERENCE_BYTES bytes)"
-fi
-echo "Compression Ratio: $SAVED_PERCENTAGE%"
-echo "----------------------------------------"
 
-exit 0
+class ZippMain:
+    """Main zipp application."""
+    
+    def __init__(self):
+        self.compressors = {
+            'zip': ZipCompressor,
+            'tar.gz': TarGzCompressor, 
+            'tgz': TarGzCompressor,
+            'tar.xz': TarXzCompressor,
+            'txz': TarXzCompressor,
+            '7z': SevenZCompressor
+        }
+        
+        self.setup_logging()
+    
+    def setup_logging(self):
+        """Setup logging configuration."""
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(levelname)s: %(message)s'
+        )
+    
+    def detect_format(self, output_path: str, format_hint: str = 'auto') -> str:
+        """Detect compression format from output path or hint."""
+        if format_hint != 'auto':
+            return format_hint
+        
+        # Extract extension(s) from filename
+        path = Path(output_path.lower())
+        
+        # Handle double extensions like .tar.gz
+        if path.suffix == '.gz' and path.stem.endswith('.tar'):
+            return 'tar.gz'
+        elif path.suffix == '.xz' and path.stem.endswith('.tar'):
+            return 'tar.xz'
+        
+        # Single extensions
+        ext = path.suffix
+        if ext == '.zip':
+            return 'zip'
+        elif ext in ['.tgz']:
+            return 'tar.gz'
+        elif ext in ['.txz']:
+            return 'tar.xz'
+        elif ext == '.7z':
+            return '7z'
+        
+        # Default to zip
+        logging.warning(f"Could not detect format from '{output_path}', defaulting to zip")
+        return 'zip'
+    
+    def calculate_total_size(self, sources: List[str], excludes: List[str]) -> int:
+        """Calculate total size of sources, respecting exclude patterns."""
+        total_size = 0
+        
+        for source in sources:
+            if os.path.isfile(source):
+                if not self.is_excluded(source, excludes):
+                    total_size += os.path.getsize(source)
+            elif os.path.isdir(source):
+                for root, dirs, files in os.walk(source):
+                    # Remove excluded directories from dirs list to prevent walking them
+                    dirs[:] = [d for d in dirs if not self.is_excluded(os.path.join(root, d), excludes)]
+                    
+                    for file in files:
+                        filepath = os.path.join(root, file)
+                        if not self.is_excluded(filepath, excludes):
+                            try:
+                                total_size += os.path.getsize(filepath)
+                            except OSError:
+                                pass  # Skip files we can't read
+        
+        return total_size
+    
+    def is_excluded(self, path: str, excludes: List[str]) -> bool:
+        """Check if path matches any exclude pattern."""
+        for pattern in excludes:
+            # Convert ** glob patterns to standard fnmatch patterns
+            if '**' in pattern:
+                # For patterns like ".git/**", match if path starts with ".git/" or is exactly ".git"
+                base_pattern = pattern.replace('/**', '')
+                if path.startswith(base_pattern + '/') or path == base_pattern:
+                    return True
+                # Also check relative patterns
+                norm_path = path.replace(os.path.sep, '/')
+                if '/' + base_pattern + '/' in '/' + norm_path + '/' or norm_path.endswith('/' + base_pattern):
+                    return True
+            elif fnmatch.fnmatch(path, pattern) or fnmatch.fnmatch(os.path.basename(path), pattern):
+                return True
+            # Check if any parent directory matches pattern
+            parts = Path(path).parts
+            for i in range(len(parts)):
+                subpath = '/'.join(parts[:i+1])
+                if fnmatch.fnmatch(subpath, pattern):
+                    return True
+        return False
+    
+    def create_archive(self, sources: List[str], output: str, format_name: str, 
+                      level: int, excludes: List[str], preserve_timestamps: bool,
+                      threads: int, progress: bool) -> Tuple[int, int]:
+        """Create archive and return (original_size, compressed_size)."""
+        
+        # Get the appropriate compressor
+        if format_name not in self.compressors:
+            raise CompressionError(f"Unsupported format: {format_name}")
+        
+        compressor_class = self.compressors[format_name]
+        compressor = compressor_class(level=level, preserve_timestamps=preserve_timestamps, threads=threads)
+        
+        if not compressor.is_available():
+            raise CompressionError(f"Command '{compressor.command_name}' not available for {format_name} format")
+        
+        # Calculate original size
+        logging.info("Calculating original size...")
+        original_size = self.calculate_total_size(sources, excludes)
+        
+        # Build compression command
+        cmd = compressor.build_command(sources, output, excludes)
+        
+        # Add progress indication
+        if progress:
+            progress_indicator = ProgressIndicator(enabled=True)
+            cmd = progress_indicator.wrap_command(cmd, original_size)
+        
+        logging.info(f"Creating {format_name} archive: {output}")
+        logging.debug(f"Command: {' '.join(shlex.quote(arg) for arg in cmd)}")
+        
+        # Execute compression
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            if result.stderr and logging.getLogger().level <= logging.DEBUG:
+                logging.debug(f"Stderr: {result.stderr}")
+        except subprocess.CalledProcessError as e:
+            logging.error(f"Compression failed: {e}")
+            if e.stderr:
+                logging.error(f"Error output: {e.stderr}")
+            raise CompressionError(f"Compression command failed: {e}")
+        
+        # Validate archive
+        logging.info("Validating archive...")
+        validation_cmd = compressor.validate_command(output)
+        try:
+            subprocess.run(validation_cmd, capture_output=True, check=True)
+            logging.info("Archive validation successful")
+        except subprocess.CalledProcessError as e:
+            logging.warning(f"Archive validation failed: {e}")
+        
+        # Get compressed size
+        compressed_size = os.path.getsize(output) if os.path.exists(output) else 0
+        
+        return original_size, compressed_size
+    
+    def format_size(self, size_bytes: int) -> str:
+        """Format size in human-readable format."""
+        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+            if size_bytes < 1024:
+                return f"{size_bytes:.1f}{unit}"
+            size_bytes /= 1024
+        return f"{size_bytes:.1f}PB"
+    
+    def print_summary(self, sources: List[str], output: str, original_size: int, compressed_size: int):
+        """Print compression summary."""
+        sources_str = ', '.join(f"'{src}'" for src in sources)
+        
+        if original_size > 0:
+            saved_bytes = original_size - compressed_size
+            saved_percentage = (saved_bytes / original_size) * 100
+        else:
+            saved_bytes = 0
+            saved_percentage = 0
+        
+        print("━" * 50)
+        print(f"Compression Summary for {sources_str}:")
+        print("━" * 50)
+        print(f"Original Size   : {self.format_size(original_size)} ({original_size:,} bytes)")
+        print(f"Compressed Size : {self.format_size(compressed_size)} ({compressed_size:,} bytes)")
+        
+        if saved_bytes < 0:
+            print(f"Size Increased  : {self.format_size(-saved_bytes)} ({-saved_bytes:,} bytes) (Archive is LARGER)")
+        else:
+            print(f"Space Saved     : {self.format_size(saved_bytes)} ({saved_bytes:,} bytes)")
+        
+        print(f"Compression Ratio: {saved_percentage:.2f}%")
+        print("━" * 50)
+    
+    def create_parser(self) -> argparse.ArgumentParser:
+        """Create argument parser with backward compatibility."""
+        parser = argparse.ArgumentParser(
+            description="Enhanced compression utility with multi-format support",
+            epilog="""
+Examples:
+  zipp myfile.txt                    # Create myfile.txt.zip (legacy mode)
+  zipp --format tar.gz docs/         # Create docs.tar.gz
+  zipp -f 7z -l 9 project/ build/    # Create project.7z with max compression
+  zipp --exclude "*.log" --exclude ".git/**" source/
+            """,
+            formatter_class=argparse.RawDescriptionHelpFormatter
+        )
+        
+        # Positional arguments (make optional for utility commands)
+        parser.add_argument('sources', nargs='*', help='Files or directories to compress')
+        
+        # Output file (optional, will be auto-generated if not provided)
+        parser.add_argument('-o', '--output', help='Output archive name (auto-generated if not specified)')
+        
+        # Format selection
+        parser.add_argument('-f', '--format', choices=['auto', 'zip', 'tar.gz', 'tar.xz', '7z'],
+                           default='auto', help='Compression format (default: auto-detect from output name)')
+        
+        # Compression level
+        parser.add_argument('-l', '--level', type=int, choices=range(10), default=6,
+                           help='Compression level 0-9 (0=fastest, 9=best, default=6)')
+        
+        # Exclude patterns
+        parser.add_argument('-x', '--exclude', action='append', default=[],
+                           help='Exclude files matching pattern (can be used multiple times)')
+        
+        # Threading
+        parser.add_argument('-j', '--threads', type=int, default=0,
+                           help='Number of threads for parallel compression (0=auto)')
+        
+        # Output control
+        parser.add_argument('-q', '--quiet', action='store_true', help='Suppress non-essential output')
+        parser.add_argument('-v', '--verbose', action='store_true', help='Enable verbose output')
+        parser.add_argument('--no-progress', action='store_true', help='Disable progress indicators')
+        
+        # Options
+        parser.add_argument('--no-timestamps', action='store_true', help='Do not preserve timestamps')
+        parser.add_argument('--config', help='Use specific configuration file')
+        
+        # Utility commands
+        parser.add_argument('--create-config', metavar='PATH', help='Create sample configuration file')
+        
+        return parser
+    
+    def generate_output_name(self, sources: List[str], format_name: str) -> str:
+        """Generate output filename based on sources and format."""
+        if len(sources) == 1:
+            source = sources[0].rstrip('/')
+            base_name = os.path.basename(source)
+        else:
+            base_name = "archive"
+        
+        # Add appropriate extension
+        if format_name == 'zip':
+            return f"{base_name}.zip"
+        elif format_name in ['tar.gz', 'tgz']:
+            return f"{base_name}.tar.gz"
+        elif format_name in ['tar.xz', 'txz']:
+            return f"{base_name}.tar.xz"
+        elif format_name == '7z':
+            return f"{base_name}.7z"
+        else:
+            return f"{base_name}.zip"  # fallback
+    
+    def run(self, args=None):
+        """Main entry point."""
+        parser = self.create_parser()
+        
+        # Handle legacy single-argument usage for backward compatibility
+        if args is None:
+            args = sys.argv[1:]
+        
+        # If only one argument provided and it's not a flag, assume legacy mode
+        if len(args) == 1 and not args[0].startswith('-'):
+            # Legacy mode: zipp <file>
+            parsed_args = argparse.Namespace(
+                sources=[args[0]],
+                output=None,
+                format='zip',
+                level=9,  # Use max compression like original
+                exclude=[],
+                threads=0,
+                quiet=False,
+                verbose=False,
+                no_progress=False,
+                no_timestamps=False,
+                config=None,
+                create_config=None
+            )
+        else:
+            parsed_args = parser.parse_args(args)
+        
+        # Handle utility commands
+        if parsed_args.create_config:
+            ZippConfig.create_sample_config(parsed_args.create_config)
+            print(f"Sample configuration created at: {parsed_args.create_config}")
+            return 0
+        
+        # Validate sources are provided for compression
+        if not parsed_args.sources:
+            parser.error("At least one source file or directory is required")
+        
+        # Setup logging level
+        if parsed_args.quiet:
+            logging.getLogger().setLevel(logging.ERROR)
+        elif parsed_args.verbose:
+            logging.getLogger().setLevel(logging.DEBUG)
+        
+        # Load configuration
+        config = ZippConfig(parsed_args.config)
+        
+        # Merge config with command line arguments
+        format_name = parsed_args.format
+        if format_name == 'auto' and config.get('format') != 'auto':
+            format_name = config.get('format')
+        
+        level = parsed_args.level
+        excludes = parsed_args.exclude.copy()
+        excludes.extend(config.get_excludes())
+        
+        threads = parsed_args.threads or int(config.get('threads', '0')) or os.cpu_count()
+        preserve_timestamps = not parsed_args.no_timestamps and config.get('preserve_timestamps', 'true').lower() == 'true'
+        
+        # Validate sources
+        for source in parsed_args.sources:
+            if not os.path.exists(source):
+                logging.error(f"Source not found: {source}")
+                return 1
+        
+        # Determine output filename
+        if parsed_args.output:
+            output = parsed_args.output
+        else:
+            output = self.generate_output_name(parsed_args.sources, format_name)
+        
+        # Final format detection
+        format_name = self.detect_format(output, format_name)
+        
+        # Check for potential overwrite
+        if os.path.exists(output):
+            # Safety check similar to original script
+            if len(parsed_args.sources) == 1 and parsed_args.sources[0] == output:
+                # Generate safe name
+                base, ext = os.path.splitext(output)
+                output = f"{base}_archive{ext}"
+                logging.warning(f"Output would overwrite source, using: {output}")
+        
+        try:
+            # Create archive
+            original_size, compressed_size = self.create_archive(
+                sources=parsed_args.sources,
+                output=output,
+                format_name=format_name,
+                level=level,
+                excludes=excludes,
+                preserve_timestamps=preserve_timestamps,
+                threads=threads,
+                progress=not parsed_args.no_progress and not parsed_args.quiet
+            )
+            
+            # Print summary
+            if not parsed_args.quiet:
+                self.print_summary(parsed_args.sources, output, original_size, compressed_size)
+            
+            return 0
+            
+        except CompressionError as e:
+            logging.error(str(e))
+            return 1
+        except KeyboardInterrupt:
+            logging.error("Operation cancelled by user")
+            if os.path.exists(output):
+                os.unlink(output)
+                logging.info(f"Removed incomplete archive: {output}")
+            return 1
+        except Exception as e:
+            logging.error(f"Unexpected error: {e}")
+            if parsed_args.verbose:
+                import traceback
+                traceback.print_exc()
+            return 1
+
+
+def main():
+    """Entry point for command line usage."""
+    app = ZippMain()
+    return app.run()
+
+
+if __name__ == '__main__':
+    sys.exit(main())

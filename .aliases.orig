@@ -1,0 +1,948 @@
+#!/usr/bin/env bash
+# ============================================================================
+#
+#         Optimized & Refactored Shell Aliases and Functions
+#
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# General & Navigation Functions
+# ----------------------------------------------------------------------------
+
+# Create a directory and cd into it
+mkcd() {
+  [[ -z "$1" ]] && {
+    echo "Usage: mkcd <directory>" >&2
+    return 1
+  }
+  mkdir -p "$1" && cd "$1"
+}
+
+# Use fzf to interactively cd into a subdirectory
+cdf() {
+  local dir
+  if command -v fd &>/dev/null; then
+    dir=$(fd --type d --max-depth 2 | fzf --height 20% --reverse --prompt="Select directory > ")
+  else
+    dir=$(find . -maxdepth 2 -type d | fzf --height 20% --reverse --prompt="Select directory > ")
+  fi
+  # Only cd if a directory was selected
+  [[ -n "$dir" ]] && cd "$dir"
+}
+
+# Go up a specified number of directories
+up() {
+  local d=""
+  local limit="${1:-1}"
+  # Ensure limit is a positive integer
+  [[ ! "$limit" =~ ^[1-9][0-9]*$ ]] && limit=1
+  for ((i = 1; i <= limit; i++)); do
+    d+="../"
+  done
+  # Use pushd/popd logic for safer navigation if available, else cd
+  cd "$d" || echo "Error: Couldn't go up $limit level(s)." >&2
+}
+
+# Direct navigation aliases
+alias ..="cd .."
+alias ...="cd ../.."
+alias ....="cd ../../.."
+alias .....="cd ../../../.."
+alias ~="cd ~"
+alias dl="cd ~/Downloads"
+alias dt="cd ~/Desktop"
+alias p="cd ~/projects"
+alias doc="cd ~/Documents"
+
+# ----------------------------------------------------------------------------
+# File & Directory Management
+# ----------------------------------------------------------------------------
+
+# Use modern, feature-rich tools if available, with robust fallbacks
+if command -v eza &>/dev/null; then
+  alias ls='eza --icons --group-directories-first'
+  alias ll='eza -al --icons --git --group-directories-first --time-style=long-iso'
+  alias lt='eza --tree --level=3 --icons --git-ignore'
+  alias la='eza -a --icons --group-directories-first' # List all, including dots
+  alias l='eza -l --icons --git --group-directories-first'
+  alias lm='eza -al --sort=modified --icons --time-style=relative'
+  alias lS='eza -al --sort=size --icons --binary'
+  alias lr='eza -R --icons --level=2' # Recursive 2 levels
+elif command -v lsd &>/dev/null; then
+  alias ls='lsd --icon=auto --group-dirs=first'
+  alias ll='lsd -la --icon=auto --date=relative --group-dirs=first'
+  alias lt='lsd --tree --depth=3 --icon=auto'
+  alias la='lsd -A --icon=auto --group-dirs=first'
+  alias l='lsd -l --icon=auto --group-dirs=first'
+  alias lm='lsd -la --sort=time --icon=auto'
+  alias lS='lsd -la --sort=size --icon=auto'
+else
+  # Colorized ls fallbacks
+  alias ls="ls --color=auto --group-directories-first"
+  alias ll="ls -alh --color=auto --group-directories-first --time-style=long-iso"
+  alias la="ls -A --color=auto --group-directories-first"
+  alias l="ls -l --color=auto --group-directories-first"
+  alias l.="ls -ld .* --color=auto"
+  alias lm="ls -alht --color=auto"
+  alias lS="ls -alhS --color=auto"
+fi
+
+# Use rsync for cp/mv to get progress bars
+alias ccp='rsync -avhP --info=progress2'
+alias mmv='rsync -avhP --info=progress2 --remove-source-files'
+alias mmkdir='mkdir -pv'
+
+# Use fd instead of find if it exists
+if command -v fd &>/dev/null; then
+  alias findr='fd'
+  alias find='fd' # Bold replacement, comment out if you prefer traditional find
+fi
+
+# Find text in files, preferring ripgrep (rg)
+ftext() {
+  [[ $# -eq 0 ]] && {
+    echo "Usage: ftext <pattern> [path]" >&2
+    return 1
+  }
+  local pattern="$1"
+  local path="${2:-.}"
+  if command -v rg &>/dev/null; then
+    rg --color=always --line-number --no-heading --smart-case "$pattern" "$path"
+  else
+    grep -rni --color=always "$pattern" "$path"
+  fi
+}
+
+# Find directories by name, preferring fd
+fdir() {
+  [[ -z "$1" ]] && {
+    echo "Usage: fdir <pattern> [depth]" >&2
+    return 1
+  }
+  local pattern="$1"
+  local depth="${2:-3}"
+  if command -v fd &>/dev/null; then
+    fd --type d --max-depth "$depth" --ignore-case "$pattern"
+  else
+    find . -maxdepth "$depth" -type d -iname "*$pattern*"
+  fi
+}
+
+# Extract almost any archive format
+extract() {
+  [[ -z "$1" ]] && {
+    echo "Usage: extract <archive_file>" >&2
+    return 1
+  }
+  local file="$1"
+  [[ ! -f "$file" ]] && {
+    echo "Error: File '$file' not found." >&2
+    return 1
+  }
+
+  echo "Extracting '$file'..."
+  case "$file" in
+  *.tar.bz2 | *.tbz2 | *.tbz) tar xjf "$file" ;;
+  *.tar.gz | *.tgz) tar xzf "$file" ;;
+  *.tar.xz | *.txz) tar xJf "$file" ;;
+  *.tar | *.cbt) tar xf "$file" ;;
+  *.zip | *.cbz | *.epub) unzip "$file" ;;
+  *.rar | *.cbr) unrar x "$file" ;;
+  *.7z | *.cb7) 7z x "$file" ;;
+  *.gz) gunzip "$file" ;;
+  *.bz2) bunzip2 "$file" ;;
+  *.xz) unxz "$file" ;;
+  *)
+    echo "Error: Unsupported file type: '$file'" >&2
+    return 1
+    ;;
+  esac
+}
+
+# **[FIXED]** Extract all archives in the current directory into their own subdirectories
+extract-all() {
+  for archive in *.tar.bz2 *.tbz2 *.tbz *.tar.gz *.tgz *.tar.xz *.txz *.tar *.cbt *.zip *.cbz *.epub *.rar *.cbr *.7z *.cb7 *.gz *.bz2 *.xz; do
+    if [[ -f "$archive" ]]; then
+      # Create a directory named after the archive, without the extension.
+      # This handles complex extensions like .tar.gz
+      local dest_dir
+      dest_dir=$(basename "$archive" | sed -E 's/(\.tar\.(gz|bz2|xz)|.t(gz|bz2|xz))$//; s/\.[^.]+$//')
+
+      mkdir -p -- "$dest_dir"
+      echo "--- Extracting $archive to $dest_dir/ ---"
+      # Use a subshell to extract into the new directory without changing the current shell's directory
+      (cd -- "$dest_dir" && tar -xf "../$archive") || echo "Failed to extract $archive" >&2
+    fi
+  done
+  echo "--- All archives processed. ---"
+}
+
+# ----------------------------------------------------------------------------
+# Yazi File Manager
+# ----------------------------------------------------------------------------
+alias y='yazi'
+ycd() {
+  local tmp cwd
+  tmp="$(mktemp -t "yazi-cwd.XXXXX")"
+  # Ensure yazi is called with any arguments passed to ycd
+  yazi --cwd-file="$tmp" "$@"
+  if cwd="$(cat -- "$tmp")" && [[ -n "$cwd" && "$cwd" != "$PWD" ]]; then
+    cd -- "$cwd"
+  fi
+  rm -f -- "$tmp"
+}
+
+# ----------------------------------------------------------------------------
+# System Management
+# ----------------------------------------------------------------------------
+
+alias h='history'
+alias j='jobs -l'
+alias reload='exec "$SHELL" -l'
+alias :q='exit'
+alias please='sudo !!'
+
+# System info and resource usage
+alias psa='ps auxf'
+alias psgrep='ps aux | grep -v grep | grep -i -e VSZ -e'
+alias psmem='ps auxf | sort -nrk 4 | head -10'
+alias pscpu='ps auxf | sort -nrk 3 | head -10'
+alias meminfo='free -h'
+alias cpuinfo='lscpu'
+alias df='df -h'
+alias du='du -h'
+alias syswatch='watch -n 2 "echo \"## Memory Usage ##\"; free -h; echo; echo \"## Disk Usage ##\"; df -h -T /"'
+alias tempcheck='sensors | grep -i "core"'
+
+# Summarize directory contents
+dirsummary() {
+  local dir="${1:-.}"
+  [[ ! -d "$dir" ]] && {
+    echo "Error: Directory '$dir' not found." >&2
+    return 1
+  }
+  echo "📂 Directory Summary for: $(realpath "$dir")"
+  echo "───────────────────────────────────────"
+  local files
+  local dirs
+  files=$(find "$dir" -type f | wc -l)
+  dirs=$(find "$dir" -type d | wc -l)
+  local size
+  size=$(du -sh "$dir" | cut -f1)
+
+  echo "📊 Stats:"
+  printf "  Files: %'d, Directories: %'d, Total Size: %s\n" "$files" "$dirs" "$size"
+  echo -e "\n📑 Top 5 File Types:"
+  find "$dir" -type f -not -path '*/.*' -exec file {} + | sed 's/.*: //' | sort | uniq -c | sort -nr | head -5
+  echo -e "\n📁 Top 5 Largest Subdirectories:"
+  du -h --max-depth=1 "$dir" | sort -hr | head -n 6 | tail -n 5 # head -n 6 to include parent, tail -n 5 to exclude it
+}
+
+# Quick system overview
+sysinfo() {
+  echo "📊 System Information:"
+  echo "  - Kernel: $(uname -rs)"
+  echo "  - Uptime: $(uptime -p)"
+  command -v free &>/dev/null && echo "  - Memory: $(free -h | awk '/^Mem:/ {printf "%s / %s (%s used)", $3, $2, $7}')"
+  command -v df &>/dev/null && echo "  - Disk (/): $(df -h / | awk 'NR==2 {printf "%s / %s (%s used)", $3, $2, $5}')"
+}
+
+# ----------------------------------------------------------------------------
+# Package Management (Arch Linux)
+# ----------------------------------------------------------------------------
+
+# Pacman
+alias pacsyu='sudo pacman -Syu'
+alias pacs='sudo pacman -S'
+alias pacr='sudo pacman -Rns'
+alias pacq='pacman -Q'
+alias pacqs='pacman -Qs'
+alias pacss='pacman -Ss'
+alias pacsi='pacman -Si'
+alias pacqi='pacman -Qi'
+alias pacqo='pacman -Qo'
+alias pacclean='sudo pacman -Scc' # Use with caution
+
+# Paru (AUR Helper)
+if command -v paru &>/dev/null; then
+  alias parsua='paru -Sua --noconfirm'
+  alias parsyu='paru -Syu --noconfirm'
+  alias pars='paru' # Just use paru as the base command
+  alias parr='paru -Rns'
+  alias parqs='paru -Qs'
+  alias parss='paru -Ss'
+  alias parqi='paru -Qi'
+fi
+
+# **[SAFER]** Remove orphan packages
+orphan() {
+  local orphans
+  orphans=$(pacman -Qtdq)
+  if [[ -n "$orphans" ]]; then
+    echo "The following orphan packages will be removed:"
+    echo "$orphans"
+    # shellcheck disable=SC2086
+    sudo pacman -Rns $orphans
+  else
+    echo "No orphan packages to remove."
+  fi
+}
+alias listorphan='pacman -Qtdq'
+
+# Reflector (Mirrorlist)
+alias mirror='sudo reflector --country Canada,US --age 6 --sort rate --save /etc/pacman.d/mirrorlist'
+
+# ----------------------------------------------------------------------------
+# Networking
+# ----------------------------------------------------------------------------
+
+alias ports='ss -tulanp' # ss is the modern replacement for netstat
+alias lsport='sudo lsof -i'
+alias myip="dig +short myip.opendns.com @resolver1.opendns.com"
+alias localip="hostname -I | awk '{print \$1}'"
+command -v vnstat &>/dev/null && alias vnstat="vnstat -i eth1"
+
+# Nmap presets
+alias nmap-open="nmap --open"
+alias nmap-fast="nmap -F -T4 --version-light --top-ports 300"
+alias nmap-full="sudo nmap -sS -A -v -T4 -p-" # Simplified full scan
+
+# Simple HTTP server for sharing
+share() {
+  [[ ! -e "$1" ]] && {
+    echo "Error: '$1' not found." >&2
+    return 1
+  }
+  local port="${2:-8000}"
+  local ip_addr
+  ip_addr=$(hostname -I | awk '{print $1}')
+
+  # Use a subshell to prevent directory changes and simplify cleanup
+  (
+    if [[ -d "$1" ]]; then
+      cd "$1" || return
+      echo "Sharing directory at http://$ip_addr:$port/"
+    else
+      # For files, serve from its containing directory to avoid copying
+      local dir
+      local file
+      dir=$(dirname "$1")
+      file=$(basename "$1")
+      cd "$dir" || return
+      echo "Sharing file at http://$ip_addr:$port/$file"
+    fi
+    python3 -m http.server "$port"
+  )
+}
+
+# ----------------------------------------------------------------------------
+# Media & Downloads
+# ----------------------------------------------------------------------------
+
+# Use yt-dlp if available, as it's more actively maintained
+if command -v yt-dlp &>/dev/null; then
+  alias ytmp3="yt-dlp --extract-audio --audio-format mp3 -o '%(title)s.%(ext)s'"
+  alias ytmp4="yt-dlp -f 'bv[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/best' -o '%(title)s.%(ext)s'"
+else
+  alias ytmp3="youtube-dl --extract-audio --audio-format mp3"
+  alias ytmp4="youtube-dl -f 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4'"
+fi
+
+# Enhanced wget with better defaults
+alias wget='wget -c --progress=bar --show-progress'
+alias get='wget -mpkc -R "index.html*"' # Mirror, page-requisites, convert-links
+
+# Modern curl aliases
+alias curl-json='curl -H "Content-Type: application/json"'
+alias curl-post='curl -X POST'
+alias curl-put='curl -X PUT'
+alias curl-delete='curl -X DELETE'
+alias curl-time='curl -w "@$HOME/.curl-format.txt"'
+
+# ----------------------------------------------------------------------------
+# Git & Development
+# ----------------------------------------------------------------------------
+
+alias gs="git status -sb" # Short branch status
+alias ga="git add -A"
+alias gc="git commit -m"
+alias gca="git commit -am" # Stage and commit
+alias gp="git push"
+alias gpl="git pull"
+alias gf="git fetch"
+alias gco="git checkout"
+alias gb="git branch"
+alias glog="git log --graph --pretty='%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset'"
+alias gclean="git clean -fd"
+alias gclone="git clone"
+
+# Function to clone a repo and cd into it
+gcc() {
+  [[ -z "$1" ]] && {
+    echo "Usage: gcc <repo_url> [dir_name]" >&2
+    return 1
+  }
+  local repo_url="$1"
+  # Smartly derive directory name if not provided
+  local dir_name="${2:-$(basename "$repo_url" .git)}"
+  git clone "$repo_url" "$dir_name" && cd "$dir_name"
+}
+
+# Quickly add, commit, and push all changes
+quickgit() {
+  [[ -z "$1" ]] && {
+    echo "Usage: quickgit <commit message>" >&2
+    return 1
+  }
+  git rev-parse --is-inside-work-tree &>/dev/null || {
+    echo "Error: Not a git repository." >&2
+    return 1
+  }
+
+  git add -A && git commit -m "$*" && git push
+}
+
+# A robust git pull using rebase and handling stashing
+gitupdate() {
+  git rev-parse --is-inside-work-tree &>/dev/null || {
+    echo "Error: Not a git repository." >&2
+    return 1
+  }
+
+  local stashed=false
+  # Only stash if there are uncommitted changes
+  if ! git diff --quiet || ! git diff --cached --quiet; then
+    echo "Stashing local changes..."
+    git stash push -u # -u includes untracked files
+    stashed=true
+  fi
+
+  echo "Fetching latest changes..."
+  git fetch --all --prune || {
+    $stashed && git stash pop
+    return 1
+  }
+
+  local current_branch
+  current_branch=$(git rev-parse --abbrev-ref HEAD)
+  local upstream
+  upstream=$(git rev-parse --abbrev-ref "@{u}" 2>/dev/null)
+
+  if [[ -n "$upstream" ]]; then
+    echo "Rebasing onto '$upstream'..."
+    git rebase "$upstream" || {
+      echo "Error: Rebase failed. Local changes remain stashed." >&2
+      $stashed && git stash pop
+      return 1
+    }
+  else
+    echo "No upstream branch configured for '$current_branch'. Skipping rebase."
+  fi
+
+  $stashed && echo "Applying stashed changes..." && git stash pop
+  echo "✅ Update complete!"
+}
+
+# ----------------------------------------------------------------------------
+# Tmux Shortcuts
+# ----------------------------------------------------------------------------
+
+alias ts='tmux new -s'
+alias ta='tmux attach -t'
+alias tl='tmux list-sessions'
+alias tk='tmux kill-session -t'
+
+# ----------------------------------------------------------------------------
+# Shell, Apps, & Custom Commands
+# ----------------------------------------------------------------------------
+
+# Edit shell config files
+alias reload-zsh="source \${ZDOTDIR:-\$HOME}/.zshrc"
+alias edit-zsh="nvim \${ZDOTDIR:-\$HOME}/.zshrc"
+alias edit-aliases="nvim \${ZDOTDIR:-\$HOME}/.aliases"
+
+# Default Applications (Flatpak)
+if command -v flatpak &>/dev/null; then
+  alias vlc="flatpak run org.videolan.VLC"
+  alias spotify="flatpak run com.spotify.Client"
+  alias discord="flatpak run com.discordapp.Discord"
+  alias teams="flatpak run com.microsoft.Teams"
+  alias code="flatpak run com.visualstudio.code"
+  alias studio="flatpak run com.visualstudio.code"
+  alias obs="flatpak run com.obsproject.Studio"
+  alias gimp="flatpak run org.gimp.GIMP"
+  alias blender="flatpak run org.blender.Blender"
+fi
+
+# Development shortcuts
+alias py='python3'
+alias pip='python3 -m pip'
+alias venv='python3 -m venv'
+alias serve='python3 -m http.server'
+alias json='python3 -m json.tool'
+alias pyserver='python3 -m http.server 8080'
+
+# Docker shortcuts
+if command -v docker &>/dev/null; then
+  alias d='docker'
+  alias dc='docker-compose'
+  alias dps='docker ps'
+  alias dpsa='docker ps -a'
+  alias di='docker images'
+  alias dex='docker exec -it'
+  alias drm='docker rm'
+  alias drmi='docker rmi'
+  alias dlog='docker logs -f'
+  alias dprune='docker system prune -a'
+fi
+
+# Use bat as a pager and for cat if available
+if command -v bat &>/dev/null; then
+  export MANPAGER="sh -c 'col -bx | bat -l man -p'"
+  alias cat='bat -p'
+fi
+
+# Installer shortcuts
+alias christitus='curl -fsSL christitus.com/linux | sh'
+alias christitusdev='curl -fsSL https://christitus.com/linuxdev | sh'
+
+pkg-install() {
+  [[ -z "$1" ]] && {
+    echo "Usage: pkg-install <package> [--verbose]" >&2
+    return 1
+  }
+  [[ -f ~/install.sh ]] && ~/install.sh "$@" || {
+    echo "Error: install.sh not found." >&2
+    return 1
+  }
+}
+
+# AI/Ollama Tools
+alias ffabric='fabric --fast' # default to fast model
+alias run_llama3='ollama run llama3:8b'
+
+# Password generator
+genpass() {
+  local length="${1:-16}"
+  [[ ! "$length" =~ ^[0-9]+$ || "$length" -lt 8 ]] && {
+    echo "Specify a valid length (min 8)" >&2
+    return 1
+  }
+  # Use a more robust character set and avoid special chars that cause issues in URLs/shells
+  LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c "$length"
+  echo
+}
+
+# Modern alternatives and enhancements
+command -v btop &>/dev/null && alias top='btop'
+command -v htop &>/dev/null && alias top='htop'
+command -v ncdu &>/dev/null && alias du='ncdu'
+command -v duf &>/dev/null && alias df='duf'
+command -v procs &>/dev/null && alias ps='procs'
+command -v dog &>/dev/null && alias dig='dog'
+command -v gping &>/dev/null && alias ping='gping'
+command -v httpie &>/dev/null && alias http='httpie'
+
+# Misc Tools & Fun
+command -v lolcat &>/dev/null && {
+  alias neofetch="neofetch | lolcat"
+  alias loo="| lolcat"
+}
+alias lweather="ansiweather -l Palmerston,Ontario"
+alias week="date +%V"
+alias now="date +%T"
+alias today='date "+%Y-%m-%d"'
+alias yesterday='date -d yesterday "+%Y-%m-%d"'
+alias tomorrow='date -d tomorrow "+%Y-%m-%d"'
+alias timestamp='date +%s'
+alias tb="nc termbin.com 9999"
+alias ix="curl -F 'f:1=<-' ix.io" # Another pastebin service
+alias bc="bc -l"
+alias calc='qalc' # Better calculator if available
+alias sha1="openssl sha1"
+alias sha256="openssl sha256"
+alias md5="openssl md5"
+alias base64='base64 -w 0' # No line wrapping
+alias urlencode='python3 -c "import sys, urllib.parse as ul; print(ul.quote_plus(sys.argv[1]))"'
+alias urldecode='python3 -c "import sys, urllib.parse as ul; print(ul.unquote_plus(sys.argv[1]))"'
+alias flushmcd='echo "flush_all" | nc 10.10.27.11 11211'
+alias jctl="journalctl -p 3 -xb"
+alias jctlf="journalctl -f" # Follow journal
+alias gpg-check="gpg2 --keyserver-options auto-key-retrieve --verify"
+alias gpg-retrieve="gpg2 --keyserver-options auto-key-retrieve --receive-keys"
+
+# Clipboard integration
+if command -v xclip &>/dev/null; then
+  alias pbcopy='xclip -selection clipboard'
+  alias pbpaste='xclip -selection clipboard -o'
+elif command -v xsel &>/dev/null; then
+  alias pbcopy='xsel --clipboard --input'
+  alias pbpaste='xsel --clipboard --output'
+elif command -v wl-copy &>/dev/null; then # Wayland
+  alias pbcopy='wl-copy'
+  alias pbpaste='wl-paste'
+fi
+
+# Quick text manipulation
+alias trim="sed 's/^[ \t]*//;s/[ \t]*$//'"
+alias squeeze="tr -s ' '"
+alias lower="tr '[:upper:]' '[:lower:]'"
+alias upper="tr '[:lower:]' '[:upper:]'"
+
+# Internet and network tools
+alias speedtest='curl -s https://raw.githubusercontent.com/sivel/speedtest-cli/master/speedtest.py | python3 -'
+alias myip-fast='curl -s ipinfo.io/ip'
+alias myip-json='curl -s ipinfo.io/json'
+alias weather='curl -s "wttr.in?format=3"'
+alias weather-full='curl -s wttr.in'
+
+# Systemd shortcuts
+alias sc='systemctl'
+alias scu='systemctl --user'
+alias jc='journalctl'
+alias jcu='journalctl --user'
+
+# Modern file management
+command -v trash-put &>/dev/null && alias rm='trash-put' # Use trash instead of rm
+command -v rg &>/dev/null && alias grep='rg'             # Use ripgrep instead of grep
+
+# ----------------------------------------------------------------------------
+# Productivity Functions & Advanced Utilities
+# ----------------------------------------------------------------------------
+
+# Create a backup of a file with timestamp
+backup() {
+  [[ -z "$1" ]] && {
+    echo "Usage: backup <file>" >&2
+    return 1
+  }
+  [[ ! -f "$1" ]] && {
+    echo "Error: File '$1' not found." >&2
+    return 1
+  }
+  cp "$1" "$1.backup.$(date +%Y%m%d_%H%M%S)"
+  echo "Backup created: $1.backup.$(date +%Y%m%d_%H%M%S)"
+}
+
+# Quick notes function
+note() {
+  local notes_dir="$HOME/notes"
+  local notes_file="$notes_dir/$(date +%Y-%m-%d).md"
+  mkdir -p "$notes_dir"
+
+  if [[ $# -eq 0 ]]; then
+    # Open today's notes file
+    "${EDITOR:-nvim}" "$notes_file"
+  else
+    # Append note with timestamp
+    echo "## $(date '+%H:%M:%S') - $*" >>"$notes_file"
+    echo "Note added to $(basename "$notes_file")"
+  fi
+}
+
+# Quick todo function
+todo() {
+  local todo_file="$HOME/.todo.txt"
+  if [[ $# -eq 0 ]]; then
+    [[ -f "$todo_file" ]] && cat "$todo_file" || echo "No todos yet. Add one with: todo <task>"
+  else
+    echo "[ ] $* ($(date '+%Y-%m-%d'))" >>"$todo_file"
+    echo "Todo added: $*"
+  fi
+}
+
+# Mark todo as done
+todo-done() {
+  local todo_file="$HOME/.todo.txt"
+  [[ ! -f "$todo_file" ]] && {
+    echo "No todo file found." >&2
+    return 1
+  }
+
+  if [[ -z "$1" ]]; then
+    echo "Current todos:"
+    nl "$todo_file"
+    echo -n "Which todo to mark as done? (number): "
+    read -r num
+  else
+    num="$1"
+  fi
+
+  if [[ "$num" =~ ^[0-9]+$ ]]; then
+    sed -i "${num}s/\[ \]/[x]/" "$todo_file"
+    echo "Todo $num marked as done!"
+  else
+    echo "Invalid todo number." >&2
+  fi
+}
+
+# Find and replace in files
+freplace() {
+  [[ $# -lt 2 ]] && {
+    echo "Usage: freplace <find> <replace> [file_pattern]" >&2
+    return 1
+  }
+  local find_text="$1" replace_text="$2" pattern="${3:-*}"
+
+  if command -v rg &>/dev/null && command -v sed &>/dev/null; then
+    rg -l "$find_text" --glob="$pattern" | xargs sed -i "s/$find_text/$replace_text/g"
+    echo "Replaced '$find_text' with '$replace_text' in files matching '$pattern'"
+  else
+    find . -name "$pattern" -type f -exec sed -i "s/$find_text/$replace_text/g" {} +
+    echo "Replaced '$find_text' with '$replace_text' in files matching '$pattern'"
+  fi
+}
+
+# Process management helpers
+killport() {
+  [[ -z "$1" ]] && {
+    echo "Usage: killport <port>" >&2
+    return 1
+  }
+  local pid
+  pid=$(lsof -ti:"$1")
+  if [[ -n "$pid" ]]; then
+    kill -9 "$pid"
+    echo "Killed process on port $1 (PID: $pid)"
+  else
+    echo "No process found on port $1"
+  fi
+}
+
+# Find and kill processes by name
+killname() {
+  [[ -z "$1" ]] && {
+    echo "Usage: killname <process_name>" >&2
+    return 1
+  }
+  pkill -f "$1" && echo "Killed processes matching '$1'" || echo "No processes found matching '$1'"
+}
+
+# System monitoring functions
+watchdir() {
+  [[ -z "$1" ]] && {
+    echo "Usage: watchdir <directory> [command]" >&2
+    return 1
+  }
+  local dir="$1" cmd="${2:-echo 'Directory changed'}"
+
+  if command -v inotifywait &>/dev/null; then
+    echo "Watching $dir for changes..."
+    while inotifywait -r -e modify,create,delete "$dir" &>/dev/null; do
+      eval "$cmd"
+    done
+  else
+    echo "inotifywait not found. Install inotify-tools package." >&2
+    return 1
+  fi
+}
+
+# Enhanced directory operations
+mktemp-cd() {
+  local tmp_dir
+  tmp_dir=$(mktemp -d)
+  echo "Created and entering temporary directory: $tmp_dir"
+  cd "$tmp_dir"
+}
+
+# File comparison helpers
+diffdir() {
+  [[ $# -ne 2 ]] && {
+    echo "Usage: diffdir <dir1> <dir2>" >&2
+    return 1
+  }
+  diff -r "$1" "$2"
+}
+
+# Quick archive creation
+archive() {
+  [[ -z "$1" ]] && {
+    echo "Usage: archive <file_or_directory> [archive_name]" >&2
+    return 1
+  }
+  local source="$1"
+  local archive_name="${2:-$(basename "$source")_$(date +%Y%m%d_%H%M%S)}"
+
+  if [[ -d "$source" ]]; then
+    tar -czf "${archive_name}.tar.gz" "$source"
+    echo "Directory archived to: ${archive_name}.tar.gz"
+  elif [[ -f "$source" ]]; then
+    gzip -c "$source" >"${archive_name}.gz"
+    echo "File archived to: ${archive_name}.gz"
+  else
+    echo "Error: '$source' not found." >&2
+    return 1
+  fi
+}
+
+# Network utilities
+whosonport() {
+  [[ -z "$1" ]] && {
+    echo "Usage: whosonport <port>" >&2
+    return 1
+  }
+  lsof -i :"$1"
+}
+
+# Test internet connection
+ping-test() {
+  local hosts=("8.8.8.8" "1.1.1.1" "google.com" "github.com")
+  for host in "${hosts[@]}"; do
+    if ping -c 1 -W 2 "$host" &>/dev/null; then
+      echo "✓ Connected to $host"
+    else
+      echo "✗ Failed to connect to $host"
+    fi
+  done
+}
+
+# Generate QR code for text
+qr() {
+  [[ -z "$1" ]] && {
+    echo "Usage: qr <text>" >&2
+    return 1
+  }
+  if command -v qrencode &>/dev/null; then
+    qrencode -t ansiutf8 "$1"
+  else
+    curl -s "https://qr-server.com/api/qr-code/?size=150x150&data=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$1'))")" | display
+  fi
+}
+
+# Disk usage helpers
+biggest() {
+  local num="${1:-10}" dir="${2:-.}"
+  echo "Top $num largest files/directories in $dir:"
+  du -ah "$dir" | sort -hr | head -"$num"
+}
+
+# Git helpers
+git-size() {
+  git rev-list --objects --all |
+    git cat-file --batch-check='%(objecttype) %(objectname) %(objectsize) %(rest)' |
+    sed -n 's/^blob //p' |
+    sort --numeric-sort --key=2 |
+    tail -20 |
+    cut -c 1-12,41- |
+    $(command -v gnumfmt || echo numfmt) --field=2 --to=iec-i --suffix=B --padding=7 --round=nearest
+}
+
+# Enhanced system information
+sys-full() {
+  echo "🖥️  System Information (Detailed)"
+  echo "═══════════════════════════════════════════════"
+  echo "🔹 Hostname: $(hostname)"
+  echo "🔹 Kernel: $(uname -srm)"
+  echo "🔹 Uptime: $(uptime -p)"
+  echo "🔹 Load: $(uptime | awk -F'load average:' '{print $2}')"
+
+  if command -v free &>/dev/null; then
+    echo "🔹 Memory: $(free -h | awk '/^Mem:/ {printf "%s used / %s total (%.1f%% free)", $3, $2, ($4/$2)*100}')"
+  fi
+
+  if command -v df &>/dev/null; then
+    echo "🔹 Root disk: $(df -h / | awk 'NR==2 {printf "%s used / %s total (%s full)", $3, $2, $5}')"
+  fi
+
+  if command -v sensors &>/dev/null; then
+    local temp
+    temp=$(sensors 2>/dev/null | grep -i 'core 0' | awk '{print $3}' | head -1)
+    [[ -n "$temp" ]] && echo "🔹 CPU Temp: $temp"
+  fi
+}
+
+# ----------------------------------------------------------------------------
+# Modern CLI Tool Shortcuts
+# ----------------------------------------------------------------------------
+
+# Zoxide shortcuts (if available)
+command -v zoxide &>/dev/null && {
+  alias z='cd'   # Since zoxide replaces cd
+  alias zi='cdi' # Interactive mode
+}
+
+# FZF powered functions
+if command -v fzf &>/dev/null; then
+  # Edit a file with fzf
+  fzf-edit() {
+    local file
+    file=$(fzf --preview 'bat --style=numbers --color=always {}' --preview-window=right:60%)
+    [[ -n "$file" ]] && "${EDITOR:-nvim}" "$file"
+  }
+  alias fe='fzf-edit'
+
+  # Change directory with fzf
+  fzf-cd() {
+    local dir
+    dir=$(find . -type d 2>/dev/null | fzf --preview 'ls -la {}' --preview-window=right:60%)
+    [[ -n "$dir" ]] && cd "$dir"
+  }
+  alias fcd='fzf-cd'
+
+  # Kill process with fzf
+  fzf-kill() {
+    local pid
+    pid=$(ps -ef | sed 1d | fzf -m --header='[KILL PROCESS]' | awk '{print $2}')
+    [[ -n "$pid" ]] && echo "$pid" | xargs kill -"${1:-9}"
+  }
+  alias fkill='fzf-kill'
+fi
+
+# Modern alternatives shortcuts
+alias cat='bat --paging=never' 2>/dev/null || alias cat='cat'
+alias find='fd' 2>/dev/null || alias find='find'
+
+# ----------------------------------------------------------------------------
+# Quick utilities and one-liners
+# ----------------------------------------------------------------------------
+
+# Convert seconds to human readable
+sec2time() {
+  local T="$1"
+  local D=$((T / 60 / 60 / 24))
+  local H=$((T / 60 / 60 % 24))
+  local M=$((T / 60 % 60))
+  local S=$((T % 60))
+  ((D > 0)) && printf '%d days ' $D
+  ((H > 0)) && printf '%d hours ' $H
+  ((M > 0)) && printf '%d minutes ' $M
+  printf '%d seconds\n' $S
+}
+
+# Get public IP with location info
+myip-full() {
+  curl -s https://ipapi.co/json/ | jq -r '
+    "🌐 Public IP Information:\n" +
+    "   IP: " + .ip + "\n" +
+    "   Location: " + .city + ", " + .region + ", " + .country_name + "\n" +
+    "   ISP: " + .org + "\n" +
+    "   Timezone: " + .timezone
+  '
+}
+
+# Local network scan
+localscan() {
+  local network
+  network=$(ip route | grep -E '^default' | awk '{print $3}' | head -1)
+  if [[ -n "$network" ]]; then
+    nmap -sn "${network%.*}.0/24"
+  else
+    echo "Could not determine network range" >&2
+  fi
+}
+
+# Port scanner
+portscan() {
+  [[ -z "$1" ]] && {
+    echo "Usage: portscan <host> [port_range]" >&2
+    return 1
+  }
+  local host="$1" ports="${2:-1-1000}"
+  nmap -Pn "$host" -p "$ports"
+}
+
+# Generate random string
+randstr() {
+  local length="${1:-32}"
+  LC_ALL=C tr -dc 'A-Za-z0-9!@#$%^&*()_+[]{}|;:,.<>?' </dev/urandom | head -c "$length" && echo
+}
