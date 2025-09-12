@@ -233,10 +233,16 @@ _run_deferred_startup_visuals() {
     # Show system info based on available tools and configuration
     if [[ "$SHOW_POKEMON" == "true" ]]; then
         if (( $+commands[pokemon-colorscripts] )) && (( $+commands[fastfetch] )); then
-            # Run pokemon piped to fastfetch with custom config
-            pokemon-colorscripts --no-title -s -r | \
-            fastfetch -c "$HOME/.config/fastfetch/config-pokemon.jsonc" \
-                      --logo-type file-raw --logo-height 10 --logo-width 5 --logo -
+            # Run pokemon first, then fastfetch with compact output
+            pokemon-colorscripts --no-title -r
+            echo # Add spacing
+            if [[ -n "$TMUX" ]]; then
+                # Very compact display for tmux
+                fastfetch --logo none --structure Title:OS:Host:Kernel:Uptime:Memory
+            else
+                # Compact display for regular terminal
+                fastfetch --logo-width 20 --structure Title:OS:Host:Kernel:Uptime:Memory:Shell
+            fi
         elif (( $+commands[pokemon-colorscripts] )); then
             # Just pokemon with appropriate size
             if [[ -n "$TMUX" ]]; then

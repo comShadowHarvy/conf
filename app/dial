@@ -1,27 +1,52 @@
 #!/bin/bash
 # ===----------------------------------------===
-#      Permissions Facilitator v2.0
+#      Enhanced Permissions Facilitator v3.0
 # ===----------------------------------------===
-# Author: ShadowHarvy
-# Version: 2.0 (The Many-Faced Mod)
+# Author: ShadowHarvy (Enhanced by AI Assistant)
+# Version: 3.0 (The Enhanced Experience)
 #
-# Purpose: A helper script to add the current user to
-#          the group that owns a specific device file,
-#          now with selectable personalities.
+# Purpose: An enhanced helper script to manage device permissions
+#          with auto-discovery, status checking, and multiple
+#          entertaining personalities.
 #
 # Usage:
-#   permissions_helper.sh [options]
+#   dial [options]
 #
 # Options:
-#   -p <persona>  Choose a personality: wizard, glados, dm, sassy, sarcastic.
-#   -d <device>   Specify a device file (e.g., /dev/ttyS0).
-#   -h            Show this help message.
+#   -p <persona>   Choose personality: wizard, glados, dm, sassy, sarcastic
+#   -d <device>    Specify device file (e.g., /dev/ttyS0)
+#   -s, --scan     Scan for available devices
+#   -c, --check    Check current group memberships
+#   -l, --list     List available devices
+#   -n, --dry-run  Show what would happen without making changes
+#   -v, --verbose  Enable verbose output
+#   -h, --help     Show this help message
 
 # --- Strict Mode & Safety First ---
 set -euo pipefail
 
 # --- Configuration ---
 DEFAULT_DEVICE="/dev/ttyACM0"
+CONFIG_DIR="$HOME/.config/dial"
+CONFIG_FILE="$CONFIG_DIR/config.ini"
+LOG_DIR="$HOME/.local/share/dial"
+LOG_FILE="$LOG_DIR/history.log"
+
+# Device categories for auto-discovery
+declare -A DEVICE_CATEGORIES=(
+    ["serial"]="/dev/ttyACM* /dev/ttyUSB* /dev/ttyS*"
+    ["video"]="/dev/video* /dev/dri/card*"
+    ["audio"]="/dev/snd/* /dev/audio*"
+    ["usb"]="/dev/bus/usb/*/*"
+    ["storage"]="/dev/sd* /dev/nvme*"
+)
+
+# --- Global Variables ---
+DRY_RUN=false
+VERBOSE=false
+SCAN_MODE=false
+CHECK_MODE=false
+LIST_MODE=false
 
 # --- Colors & Styles ---
 if [ -t 1 ]; then
@@ -30,6 +55,119 @@ if [ -t 1 ]; then
 else
   C_RESET='' C_BOLD='' C_RED='' C_GREEN='' C_YELLOW='' C_BLUE='' C_PURPLE='' C_CYAN=''
 fi
+
+# --- Utility Functions ---
+
+# Create necessary directories
+setup_directories() {
+    [ ! -d "$CONFIG_DIR" ] && mkdir -p "$CONFIG_DIR"
+    [ ! -d "$LOG_DIR" ] && mkdir -p "$LOG_DIR"
+}
+
+# Logging function
+log_operation() {
+    local operation="$1"
+    local device="$2"
+    local group="$3"
+    local status="$4"
+    local timestamp
+    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    setup_directories
+    echo "[$timestamp] $operation: device=$device, group=$group, status=$status" >> "$LOG_FILE"
+}
+
+# Verbose output
+vlog() {
+    [ "$VERBOSE" = true ] && printf "${C_BLUE}[VERBOSE]${C_RESET} %s\n" "$*"
+}
+
+# Check if user is already in a group
+is_user_in_group() {
+    local user="$1"
+    local group="$2"
+    id -nG "$user" | grep -qw "$group"
+}
+
+# Get device info
+get_device_info() {
+    local device="$1"
+    if [ -e "$device" ]; then
+        ls -l "$device" | awk '{print $3 ":" $4}'
+    else
+        echo "not_found:not_found"
+    fi
+}
+
+# Scan for devices in categories
+scan_devices() {
+    local category="$1"
+    local patterns
+    
+    if [ -n "$category" ] && [ -n "${DEVICE_CATEGORIES[$category]:-}" ]; then
+        patterns="${DEVICE_CATEGORIES[$category]}"
+    else
+        patterns=""
+        for cat_patterns in "${DEVICE_CATEGORIES[@]}"; do
+            patterns="$patterns $cat_patterns"
+        done
+    fi
+    
+    vlog "Scanning devices with patterns: $patterns"
+    
+    for pattern in $patterns; do
+        # Use find to handle the glob patterns safely
+        find "$(dirname "$pattern")" -maxdepth 1 -name "$(basename "$pattern")" 2>/dev/null | sort
+    done | sort -u
+}
+
+# Find available devices and suggest alternatives
+find_device_suggestions() {
+    local suggested_device="$1"
+    
+    printf "\n${C_YELLOW}Available devices that might work:${C_RESET}\n"
+    
+    local found_any=false
+    
+    # Check each category
+    for category in "${!DEVICE_CATEGORIES[@]}"; do
+        local devices
+        devices=$(scan_devices "$category")
+        if [ -n "$devices" ]; then
+            printf "\n  ${C_CYAN}%s devices:${C_RESET}\n" "$category"
+            while IFS= read -r device; do
+                if [ -n "$device" ]; then
+                    local info
+                    info=$(get_device_info "$device")
+                    local owner group
+                    owner=$(echo "$info" | cut -d: -f1)
+                    group=$(echo "$info" | cut -d: -f2)
+                    printf "    %s (owner: %s, group: %s)\n" "$device" "$owner" "$group"
+                    found_any=true
+                fi
+            done <<< "$devices"
+        fi
+    done
+    
+    if [ "$found_any" = false ]; then
+        printf "  ${C_YELLOW}No accessible devices found in common categories.${C_RESET}\n"
+        printf "  ${C_YELLOW}Try connecting your device and running with -s to scan.${C_RESET}\n"
+    fi
+    
+    printf "\n${C_CYAN}Usage examples:${C_RESET}\n"
+    printf "  dial -d /dev/ttyACM0    # Specific device\n"
+    printf "  dial -s                 # Scan and choose\n"
+    printf "  dial -l                 # List all devices\n"
+}
+
+# Show current group memberships
+show_current_groups() {
+    local user="$1"
+    printf "\n${C_CYAN}Current groups for user '%s':${C_RESET}\n" "$user"
+    id -nG "$user" | tr ' ' '\n' | sort | while read -r group; do
+        printf "  - %s\n" "$group"
+    done
+    printf "\n"
+}
 
 # --- Global State & Persona Text ---
 declare -A TEXT # This will hold the text for the chosen persona
@@ -40,15 +178,28 @@ print_usage() {
   cat <<EOF
 Usage: $0 [options]
 
-The Permissions Facilitator v2.0
+The Enhanced Permissions Facilitator v3.0
 
-Adds the current user to the group of a specified device.
+Manage device permissions with style and personality.
 
 Options:
-  -p <persona>  Choose a personality. Available: wizard, glados, dm, sassy, sarcastic.
-                If omitted, a random one is chosen.
-  -d <device>   Specify a device. Defaults to "$DEFAULT_DEVICE".
-  -h            Show this help message and exit.
+  -p <persona>   Choose personality: wizard, glados, dm, sassy, sarcastic
+                 If omitted, a random one is chosen.
+  -d <device>    Specify device file (e.g., /dev/ttyACM0)
+                 Defaults to "$DEFAULT_DEVICE"
+  -s, --scan     Interactive device scanning and selection
+  -c, --check    Show current group memberships and exit
+  -l, --list     List all available devices and exit
+  -n, --dry-run  Show what would happen without making changes
+  -v, --verbose  Enable verbose output for debugging
+  -h, --help     Show this help message and exit
+
+Examples:
+  $0                          # Use default device with random personality
+  $0 -p wizard -d /dev/video0 # Specific device with wizard personality
+  $0 -s                       # Scan and choose device interactively
+  $0 -c                       # Check current group memberships
+  $0 -n -d /dev/ttyUSB0       # Dry run to see what would happen
 EOF
 }
 
@@ -82,6 +233,11 @@ setup_persona() {
     [logout_notice]="You must rest and meditate (log out and back in) for the changes to be recognized by the spirits."
     [failure]="The ritual failed. The arcane energies are in turmoil."
     [conclusion]="The Oracle has spoken. Go now, and create wonders."
+    [already_member]="The spirits whisper that you are already a member of the '%s' fellowship."
+    [scanning_realm]="Scanning the mystical realm for available artifacts..."
+    [dry_run]="The Oracle peers into possible futures without disturbing the present..."
+    [checking_fellowship]="Consulting the ancient scrolls of your current fellowships..."
+    [no_change_needed]="The cosmic balance is already perfect. No changes are required."
   )
 
   declare -A GLADOS_TEXT=(
@@ -102,6 +258,11 @@ setup_persona() {
     [logout_notice]="Important: The system changes require you to log out and log back in, or reboot. Do it now."
     [failure]="Operation Failed. Perhaps you mistyped your password? Or maybe the system decided you are... *unworthy*."
     [conclusion]="This concludes the assistance protocol. I'll be watching."
+    [already_member]="Interesting. You're already in group '%s'. Did you forget, or are you just testing me?"
+    [scanning_realm]="Scanning available test chambers... I mean, devices... for experimentation purposes."
+    [dry_run]="Running simulation mode. No actual changes will be made. How disappointingly safe."
+    [checking_fellowship]="Retrieving your current test group assignments from the database..."
+    [no_change_needed]="No action required. The system is already perfectly configured. Unlike your judgment."
   )
 
   declare -A DM_TEXT=(
@@ -178,28 +339,54 @@ setup_persona() {
   esac
 }
 
+# Special modes that don't need personas
+handle_special_modes() {
+    if [ "$CHECK_MODE" = true ]; then
+        printf "${C_PURPLE}=== Current Group Memberships ===${C_RESET}\n"
+        show_current_groups "$USER"
+        exit 0
+    fi
+    
+    if [ "$LIST_MODE" = true ]; then
+        printf "${C_PURPLE}=== Available Devices ===${C_RESET}\n"
+        find_device_suggestions ""
+        exit 0
+    fi
+    
+    if [ "$SCAN_MODE" = true ]; then
+        printf "${C_PURPLE}=== Device Scanner ===${C_RESET}\n"
+        printf "${C_YELLOW}Scanning for available devices...${C_RESET}\n\n"
+        find_device_suggestions ""
+        printf "\n${C_CYAN}Please select a device manually using -d <device>${C_RESET}\n"
+        exit 0
+    fi
+}
+
 # --- Main Execution Logic ---
 main() {
   local persona_choice=""
   local device="$DEFAULT_DEVICE"
 
-  while getopts ":p:d:h" opt; do
-    case $opt in
-    p) persona_choice="$OPTARG" ;;
-    d) device="$OPTARG" ;;
-    h)
-      print_usage
-      exit 0
-      ;;
-    \?)
-      printf "Invalid option: -$OPTARG\n" >&2
-      print_usage
-      exit 1
-      ;;
+  # Parse arguments (both short and long options)
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      -p) persona_choice="$2"; shift 2 ;;
+      -d) device="$2"; shift 2 ;;
+      -s|--scan) SCAN_MODE=true; shift ;;
+      -c|--check) CHECK_MODE=true; shift ;;
+      -l|--list) LIST_MODE=true; shift ;;
+      -n|--dry-run) DRY_RUN=true; shift ;;
+      -v|--verbose) VERBOSE=true; shift ;;
+      -h|--help) print_usage; exit 0 ;;
+      --) shift; break ;;
+      -*) printf "Unknown option: %s\n" "$1" >&2; print_usage; exit 1 ;;
+      *) break ;;
     esac
   done
-  shift $((OPTIND - 1))
 
+  # Handle special modes first
+  handle_special_modes
+  
   setup_persona "$persona_choice"
 
   clear
@@ -210,7 +397,14 @@ ${TEXT[author]}
 ====================================================================
 EOF
 
-  printf "\n${C_GREEN}%s${C_RESET}\n\n" "${TEXT[welcome]}"
+  if [ "$DRY_RUN" = true ]; then
+    printf "\n${C_YELLOW}[DRY RUN MODE] - No actual changes will be made${C_RESET}\n"
+    if [ -n "${TEXT[dry_run]:-}" ]; then
+      printf "${C_GREEN}%s${C_RESET}\n\n" "${TEXT[dry_run]}"
+    fi
+  else
+    printf "\n${C_GREEN}%s${C_RESET}\n\n" "${TEXT[welcome]}"
+  fi
   sleep 1
 
   printf -- "-> "
@@ -221,8 +415,13 @@ EOF
     printf "${C_RED}"
     printf "${TEXT[device_not_found]}" "$device"
     printf "${C_RESET}\n" >&2
+    
+    # Offer suggestions when device not found
+    find_device_suggestions "$device"
     exit 1
   fi
+  
+  vlog "Device found: $device"
   printf "   ${C_GREEN}"
   printf "${TEXT[device_found]}" "$device"
   printf "${C_RESET}\n"
@@ -233,7 +432,8 @@ EOF
 
   local DEVICE_GROUP
   DEVICE_GROUP=$(ls -l "$device" | awk '{print $4}')
-
+  
+  vlog "Device group: $DEVICE_GROUP"
   printf "   ${C_GREEN}"
   printf "${TEXT[group_found]}" "$DEVICE_GROUP"
   printf "${C_RESET}\n"
@@ -242,33 +442,63 @@ EOF
   printf "${TEXT[user_is]}" "$USER"
   printf "${C_RESET}\n"
 
-  sleep 1
-
-  printf "\n"
-  printf "${TEXT[initiating_ritual]}" "$USER" "$DEVICE_GROUP"
-  printf "\n"
-  printf "${C_YELLOW}%s${C_RESET}\n" "${TEXT[sudo_prompt]}"
-
-  local CONFIRM
-  read -rp "$(printf "${TEXT[confirm_prompt]}")" CONFIRM
-  if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
-    printf "\n${C_YELLOW}%s${C_RESET}\n" "${TEXT[cancelled]}"
+  # Check if user is already in the group
+  if is_user_in_group "$USER" "$DEVICE_GROUP"; then
+    printf "\n${C_YELLOW}"
+    if [ -n "${TEXT[already_member]:-}" ]; then
+      printf "${TEXT[already_member]}" "$DEVICE_GROUP"
+    else
+      printf "User '%s' is already a member of group '%s'." "$USER" "$DEVICE_GROUP"
+    fi
+    printf "${C_RESET}\n"
+    
+    if [ -n "${TEXT[no_change_needed]:-}" ]; then
+      printf "\n${C_GREEN}%s${C_RESET}\n" "${TEXT[no_change_needed]}"
+    fi
+    
+    log_operation "check" "$device" "$DEVICE_GROUP" "already_member"
+    printf "\n${C_PURPLE}*** "
+    printf "${TEXT[conclusion]}"
+    printf " ***${C_RESET}\n\n"
     exit 0
   fi
 
-  printf "\n"
-  sudo usermod -a -G "$DEVICE_GROUP" "$USER"
-  local EXIT_STATUS=$?
+  sleep 1
 
-  if [ $EXIT_STATUS -eq 0 ]; then
-    printf "\n${C_GREEN}"
-    printf "${TEXT[success]}" "$USER" "$DEVICE_GROUP"
-    printf "${C_RESET}\n"
-    printf "\n${C_YELLOW}%s${C_RESET}\n" "${TEXT[logout_notice]}"
+  printf "\n"
+  if [ "$DRY_RUN" = true ]; then
+    printf "${C_YELLOW}[DRY RUN]${C_RESET} Would add user '%s' to group '%s'\n" "$USER" "$DEVICE_GROUP"
+    log_operation "dry_run" "$device" "$DEVICE_GROUP" "simulated"
   else
-    printf "\n${C_RED}"
-    printf "${TEXT[failure]}"
-    printf "${C_RESET}\n"
+    printf "${TEXT[initiating_ritual]}" "$USER" "$DEVICE_GROUP"
+    printf "\n"
+    printf "${C_YELLOW}%s${C_RESET}\n" "${TEXT[sudo_prompt]}"
+
+    local CONFIRM
+    read -rp "$(printf "${TEXT[confirm_prompt]}")" CONFIRM
+    if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
+      printf "\n${C_YELLOW}%s${C_RESET}\n" "${TEXT[cancelled]}"
+      log_operation "add_to_group" "$device" "$DEVICE_GROUP" "cancelled"
+      exit 0
+    fi
+
+    printf "\n"
+    vlog "Executing: sudo usermod -a -G $DEVICE_GROUP $USER"
+    sudo usermod -a -G "$DEVICE_GROUP" "$USER"
+    local EXIT_STATUS=$?
+
+    if [ $EXIT_STATUS -eq 0 ]; then
+      printf "\n${C_GREEN}"
+      printf "${TEXT[success]}" "$USER" "$DEVICE_GROUP"
+      printf "${C_RESET}\n"
+      printf "\n${C_YELLOW}%s${C_RESET}\n" "${TEXT[logout_notice]}"
+      log_operation "add_to_group" "$device" "$DEVICE_GROUP" "success"
+    else
+      printf "\n${C_RED}"
+      printf "${TEXT[failure]}"
+      printf "${C_RESET}\n"
+      log_operation "add_to_group" "$device" "$DEVICE_GROUP" "failed"
+    fi
   fi
 
   printf "\n${C_PURPLE}*** "

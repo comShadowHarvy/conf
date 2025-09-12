@@ -1,0 +1,110 @@
+#!/bin/bash
+
+# Check if an argument (file or directory to zip) is provided
+if [ -z "$1" ]; then
+  echo "Usage: $0 <file_or_directory_to_zip>"
+  exit 1
+fi
+
+# Get the input file or directory
+TARGET="$1"
+
+# Check if the target exists
+if [ ! -e "$TARGET" ]; then
+  echo "Error: File or directory '$TARGET' not found."
+  exit 1
+fi
+
+# --- Get Original Size ---
+echo "Calculating original size..."
+ORIGINAL_SIZE_BYTES=$(du -sb "$TARGET" | awk '{print $1}')
+ORIGINAL_SIZE_HUMAN=$(du -sh "$TARGET" | awk '{print $1}')
+echo "Original size: $ORIGINAL_SIZE_HUMAN ($ORIGINAL_SIZE_BYTES bytes)"
+
+# --- Determine Archive Name with Safety Check ---
+# Initial proposed archive name: appends .zip to the target name
+# If TARGET is "mydir/", ARCHIVE_NAME becomes "mydir.zip".
+# If TARGET is "myfile.txt", ARCHIVE_NAME becomes "myfile.txt.zip".
+# If TARGET is "myfile.zip" (a file), ARCHIVE_NAME initially becomes "myfile.zip.zip".
+PROPOSED_ARCHIVE_NAME="${TARGET%/}.zip"
+ARCHIVE_NAME="$PROPOSED_ARCHIVE_NAME" # Assume this is fine initially
+
+# Safety check: if the TARGET is a file AND its name is identical to the PROPOSED_ARCHIVE_NAME
+# This would typically only happen if TARGET was something like "data.zip.zip" and PROPOSED_ARCHIVE_NAME also became "data.zip.zip"
+if [ -f "$TARGET" ] && [ "$TARGET" == "$PROPOSED_ARCHIVE_NAME" ]; then
+  echo "Warning: Proposed archive name '$PROPOSED_ARCHIVE_NAME' is identical to the source file '$TARGET'."
+
+  TARGET_DIR=$(dirname "$PROPOSED_ARCHIVE_NAME")
+  TARGET_FILE=$(basename "$PROPOSED_ARCHIVE_NAME")
+
+  # Create a new name, e.g., "file.zip.zip" -> "file.zip_archive.zip"
+  # Remove the trailing ".zip" from the filename part, add "_archive", then add ".zip" back.
+  FILENAME_BASE="${TARGET_FILE%.zip}"
+  ADJUSTED_FILENAME="${FILENAME_BASE}_archive.zip"
+
+  if [ "$TARGET_DIR" == "." ]; then
+    ARCHIVE_NAME="$ADJUSTED_FILENAME"
+  else
+    ARCHIVE_NAME="$TARGET_DIR/$ADJUSTED_FILENAME"
+  fi
+  echo "Adjusted archive name to: '$ARCHIVE_NAME'"
+
+  # Final check in case the adjusted name somehow still matches (highly unlikely)
+  if [ "$TARGET" == "$ARCHIVE_NAME" ]; then
+    echo "Error: Could not determine a safe archive name for '$TARGET' even after adjustment."
+    exit 1
+  fi
+fi
+
+# --- Create the Zip Archive ---
+echo "Creating archive '$ARCHIVE_NAME' with maximum compression..."
+
+# If it's a directory, use -r for recursive zipping
+if [ -d "$TARGET" ]; then
+  zip -9 -r "$ARCHIVE_NAME" "$TARGET"
+else
+  zip -9 "$ARCHIVE_NAME" "$TARGET"
+fi
+
+# Check if zip command was successful
+if [ $? -ne 0 ]; then
+  echo "Error: Zip command failed."
+  # Attempt to remove partially created archive if it exists
+  [ -f "$ARCHIVE_NAME" ] && rm "$ARCHIVE_NAME"
+  exit 1
+fi
+
+echo "Archive created successfully."
+
+# --- Get New Size ---
+echo "Calculating new archive size..."
+if [ ! -f "$ARCHIVE_NAME" ]; then
+    echo "Error: Compressed file '$ARCHIVE_NAME' not found after compression."
+    exit 1
+fi
+NEW_SIZE_BYTES=$(du -sb "$ARCHIVE_NAME" | awk '{print $1}')
+NEW_SIZE_HUMAN=$(du -sh "$ARCHIVE_NAME" | awk '{print $1}')
+echo "New archive size: $NEW_SIZE_HUMAN ($NEW_SIZE_BYTES bytes)"
+
+# --- Calculate and Display Difference ---
+DIFFERENCE_BYTES=$((ORIGINAL_SIZE_BYTES - NEW_SIZE_BYTES))
+
+SAVED_PERCENTAGE="0.00" # Default if original size is zero
+if [ "$ORIGINAL_SIZE_BYTES" -ne 0 ]; then
+  SAVED_PERCENTAGE=$(awk "BEGIN {printf \"%.2f\", ($DIFFERENCE_BYTES / $ORIGINAL_SIZE_BYTES) * 100}")
+fi
+
+echo "----------------------------------------"
+echo "Compression Summary for '$TARGET':"
+echo "----------------------------------------"
+echo "Original Size   : $ORIGINAL_SIZE_HUMAN ($ORIGINAL_SIZE_BYTES bytes)"
+echo "Compressed Size : $NEW_SIZE_HUMAN ($NEW_SIZE_BYTES bytes)"
+if [ "$DIFFERENCE_BYTES" -lt 0 ]; then
+    echo "Space Increased By: $(numfmt --to=iec-i --suffix=B ${DIFFERENCE_BYTES#-} | sed 's/ //g') (${DIFFERENCE_BYTES#-} bytes) (Note: Archive is LARGER)"
+else
+    echo "Space Saved     : $(numfmt --to=iec-i --suffix=B $DIFFERENCE_BYTES | sed 's/ //g') ($DIFFERENCE_BYTES bytes)"
+fi
+echo "Compression Ratio: $SAVED_PERCENTAGE%"
+echo "----------------------------------------"
+
+exit 0
