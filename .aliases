@@ -87,9 +87,7 @@ fi
 # Use rsync for cp/mv to get progress bars
 alias ccp='rsync -avhP --info=progress2'
 alias mmv='rsync -avhP --info=progress2 --remove-source-files'
-# FIXED: Changed mmkdir to mkdir for consistency - keeping old name for compatibility
-# alias mmkdir='mkdir -pv'  # OLD - commented for consistency
-alias mkdir='mkdir -pv'     # Enhanced mkdir with verbose and parent creation
+alias mkdir='mkdir -pv'
 
 # Use fd instead of find if it exists
 if command -v fd &>/dev/null; then
