@@ -1,6 +1,6 @@
 {
   "summary": {
-    "total_aliases": 174,
+    "total_aliases": 173,
     "total_functions": 59,
     "duplicates": 0,
     "path_issues": 1,
@@ -10,7 +10,7 @@
   "path_issues": [
     {
       "type": "hardcoded_path",
-      "line": 665,
+      "line": 615,
       "content": "PYTHON_ENV_PATH=\"/home/me/python_packages_env/bin/activate\"",
       "issue": "Hardcoded /home/me path - should use $HOME"
     }
