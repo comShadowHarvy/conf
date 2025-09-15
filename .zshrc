@@ -134,7 +134,7 @@ zplugins[autosuggestions]=1
 # User can override in ~/.zshrc.local by setting zplugins[plugin_name]=0
 
 # --- FZF Configuration ---
-export FZF_DEFAULT_OPTS="--layout=reverse --exact --border=bold --border-rounded --margin=3% --color=dark --height 60% --multi"
+export FZF_DEFAULT_OPTS="--layout=reverse --exact --border=rounded --margin=3% --color=dark --height 60% --multi"
 
 # Use fd/rg if available for FZF with intelligent fallbacks
 if (( $+commands[fd] )); then
