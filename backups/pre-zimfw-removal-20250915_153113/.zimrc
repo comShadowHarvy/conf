@@ -1,0 +1,28 @@
+# Auto-generated .zimrc - DO NOT EDIT DIRECTLY
+# Edit zplugins array in .zshrc instead
+
+# Core modules (always enabled)
+zmodule environment
+zmodule utility  
+zmodule input
+zmodule termtitle
+
+# Completion system
+zmodule completion
+zmodule zsh-users/zsh-completions
+
+# Git integration
+zmodule git-info
+# Smart directory jumping
+zmodule kiesman99/zim-zoxide
+# Fuzzy finder
+zmodule junegunn/fzf
+zmodule duration-info
+zmodule MichaelAquilina/zsh-auto-notify
+zmodule djui/alias-tips
+zmodule ael-code/zsh-colored-man-pages
+
+# Syntax highlighting and autosuggestions (load last for performance)
+zmodule zdharma-continuum/fast-syntax-highlighting
+zmodule zsh-users/zsh-history-substring-search
+zmodule zsh-users/zsh-autosuggestions
