@@ -1,0 +1,2208 @@
+#!/usr/bin/env bash
+# ============================================================================
+#
+#         Enhanced Shell Aliases and Functions
+#         CachyOS Linux Optimized - Compatible with Bash & Zsh
+#
+# ============================================================================
+#
+# Performance: Lazy loading, command checks, and smart fallbacks
+# Compatibility: POSIX-compliant functions work across shells
+# Features: Modern CLI tools, enhanced workflows, productivity helpers
+#
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# General & Navigation Functions
+# ----------------------------------------------------------------------------
+
+# Create a directory and cd into it
+mkcd() {
+  [[ -z "$1" ]] && { echo "Usage: mkcd <directory>" >&2; return 1; }
+  mkdir -p "$1" && cd "$1"
+}
+
+# Use fzf to interactively cd into a subdirectory
+cdf() {
+  local dir
+  if command -v fd &>/dev/null; then
+    dir=$(fd --type d --max-depth 2 | fzf --height 20% --reverse --prompt="Select directory > ")
+  else
+    dir=$(find . -maxdepth 2 -type d | fzf --height 20% --reverse --prompt="Select directory > ")
+  fi
+  # Only cd if a directory was selected
+  [[ -n "$dir" ]] && cd "$dir"
+}
+
+# Go up a specified number of directories
+up() {
+  local d=""
+  local limit="${1:-1}"
+  # Ensure limit is a positive integer
+  [[ ! "$limit" =~ ^[1-9][0-9]*$ ]] && limit=1
+  for ((i=1; i<=limit; i++)); do
+    d+="../"
+  done
+  # Use pushd/popd logic for safer navigation if available, else cd
+  cd "$d" || echo "Error: Couldn't go up $limit level(s)." >&2
+}
+
+# Direct navigation aliases
+alias ..="cd .."
+alias ...="cd ../.."
+alias ....="cd ../../.."
+alias .....="cd ../../../.."
+alias ~="cd ~"
+alias dl="cd ~/Downloads"
+alias dt="cd ~/Desktop"
+alias p="cd ~/projects"
+alias doc="cd ~/Documents"
+
+# ----------------------------------------------------------------------------
+# File & Directory Management
+# ----------------------------------------------------------------------------
+
+# Use modern, feature-rich tools if available, with robust fallbacks
+if command -v eza &>/dev/null; then
+  alias ls='eza --icons --group-directories-first'
+  alias ll='eza -al --icons --git --group-directories-first --time-style=long-iso'
+  alias lt='eza --tree --level=3 --icons --git-ignore'
+  alias la='eza -a --icons --group-directories-first' # List all, including dots
+  alias l='eza -l --icons --git --group-directories-first'
+  alias lm='eza -al --sort=modified --icons --time-style=relative'
+  alias lS='eza -al --sort=size --icons --binary'
+  alias lr='eza -R --icons --level=2' # Recursive 2 levels
+elif command -v lsd &>/dev/null; then
+  alias ls='lsd --icon=auto --group-dirs=first'
+  alias ll='lsd -la --icon=auto --date=relative --group-dirs=first'
+  alias lt='lsd --tree --depth=3 --icon=auto'
+  alias la='lsd -A --icon=auto --group-dirs=first'
+  alias l='lsd -l --icon=auto --group-dirs=first'
+  alias lm='lsd -la --sort=time --icon=auto'
+  alias lS='lsd -la --sort=size --icon=auto'
+else
+  # Colorized ls fallbacks
+  alias ls="ls --color=auto --group-directories-first"
+  alias ll="ls -alh --color=auto --group-directories-first --time-style=long-iso"
+  alias la="ls -A --color=auto --group-directories-first"
+  alias l="ls -l --color=auto --group-directories-first"
+  alias l.="ls -ld .* --color=auto"
+  alias lm="ls -alht --color=auto"
+  alias lS="ls -alhS --color=auto"
+fi
+
+# Use rsync for cp/mv to get progress bars
+alias ccp='rsync -avhP --info=progress2'
+alias mmv='rsync -avhP --info=progress2 --remove-source-files'
+alias mkdir='mkdir -pv'
+
+# Use fd instead of find if it exists
+if command -v fd &>/dev/null; then
+  alias findr='fd'
+  alias f='fd'        # Short, memorable alternative to 'find'
+  # alias find='fd'   # DISABLED: AUR builds need real find - use 'f' instead
+fi
+
+# Find text in files, preferring ripgrep (rg)
+ftext() {
+  [[ $# -eq 0 ]] && { echo "Usage: ftext <pattern> [path]" >&2; return 1; }
+  local pattern="$1"
+  local path="${2:-.}"
+  if command -v rg &>/dev/null; then
+    rg --color=always --line-number --no-heading --smart-case "$pattern" "$path"
+  else
+    grep -rni --color=always "$pattern" "$path"
+  fi
+}
+
+# Find directories by name, preferring fd
+fdir() {
+  [[ -z "$1" ]] && { echo "Usage: fdir <pattern> [depth]" >&2; return 1; }
+  local pattern="$1"
+  local depth="${2:-3}"
+  if command -v fd &>/dev/null; then
+    fd --type d --max-depth "$depth" --ignore-case "$pattern"
+  else
+    find . -maxdepth "$depth" -type d -iname "*$pattern*"
+  fi
+}
+
+# Extract almost any archive format
+extract() {
+  [[ -z "$1" ]] && { echo "Usage: extract <archive_file>" >&2; return 1; }
+  local file="$1"
+  [[ ! -f "$file" ]] && { echo "Error: File '$file' not found." >&2; return 1; }
+
+  echo "Extracting '$file'..."
+  case "$file" in
+    *.tar.bz2|*.tbz2|*.tbz) tar xjf "$file" ;;
+    *.tar.gz|*.tgz)        tar xzf "$file" ;;
+    *.tar.xz|*.txz)        tar xJf "$file" ;;
+    *.tar|*.cbt)           tar xf "$file"  ;;
+    *.zip|*.cbz|*.epub)    unzip "$file"   ;;
+    *.rar|*.cbr)           unrar x "$file" ;;
+    *.7z|*.cb7)            7z x "$file"    ;;
+    *.gz)                  gunzip "$file"  ;;
+    *.bz2)                 bunzip2 "$file" ;;
+    *.xz)                  unxz "$file"    ;;
+    *)
+      echo "Error: Unsupported file type: '$file'" >&2
+      return 1
+      ;;
+  esac
+}
+
+# **[FIXED]** Extract all archives in the current directory into their own subdirectories
+extract-all() {
+    for archive in *.tar.bz2 *.tbz2 *.tbz *.tar.gz *.tgz *.tar.xz *.txz *.tar *.cbt *.zip *.cbz *.epub *.rar *.cbr *.7z *.cb7 *.gz *.bz2 *.xz; do
+        if [[ -f "$archive" ]]; then
+            # Create a directory named after the archive, without the extension.
+            # This handles complex extensions like .tar.gz
+            local dest_dir
+            dest_dir=$(basename "$archive" | sed -E 's/(\.tar\.(gz|bz2|xz)|.t(gz|bz2|xz))$//; s/\.[^.]+$//')
+            
+            mkdir -p -- "$dest_dir"
+            echo "--- Extracting $archive to $dest_dir/ ---"
+            # Use a subshell to extract into the new directory without changing the current shell's directory
+            (cd -- "$dest_dir" && tar -xf "../$archive") || echo "Failed to extract $archive" >&2
+        fi
+    done
+    echo "--- All archives processed. ---"
+}
+
+
+# ----------------------------------------------------------------------------
+# Yazi File Manager
+# ----------------------------------------------------------------------------
+alias y='yazi'
+ycd() {
+  local tmp cwd
+  tmp="$(mktemp -t "yazi-cwd.XXXXX")"
+  # Ensure yazi is called with any arguments passed to ycd
+  yazi --cwd-file="$tmp" "$@"
+  if cwd="$(cat -- "$tmp")" && [[ -n "$cwd" && "$cwd" != "$PWD" ]]; then
+    cd -- "$cwd"
+  fi
+  rm -f -- "$tmp"
+}
+
+# ----------------------------------------------------------------------------
+# System Management
+# ----------------------------------------------------------------------------
+
+alias h='history'
+alias j='jobs -l'
+alias reload='exec "$SHELL" -l'
+alias :q='exit'
+alias please='sudo !!'
+
+# System info and resource usage
+alias psa='ps auxf'
+alias psgrep='ps aux | grep -v grep | grep -i -e VSZ -e'
+alias psmem='ps auxf | sort -nrk 4 | head -10'
+alias pscpu='ps auxf | sort -nrk 3 | head -10'
+alias meminfo='free -h'
+alias cpuinfo='lscpu'
+alias df='df -h'
+alias du='du -h'
+alias syswatch='watch -n 2 "echo \"## Memory Usage ##\"; free -h; echo; echo \"## Disk Usage ##\"; df -h -T /"'
+alias tempcheck='sensors | grep -i "core"'
+
+# Summarize directory contents
+dirsummary() {
+  local dir="${1:-.}"
+  [[ ! -d "$dir" ]] && { echo "Error: Directory '$dir' not found." >&2; return 1; }
+  echo "📂 Directory Summary for: $(realpath "$dir")"
+  echo "───────────────────────────────────────"
+  local files
+  local dirs
+  files=$(find "$dir" -type f | wc -l)
+  dirs=$(find "$dir" -type d | wc -l)
+  local size
+  size=$(du -sh "$dir" | cut -f1)
+
+  echo "📊 Stats:"
+  printf "  Files: %'d, Directories: %'d, Total Size: %s\n" "$files" "$dirs" "$size"
+  echo -e "\n📑 Top 5 File Types:"
+  find "$dir" -type f -not -path '*/.*' -exec file {} + | sed 's/.*: //' | sort | uniq -c | sort -nr | head -5
+  echo -e "\n📁 Top 5 Largest Subdirectories:"
+  du -h --max-depth=1 "$dir" | sort -hr | head -n 6 | tail -n 5 # head -n 6 to include parent, tail -n 5 to exclude it
+}
+
+# Quick system overview
+sysinfo() {
+  echo "📊 System Information:"
+  echo "  - Kernel: $(uname -rs)"
+  echo "  - Uptime: $(uptime -p)"
+  command -v free &>/dev/null && echo "  - Memory: $(free -h | awk '/^Mem:/ {printf "%s / %s (%s used)", $3, $2, $7}')"
+  command -v df &>/dev/null && echo "  - Disk (/): $(df -h / | awk 'NR==2 {printf "%s / %s (%s used)", $3, $2, $5}')"
+}
+
+# ----------------------------------------------------------------------------
+# Package Management (CachyOS/Arch Linux Optimized)
+# ----------------------------------------------------------------------------
+
+# Core Pacman aliases
+alias pacsyu='sudo pacman -Syu'  # System update
+alias pacs='sudo pacman -S'      # Install package
+alias pacr='sudo pacman -Rns'    # Remove package with deps
+alias pacss='pacman -Ss'         # Search packages
+alias pacsi='pacman -Si'         # Package info
+alias pacq='pacman -Q'           # Query installed
+alias pacqs='pacman -Qs'         # Search installed
+alias pacqi='pacman -Qi'         # Installed package info
+alias pacqo='pacman -Qo'         # Package owns file
+alias pacql='pacman -Ql'         # Package file list
+alias pacqdt='pacman -Qdt'       # List orphaned packages
+alias paclog='tail -f /var/log/pacman.log'  # Watch pacman log
+
+# CachyOS-specific optimizations
+if command -v cachyos-hello &>/dev/null; then
+  alias cachy='cachyos-hello'    # CachyOS welcome app
+fi
+
+# Enhanced AUR helpers (Paru preferred, yay fallback)
+if command -v paru &>/dev/null; then
+  alias aurinstall='paru -S'     # Install AUR package
+  alias aurupdate='paru -Sua'    # Update AUR packages only
+  alias aursync='paru -Syu'      # Full system update
+  alias aursearch='paru -Ss'     # Search AUR packages
+  alias aurinfo='paru -Si'       # AUR package info
+  alias aurclean='paru -Sc'      # Clean AUR cache
+elif command -v yay &>/dev/null; then
+  alias aurinstall='yay -S'
+  alias aurupdate='yay -Sua'
+  alias aursync='yay -Syu'
+  alias aursearch='yay -Ss'
+  alias aurinfo='yay -Si'
+  alias aurclean='yay -Sc'
+fi
+
+# Package maintenance shortcuts
+alias pacclean='sudo pacman -Scc && sudo pacman -Qtdq | sudo pacman -Rns -'  # Deep clean
+alias pacdeps='pactree'          # Show package dependencies
+alias pacfiles='pkgfile'         # Find which package provides file
+
+# **[SAFER]** Remove orphan packages
+orphan() {
+  local orphans
+  orphans=$(pacman -Qtdq)
+  if [[ -n "$orphans" ]]; then
+    echo "The following orphan packages will be removed:"
+    echo "$orphans"
+    # shellcheck disable=SC2086
+    sudo pacman -Rns $orphans
+  else
+    echo "No orphan packages to remove."
+  fi
+}
+alias listorphan='pacman -Qtdq'
+
+# Reflector (Mirrorlist)
+alias mirror='sudo reflector --country Canada,US --age 6 --sort rate --save /etc/pacman.d/mirrorlist'
+
+# ----------------------------------------------------------------------------
+# Networking
+# ----------------------------------------------------------------------------
+
+alias ports='ss -tulanp' # ss is the modern replacement for netstat
+alias lsport='sudo lsof -i'
+alias myip="dig +short myip.opendns.com @resolver1.opendns.com"
+alias localip="hostname -I | awk '{print \$1}'"
+command -v vnstat &>/dev/null && alias vnstat="vnstat -i eth1"
+
+# Nmap presets
+alias nmap-open="nmap --open"
+alias nmap-fast="nmap -F -T4 --version-light --top-ports 300"
+alias nmap-full="sudo nmap -sS -A -v -T4 -p-" # Simplified full scan
+
+# Simple HTTP server for sharing
+share() {
+  [[ ! -e "$1" ]] && { echo "Error: '$1' not found." >&2; return 1; }
+  local port="${2:-8000}"
+  local ip_addr
+  ip_addr=$(hostname -I | awk '{print $1}')
+  
+  # Use a subshell to prevent directory changes and simplify cleanup
+  (
+    if [[ -d "$1" ]]; then
+      cd "$1" || return
+      echo "Sharing directory at http://$ip_addr:$port/"
+    else
+      # For files, serve from its containing directory to avoid copying
+      local dir
+      local file
+      dir=$(dirname "$1")
+      file=$(basename "$1")
+      cd "$dir" || return
+      echo "Sharing file at http://$ip_addr:$port/$file"
+    fi
+    python3 -m http.server "$port"
+  )
+}
+
+# ----------------------------------------------------------------------------
+# Media & Downloads
+# ----------------------------------------------------------------------------
+
+# Use yt-dlp if available, as it's more actively maintained
+if command -v yt-dlp &>/dev/null; then
+  alias ytmp3="yt-dlp --extract-audio --audio-format mp3 -o '%(title)s.%(ext)s'"
+  alias ytmp4="yt-dlp -f 'bv[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/best' -o '%(title)s.%(ext)s'"
+else
+  alias ytmp3="youtube-dl --extract-audio --audio-format mp3"
+  alias ytmp4="youtube-dl -f 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4'"
+fi
+
+# Enhanced wget with better defaults
+alias wget='wget -c --progress=bar --show-progress'
+alias get='wget -mpkc -R "index.html*"' # Mirror, page-requisites, convert-links
+
+# Modern curl aliases
+alias curl-json='curl -H "Content-Type: application/json"'
+alias curl-post='curl -X POST'
+alias curl-put='curl -X PUT'
+alias curl-delete='curl -X DELETE'
+alias curl-time='curl -w "@$HOME/.curl-format.txt"'
+
+# ----------------------------------------------------------------------------
+# Git & Development
+# ----------------------------------------------------------------------------
+
+alias gs="git status -sb" # Short branch status
+alias ga="git add -A"
+alias gc="git commit -m"
+alias gca="git commit -am" # Stage and commit
+alias gp="git push"
+alias gpl="git pull"
+alias gf="git fetch"
+alias gco="git checkout"
+alias gb="git branch"
+alias glog="git log --graph --pretty='%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset'"
+alias gclean="git clean -fd"
+alias gclone="git clone"
+
+# Function to clone a repo and cd into it
+gcc() {
+  [[ -z "$1" ]] && { echo "Usage: gcc <repo_url> [dir_name]" >&2; return 1; }
+  local repo_url="$1"
+  # Smartly derive directory name if not provided
+  local dir_name="${2:-$(basename "$repo_url" .git)}"
+  git clone "$repo_url" "$dir_name" && cd "$dir_name"
+}
+
+# Quickly add, commit, and push all changes
+quickgit() {
+  [[ -z "$1" ]] && { echo "Usage: quickgit <commit message>" >&2; return 1; }
+  git rev-parse --is-inside-work-tree &>/dev/null || { echo "Error: Not a git repository." >&2; return 1; }
+
+  git add -A && git commit -m "$*" && git push
+}
+
+# A robust git pull using rebase and handling stashing
+gitupdate() {
+  git rev-parse --is-inside-work-tree &>/dev/null || { echo "Error: Not a git repository." >&2; return 1; }
+  
+  local stashed=false
+  # Only stash if there are uncommitted changes
+  if ! git diff --quiet || ! git diff --cached --quiet; then
+      echo "Stashing local changes..."
+      git stash push -u # -u includes untracked files
+      stashed=true
+  fi
+
+  echo "Fetching latest changes..."
+  git fetch --all --prune || { $stashed && git stash pop; return 1; }
+
+  local current_branch
+  current_branch=$(git rev-parse --abbrev-ref HEAD)
+  local upstream
+  upstream=$(git rev-parse --abbrev-ref "@{u}" 2>/dev/null)
+
+  if [[ -n "$upstream" ]]; then
+    echo "Rebasing onto '$upstream'..."
+    git rebase "$upstream" || { echo "Error: Rebase failed. Local changes remain stashed." >&2; $stashed && git stash pop; return 1; }
+  else
+    echo "No upstream branch configured for '$current_branch'. Skipping rebase."
+  fi
+  
+  $stashed && echo "Applying stashed changes..." && git stash pop
+  echo "✅ Update complete!"
+}
+
+# ----------------------------------------------------------------------------
+# Tmux Shortcuts
+# ----------------------------------------------------------------------------
+
+alias ts='tmux new -s'
+alias ta='tmux attach -t'
+alias tl='tmux list-sessions'
+alias tk='tmux kill-session -t'
+
+# ----------------------------------------------------------------------------
+# Shell, Apps, & Custom Commands
+# ----------------------------------------------------------------------------
+
+# Edit shell config files
+alias reload-zsh="source \${ZDOTDIR:-\$HOME}/.zshrc"
+alias edit-zsh="nvim \${ZDOTDIR:-\$HOME}/.zshrc"
+alias edit-aliases="nvim \${ZDOTDIR:-\$HOME}/.aliases"
+
+# Default Applications (Flatpak)
+if command -v flatpak &>/dev/null; then
+  alias vlc="flatpak run org.videolan.VLC"
+  alias spotify="flatpak run com.spotify.Client"
+  alias discord="flatpak run com.discordapp.Discord"
+  alias teams="flatpak run com.microsoft.Teams"
+  alias code="flatpak run com.visualstudio.code"
+  alias studio="flatpak run com.visualstudio.code"
+  alias obs="flatpak run com.obsproject.Studio"
+  alias gimp="flatpak run org.gimp.GIMP"
+  alias blender="flatpak run org.blender.Blender"
+fi
+
+# Development shortcuts
+alias py='python3'
+alias pip='python3 -m pip'
+alias venv='python3 -m venv'
+alias serve='python3 -m http.server'
+alias json='python3 -m json.tool'
+alias pyserver='python3 -m http.server 8080'
+
+# Docker shortcuts
+if command -v docker &>/dev/null; then
+  alias d='docker'
+  alias dc='docker-compose'
+  alias dps='docker ps'
+  alias dpsa='docker ps -a'
+  alias di='docker images'
+  alias dex='docker exec -it'
+  alias drm='docker rm'
+  alias drmi='docker rmi'
+  alias dlog='docker logs -f'
+  alias dprune='docker system prune -a'
+fi
+
+# Use bat as a pager and for cat if available
+if command -v bat &>/dev/null; then
+  export MANPAGER="sh -c 'col -bx | bat -l man -p'"
+  # alias cat='bat -p'  # DISABLED: AUR builds need real cat - use 'view' instead
+fi
+
+# Installer shortcuts
+alias christitus='curl -fsSL christitus.com/linux | sh'
+alias christitusdev='curl -fsSL https://christitus.com/linuxdev | sh'
+
+pkg-install() {
+  [[ -z "$1" ]] && { echo "Usage: pkg-install <package> [--verbose]" >&2; return 1; }
+  [[ -f ~/install.sh ]] && ~/install.sh "$@" || { echo "Error: install.sh not found." >&2; return 1; }
+}
+
+# AI/Ollama Tools
+alias ffabric='fabric --fast' # default to fast model
+alias run_llama3='ollama run llama3:8b'
+
+# Password generator
+genpass() {
+  local length="${1:-16}"
+  [[ ! "$length" =~ ^[0-9]+$ || "$length" -lt 8 ]] && { echo "Specify a valid length (min 8)" >&2; return 1; }
+  # Use a more robust character set and avoid special chars that cause issues in URLs/shells
+  LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c "$length" ; echo
+}
+
+# Modern alternatives and enhancements
+command -v btop &>/dev/null && alias top='btop'
+command -v htop &>/dev/null && alias top='htop'
+command -v ncdu &>/dev/null && alias du='ncdu'
+command -v duf &>/dev/null && alias df='duf'
+command -v procs &>/dev/null && alias ps='procs'
+command -v dog &>/dev/null && alias dig='dog'
+command -v gping &>/dev/null && alias ping='gping'
+command -v httpie &>/dev/null && alias http='httpie'
+
+# Misc Tools & Fun
+command -v lolcat &>/dev/null && {
+  alias neofetch="neofetch | lolcat"
+  alias loo="| lolcat"
+}
+alias lweather="ansiweather -l Palmerston,Ontario"
+alias week="date +%V"
+alias now="date +%T"
+alias today='date "+%Y-%m-%d"'
+alias yesterday='date -d yesterday "+%Y-%m-%d"'
+alias tomorrow='date -d tomorrow "+%Y-%m-%d"'
+alias timestamp='date +%s'
+alias tb="nc termbin.com 9999"
+alias ix="curl -F 'f:1=<-' ix.io"  # Another pastebin service
+alias bc="bc -l"
+alias calc='qalc'  # Better calculator if available
+alias sha1="openssl sha1"
+alias sha256="openssl sha256"
+alias md5="openssl md5"
+alias base64='base64 -w 0'  # No line wrapping
+alias urlencode='python3 -c "import sys, urllib.parse as ul; print(ul.quote_plus(sys.argv[1]))"'
+alias urldecode='python3 -c "import sys, urllib.parse as ul; print(ul.unquote_plus(sys.argv[1]))"'
+alias flushmcd='echo "flush_all" | nc 10.10.27.11 11211'
+alias jctl="journalctl -p 3 -xb"
+alias jctlf="journalctl -f"  # Follow journal
+alias gpg-check="gpg2 --keyserver-options auto-key-retrieve --verify"
+alias gpg-retrieve="gpg2 --keyserver-options auto-key-retrieve --receive-keys"
+
+# Clipboard integration
+if command -v xclip &>/dev/null; then
+  alias pbcopy='xclip -selection clipboard'
+  alias pbpaste='xclip -selection clipboard -o'
+elif command -v xsel &>/dev/null; then
+  alias pbcopy='xsel --clipboard --input'
+  alias pbpaste='xsel --clipboard --output'
+elif command -v wl-copy &>/dev/null; then  # Wayland
+  alias pbcopy='wl-copy'
+  alias pbpaste='wl-paste'
+fi
+
+# Quick text manipulation
+alias trim="sed 's/^[ \t]*//;s/[ \t]*$//'"
+alias squeeze="tr -s ' '"
+alias lower="tr '[:upper:]' '[:lower:]'"
+alias upper="tr '[:lower:]' '[:upper:]'"
+
+# Internet and network tools
+alias speedtest='curl -s https://raw.githubusercontent.com/sivel/speedtest-cli/master/speedtest.py | python3 -'
+alias myip-fast='curl -s ipinfo.io/ip'
+alias myip-json='curl -s ipinfo.io/json'
+alias weather='curl -s "wttr.in?format=3"'
+alias weather-full='curl -s wttr.in'
+
+# Systemd shortcuts
+alias sc='systemctl'
+alias scu='systemctl --user'
+alias jc='journalctl'
+alias jcu='journalctl --user'
+
+# Modern file management
+# command -v trash-put &>/dev/null && alias rm='trash-put'  # DISABLED: AUR builds need real rm - use 'del' instead
+# command -v rg &>/dev/null && alias grep='rg'  # DISABLED: AUR builds need real grep - use 'g' instead
+
+# ----------------------------------------------------------------------------
+# Productivity Functions & Advanced Utilities
+# ----------------------------------------------------------------------------
+
+# Create a backup of a file with timestamp
+backup() {
+  [[ -z "$1" ]] && { echo "Usage: backup <file>" >&2; return 1; }
+  [[ ! -f "$1" ]] && { echo "Error: File '$1' not found." >&2; return 1; }
+  cp "$1" "$1.backup.$(date +%Y%m%d_%H%M%S)"
+  echo "Backup created: $1.backup.$(date +%Y%m%d_%H%M%S)"
+}
+
+# Quick notes function
+note() {
+  local notes_dir="$HOME/notes"
+  local notes_file="$notes_dir/$(date +%Y-%m-%d).md"
+  mkdir -p "$notes_dir"
+  
+  if [[ $# -eq 0 ]]; then
+    # Open today's notes file
+    "${EDITOR:-nvim}" "$notes_file"
+  else
+    # Append note with timestamp
+    echo "## $(date '+%H:%M:%S') - $*" >> "$notes_file"
+    echo "Note added to $(basename "$notes_file")"
+  fi
+}
+
+# Quick todo function
+todo() {
+  local todo_file="$HOME/.todo.txt"
+  if [[ $# -eq 0 ]]; then
+    [[ -f "$todo_file" ]] && cat "$todo_file" || echo "No todos yet. Add one with: todo <task>"
+  else
+    echo "[ ] $* ($(date '+%Y-%m-%d'))" >> "$todo_file"
+    echo "Todo added: $*"
+  fi
+}
+
+# Mark todo as done
+todo-done() {
+  local todo_file="$HOME/.todo.txt"
+  [[ ! -f "$todo_file" ]] && { echo "No todo file found." >&2; return 1; }
+  
+  if [[ -z "$1" ]]; then
+    echo "Current todos:"
+    nl "$todo_file"
+    echo -n "Which todo to mark as done? (number): "
+    read -r num
+  else
+    num="$1"
+  fi
+  
+  if [[ "$num" =~ ^[0-9]+$ ]]; then
+    sed -i "${num}s/\[ \]/[x]/" "$todo_file"
+    echo "Todo $num marked as done!"
+  else
+    echo "Invalid todo number." >&2
+  fi
+}
+
+# Find and replace in files
+freplace() {
+  [[ $# -lt 2 ]] && { echo "Usage: freplace <find> <replace> [file_pattern]" >&2; return 1; }
+  local find_text="$1" replace_text="$2" pattern="${3:-*}"
+  
+  if command -v rg &>/dev/null && command -v sed &>/dev/null; then
+    rg -l "$find_text" --glob="$pattern" | xargs sed -i "s/$find_text/$replace_text/g"
+    echo "Replaced '$find_text' with '$replace_text' in files matching '$pattern'"
+  else
+    find . -name "$pattern" -type f -exec sed -i "s/$find_text/$replace_text/g" {} +
+    echo "Replaced '$find_text' with '$replace_text' in files matching '$pattern'"
+  fi
+}
+
+# Process management helpers
+killport() {
+  [[ -z "$1" ]] && { echo "Usage: killport <port>" >&2; return 1; }
+  local pid
+  pid=$(lsof -ti:"$1")
+  if [[ -n "$pid" ]]; then
+    kill -9 "$pid"
+    echo "Killed process on port $1 (PID: $pid)"
+  else
+    echo "No process found on port $1"
+  fi
+}
+
+# Find and kill processes by name
+killname() {
+  [[ -z "$1" ]] && { echo "Usage: killname <process_name>" >&2; return 1; }
+  pkill -f "$1" && echo "Killed processes matching '$1'" || echo "No processes found matching '$1'"
+}
+
+# System monitoring functions
+watchdir() {
+  [[ -z "$1" ]] && { echo "Usage: watchdir <directory> [command]" >&2; return 1; }
+  local dir="$1" cmd="${2:-echo 'Directory changed'}"
+  
+  if command -v inotifywait &>/dev/null; then
+    echo "Watching $dir for changes..."
+    while inotifywait -r -e modify,create,delete "$dir" &>/dev/null; do
+      eval "$cmd"
+    done
+  else
+    echo "inotifywait not found. Install inotify-tools package." >&2
+    return 1
+  fi
+}
+
+# Enhanced directory operations
+mktemp-cd() {
+  local tmp_dir
+  tmp_dir=$(mktemp -d)
+  echo "Created and entering temporary directory: $tmp_dir"
+  cd "$tmp_dir"
+}
+
+# File comparison helpers
+diffdir() {
+  [[ $# -ne 2 ]] && { echo "Usage: diffdir <dir1> <dir2>" >&2; return 1; }
+  diff -r "$1" "$2"
+}
+
+# Quick archive creation
+archive() {
+  [[ -z "$1" ]] && { echo "Usage: archive <file_or_directory> [archive_name]" >&2; return 1; }
+  local source="$1"
+  local archive_name="${2:-$(basename "$source")_$(date +%Y%m%d_%H%M%S)}"
+  
+  if [[ -d "$source" ]]; then
+    tar -czf "${archive_name}.tar.gz" "$source"
+    echo "Directory archived to: ${archive_name}.tar.gz"
+  elif [[ -f "$source" ]]; then
+    gzip -c "$source" > "${archive_name}.gz"
+    echo "File archived to: ${archive_name}.gz"
+  else
+    echo "Error: '$source' not found." >&2
+    return 1
+  fi
+}
+
+# Network utilities
+whosonport() {
+  [[ -z "$1" ]] && { echo "Usage: whosonport <port>" >&2; return 1; }
+  lsof -i :"$1"
+}
+
+# Test internet connection
+ping-test() {
+  local hosts=("8.8.8.8" "1.1.1.1" "google.com" "github.com")
+  for host in "${hosts[@]}"; do
+    if ping -c 1 -W 2 "$host" &>/dev/null; then
+      echo "✓ Connected to $host"
+    else
+      echo "✗ Failed to connect to $host"
+    fi
+  done
+}
+
+# Generate QR code for text
+qr() {
+  [[ -z "$1" ]] && { echo "Usage: qr <text>" >&2; return 1; }
+  if command -v qrencode &>/dev/null; then
+    qrencode -t ansiutf8 "$1"
+  else
+    curl -s "https://qr-server.com/api/qr-code/?size=150x150&data=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$1'))")" | display
+  fi
+}
+
+# Disk usage helpers
+biggest() {
+  local num="${1:-10}" dir="${2:-.}"
+  echo "Top $num largest files/directories in $dir:"
+  du -ah "$dir" | sort -hr | head -"$num"
+}
+
+# Git helpers
+git-size() {
+  git rev-list --objects --all | 
+    git cat-file --batch-check='%(objecttype) %(objectname) %(objectsize) %(rest)' | 
+    sed -n 's/^blob //p' | 
+    sort --numeric-sort --key=2 | 
+    tail -20 | 
+    cut -c 1-12,41- | 
+    $(command -v gnumfmt || echo numfmt) --field=2 --to=iec-i --suffix=B --padding=7 --round=nearest
+}
+
+# Enhanced system information
+sys-full() {
+  echo "🖥️  System Information (Detailed)"
+  echo "═══════════════════════════════════════════════"
+  echo "🔹 Hostname: $(hostname)"
+  echo "🔹 Kernel: $(uname -srm)"
+  echo "🔹 Uptime: $(uptime -p)"
+  echo "🔹 Load: $(uptime | awk -F'load average:' '{print $2}')"
+  
+  if command -v free &>/dev/null; then
+    echo "🔹 Memory: $(free -h | awk '/^Mem:/ {printf "%s used / %s total (%.1f%% free)", $3, $2, ($4/$2)*100}')"
+  fi
+  
+  if command -v df &>/dev/null; then
+    echo "🔹 Root disk: $(df -h / | awk 'NR==2 {printf "%s used / %s total (%s full)", $3, $2, $5}')"
+  fi
+  
+  if command -v sensors &>/dev/null; then
+    local temp
+    temp=$(sensors 2>/dev/null | grep -i 'core 0' | awk '{print $3}' | head -1)
+    [[ -n "$temp" ]] && echo "🔹 CPU Temp: $temp"
+  fi
+}
+
+# ----------------------------------------------------------------------------
+# Modern CLI Tool Shortcuts
+# ----------------------------------------------------------------------------
+
+# Zoxide shortcuts (if available)
+command -v zoxide &>/dev/null && {
+  alias z='cd'  # Since zoxide replaces cd
+  alias zi='cdi'  # Interactive mode
+}
+
+# FZF powered functions
+if command -v fzf &>/dev/null; then
+  # Edit a file with fzf
+  fzf-edit() {
+    local file
+    file=$(fzf --preview 'bat --style=numbers --color=always {}' --preview-window=right:60%)
+    [[ -n "$file" ]] && "${EDITOR:-nvim}" "$file"
+  }
+  alias fe='fzf-edit'
+  
+  # Change directory with fzf
+  fzf-cd() {
+    local dir
+    dir=$(find . -type d 2>/dev/null | fzf --preview 'ls -la {}' --preview-window=right:60%)
+    [[ -n "$dir" ]] && cd "$dir"
+  }
+  alias fcd='fzf-cd'
+  
+  # Kill process with fzf
+  fzf-kill() {
+    local pid
+    pid=$(ps -ef | sed 1d | fzf -m --header='[KILL PROCESS]' | awk '{print $2}')
+    [[ -n "$pid" ]] && echo "$pid" | xargs kill -"${1:-9}"
+  }
+  alias fkill='fzf-kill'
+fi
+
+# Modern alternatives shortcuts
+# alias cat='bat --paging=never' 2>/dev/null || alias cat='cat'  # DISABLED: AUR builds need real cat
+# alias find='fd' 2>/dev/null || alias find='find'  # DISABLED: AUR builds need real find
+
+# ----------------------------------------------------------------------------
+# Quick utilities and one-liners
+# ----------------------------------------------------------------------------
+
+# Convert seconds to human readable
+sec2time() {
+  local T="$1"
+  local D=$((T/60/60/24))
+  local H=$((T/60/60%24))
+  local M=$((T/60%60))
+  local S=$((T%60))
+  (( D > 0 )) && printf '%d days ' $D
+  (( H > 0 )) && printf '%d hours ' $H
+  (( M > 0 )) && printf '%d minutes ' $M
+  printf '%d seconds\n' $S
+}
+
+# Get public IP with location info
+myip-full() {
+  curl -s https://ipapi.co/json/ | jq -r '
+    "🌐 Public IP Information:\n" +
+    "   IP: " + .ip + "\n" +
+    "   Location: " + .city + ", " + .region + ", " + .country_name + "\n" +
+    "   ISP: " + .org + "\n" +
+    "   Timezone: " + .timezone
+  '
+}
+
+# Local network scan
+localscan() {
+  local network
+  network=$(ip route | grep -E '^default' | awk '{print $3}' | head -1)
+  if [[ -n "$network" ]]; then
+    nmap -sn "${network%.*}.0/24"
+  else
+    echo "Could not determine network range" >&2
+  fi
+}
+
+# Port scanner
+portscan() {
+  [[ -z "$1" ]] && { echo "Usage: portscan <host> [port_range]" >&2; return 1; }
+  local host="$1" ports="${2:-1-1000}"
+  nmap -Pn "$host" -p "$ports"
+}
+
+# Generate random string
+randstr() {
+  local length="${1:-32}"
+  LC_ALL=C tr -dc 'A-Za-z0-9!@#$%^&*()_+[]{}|;:,.<>?' </dev/urandom | head -c "$length" && echo
+}
+
+# ----------------------------------------------------------------------------
+# CachyOS & Performance Optimizations
+# ----------------------------------------------------------------------------
+
+# CPU performance and monitoring
+if command -v cpupower &>/dev/null; then
+  alias cpufreq='cpupower frequency-info'
+  alias cpugov='cpupower frequency-info -g'
+  alias cpuperf='sudo cpupower frequency-set -g performance'
+  alias cpusave='sudo cpupower frequency-set -g powersave'
+fi
+
+# System optimization helpers
+alias drop-caches='sudo sync && sudo sysctl vm.drop_caches=3'  # Clear system caches
+alias trim-ssd='sudo fstrim -av'  # Trim all mounted SSDs
+alias rebuild-initramfs='sudo mkinitcpio -P'  # Rebuild initramfs
+
+# CachyOS kernel management
+if [[ -f /etc/cachy-release ]]; then
+  alias kernel-list='ls /boot/vmlinuz-*'
+  alias cachy-version='cat /etc/cachy-release'
+  alias cachy-kernel='uname -r | grep -o cachy'
+fi
+
+# ----------------------------------------------------------------------------
+# Enhanced Development Environment
+# ----------------------------------------------------------------------------
+
+# Modern development tools
+if command -v code &>/dev/null; then
+  alias c='code .'
+  alias code-extensions='code --list-extensions'
+fi
+
+# Enhanced Git workflow
+alias git-tree='git log --graph --pretty=format:"%C(red)%h%C(reset) -%C(yellow)%d%C(reset) %s %C(green)(%cr) %C(blue)<%an>%C(reset)" --abbrev-commit --all'
+alias git-files='git diff --name-only'  # Show changed files
+alias git-stats='git shortlog -sn'       # Contributor stats
+alias git-today='git log --since="midnight" --author="$(git config user.name)"'
+alias git-week='git log --since="1 week ago" --oneline'
+
+# Project management shortcuts
+projectinit() {
+  [[ -z "$1" ]] && { echo "Usage: projectinit <project_name> [template]" >&2; return 1; }
+  local project_name="$1" template="${2:-basic}"
+  
+  mkdir -p "$project_name" && cd "$project_name"
+  git init
+  
+  case "$template" in
+    "python") 
+      echo "# $project_name\n\nA Python project.\n" > README.md
+      echo "*.pyc\n__pycache__/\n.env\nvenv/\n.venv/\n" > .gitignore
+      python3 -m venv venv
+      ;;
+    "node"|"js")
+      echo "# $project_name\n\nA Node.js project.\n" > README.md  
+      echo "node_modules/\n.env\n*.log\ndist/\nbuild/\n" > .gitignore
+      npm init -y
+      ;;
+    *)
+      echo "# $project_name\n\nA new project.\n" > README.md
+      echo ".DS_Store\n*.log\n.env\ntmp/\n" > .gitignore
+      ;;
+  esac
+  
+  git add .
+  git commit -m "Initial commit: Project setup with $template template"
+  echo "✅ Project '$project_name' initialized with $template template"
+}
+
+# ----------------------------------------------------------------------------
+# Modern File Operations & Analysis
+# ----------------------------------------------------------------------------
+
+# Enhanced file analysis
+fileinfo() {
+  [[ -z "$1" ]] && { echo "Usage: fileinfo <file>" >&2; return 1; }
+  local file="$1"
+  [[ ! -e "$file" ]] && { echo "Error: File '$file' not found." >&2; return 1; }
+  
+  echo "📄 File Information: $file"
+  echo "──────────────────────────────────────"
+  echo "📊 Type: $(file "$file" | cut -d: -f2-)"
+  echo "📏 Size: $(du -h "$file" | cut -f1)"
+  echo "📅 Modified: $(stat -c %y "$file" 2>/dev/null || stat -f %Sm "$file")"
+  echo "🔒 Permissions: $(stat -c %A "$file" 2>/dev/null || stat -f %Sp "$file")"
+  
+  if [[ -f "$file" ]]; then
+    echo "📝 Lines: $(wc -l < "$file" 2>/dev/null || echo "N/A")"
+    echo "🔤 Words: $(wc -w < "$file" 2>/dev/null || echo "N/A")"
+    [[ "$file" == *.md || "$file" == *.txt ]] && echo "📖 Characters: $(wc -c < "$file")"
+  fi
+}
+
+# Smart search across different file types
+search() {
+  [[ -z "$1" ]] && { echo "Usage: search <pattern> [path] [--type=ext]" >&2; return 1; }
+  local pattern="$1" path="${2:-.}" type_filter=""
+  
+  # Parse type filter if provided
+  for arg in "$@"; do
+    if [[ "$arg" == --type=* ]]; then
+      type_filter="--type=${arg#*=}"
+    fi
+  done
+  
+  echo "🔍 Searching for '$pattern' in $path"
+  
+  if command -v rg &>/dev/null; then
+    rg --color=always --line-number --heading --smart-case $type_filter "$pattern" "$path"
+  else
+    find "$path" -type f -exec grep -l "$pattern" {} + 2>/dev/null
+  fi
+}
+
+# ----------------------------------------------------------------------------
+# Productivity & Workflow Enhancements
+# ----------------------------------------------------------------------------
+
+# Enhanced system monitoring
+watch-system() {
+  local interval="${1:-2}"
+  watch -n "$interval" 'echo "=== CPU Usage ===" && grep "cpu MHz" /proc/cpuinfo | head -4; 
+  echo -e "\n=== Memory Usage ===" && free -h;
+  echo -e "\n=== Disk Usage ===" && df -h / /home 2>/dev/null | tail -2;
+  echo -e "\n=== Load Average ===" && uptime;
+  echo -e "\n=== Top Processes ===" && ps aux --sort=-%cpu | head -6'
+}
+
+# Smart directory jumping with history
+if command -v zoxide &>/dev/null; then
+  alias j='z'  # Jump to frequent directories
+  alias ji='zi' # Interactive jump
+fi
+
+# Session management
+save-session() {
+  local session_name="${1:-default}"
+  local session_file="$HOME/.shell_sessions/$session_name"
+  mkdir -p "$(dirname "$session_file")"
+  
+  {
+    echo "# Shell session saved: $(date)"
+    echo "cd '$PWD'"
+    history | tail -20 | sed 's/^[[:space:]]*[0-9]*[[:space:]]*//'
+  } > "$session_file"
+  
+  echo "📁 Session '$session_name' saved to $session_file"
+}
+
+load-session() {
+  local session_name="${1:-default}"
+  local session_file="$HOME/.shell_sessions/$session_name"
+  
+  [[ -f "$session_file" ]] && source "$session_file" && echo "📂 Session '$session_name' loaded" || echo "❌ Session '$session_name' not found"
+}
+
+list-sessions() {
+  local sessions_dir="$HOME/.shell_sessions"
+  [[ -d "$sessions_dir" ]] && ls -1 "$sessions_dir" || echo "No saved sessions found"
+}
+
+# ----------------------------------------------------------------------------
+# System Maintenance & Utilities
+# ----------------------------------------------------------------------------
+
+# Comprehensive system update for CachyOS
+full-update() {
+  echo "🚀 Starting comprehensive system update..."
+  
+  # Update package databases and system
+  if command -v paru &>/dev/null; then
+    echo "📦 Updating system with paru..."
+    paru -Syu
+  else
+    echo "📦 Updating system with pacman..."
+    sudo pacman -Syu
+  fi
+  
+  # Update Flatpaks if available
+  if command -v flatpak &>/dev/null; then
+    echo "📱 Updating Flatpak applications..."
+    flatpak update -y
+  fi
+  
+  # Clean up package cache
+  echo "🧹 Cleaning package cache..."
+  if command -v paru &>/dev/null; then
+    paru -Sc --noconfirm
+  else
+    sudo pacman -Sc --noconfirm  
+  fi
+  
+  # Remove orphaned packages
+  echo "🗑️  Removing orphaned packages..."
+  local orphans
+  orphans=$(pacman -Qtdq)
+  [[ -n "$orphans" ]] && sudo pacman -Rns --noconfirm $orphans || echo "No orphaned packages found"
+  
+  # Trim SSDs if available
+  if command -v fstrim &>/dev/null; then
+    echo "✂️  Trimming SSDs..."
+    sudo fstrim -av
+  fi
+  
+  echo "✅ System update complete!"
+}
+
+# Quick system health check
+syshealth() {
+  echo "🏥 System Health Check"
+  echo "════════════════════════════════════════"
+  
+  # Disk space check
+  echo "💾 Disk Usage:"
+  df -h / /home 2>/dev/null | awk 'NR>1 {print "  " $6 ": " $3 "/" $2 " (" $5 " used)"}'  
+  
+  # Memory usage
+  echo -e "\n🧠 Memory Usage:"
+  free -h | awk 'NR==2{printf "  RAM: %s/%s (%.0f%% used)\n", $3,$2,($3/$2)*100}'
+  
+  # Load average
+  echo -e "\n⚡ Load Average:"
+  uptime | awk -F'load average:' '{print "  " $2}'
+  
+  # Failed systemd services
+  echo -e "\n🔧 Failed Services:"
+  local failed_services
+  failed_services=$(systemctl --failed --no-legend --no-pager -q)
+  [[ -n "$failed_services" ]] && echo "$failed_services" || echo "  ✅ No failed services"
+  
+  # Temperature check
+  if command -v sensors &>/dev/null; then
+    echo -e "\n🌡️  Temperature:"
+    sensors | grep -E "(Core|Package|Tctl)" | head -3 | sed 's/^/  /'
+  fi
+  
+  echo -e "\n📊 System Status: $(systemctl is-system-running)"
+}
+
+# ----------------------------------------------------------------------------
+# Modern Development Shortcuts
+# ----------------------------------------------------------------------------
+
+# Language version managers
+if command -v node &>/dev/null; then
+  alias node-version='node --version && npm --version'
+fi
+
+if command -v python3 &>/dev/null; then
+  alias py-version='python3 --version && pip --version'
+  alias venv-create='python3 -m venv venv && source venv/bin/activate'
+  alias venv-activate='source venv/bin/activate || source .venv/bin/activate'
+fi
+
+# Docker shortcuts (enhanced)
+if command -v docker &>/dev/null; then
+  alias docker-clean='docker system prune -af && docker volume prune -f'
+  alias docker-stats='docker stats --no-stream'
+  alias docker-top='docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"'
+fi
+
+# Modern alternatives with fallbacks
+command -v delta &>/dev/null && alias diff='delta'
+command -v tldr &>/dev/null && alias help='tldr'
+command -v hyperfine &>/dev/null && alias benchmark='hyperfine'
+
+# ----------------------------------------------------------------------------
+# Neovim Configuration Management (Lazyman Compatible)
+# ----------------------------------------------------------------------------
+
+# Multiple Neovim configurations support
+if command -v nvim &>/dev/null; then
+  # Default nvim (your main config)
+  alias nvim-default='nvim'
+  alias nv='nvim'  # Quick shortcut
+  
+  # Base configurations - Well tested, full-featured distributions
+  alias abstract='NVIM_APPNAME=nvim-Abstract nvim'           # Abstract
+  alias astronvimplus='NVIM_APPNAME=nvim-AstroNvimPlus nvim' # AstroNvimPlus
+  alias basicide='NVIM_APPNAME=nvim-BasicIde nvim'           # Basic IDE
+  alias ecovim='NVIM_APPNAME=nvim-Ecovim nvim'               # Ecovim
+  alias lazyvim='NVIM_APPNAME=nvim-LazyVim nvim'             # LazyVim
+  alias lunarvim='NVIM_APPNAME=nvim-LunarVim nvim'           # LunarVim
+  alias lvim='NVIM_APPNAME=nvim-LunarVim nvim'               # LunarVim alias
+  alias magicvim='NVIM_APPNAME=nvim-MagicVim nvim'           # MagicVim
+  alias nvchad='NVIM_APPNAME=nvim-NvChad nvim'               # NvChad
+  alias spacevim='NVIM_APPNAME=nvim-SpaceVim nvim'           # SpaceVim
+  
+  # Language configurations - Tailored for specific languages
+  alias alanvim='NVIM_APPNAME=nvim-AlanVim nvim'             # AlanVim (Go)
+  alias allaman='NVIM_APPNAME=nvim-Allaman nvim'             # Allaman (multi-language)
+  alias catnvim='NVIM_APPNAME=nvim-CatNvim nvim'             # CatNvim
+  alias cppvim='NVIM_APPNAME=nvim-Cpp nvim'                  # C/C++ config
+  alias govim='NVIM_APPNAME=nvim-Go nvim'                    # Go config
+  alias go2one='NVIM_APPNAME=nvim-Go2one nvim'               # Go2one
+  alias insis='NVIM_APPNAME=nvim-Insis nvim'                 # Insis
+  alias knvim='NVIM_APPNAME=nvim-Knvim nvim'                 # Knvim (Kotlin)
+  alias latexvim='NVIM_APPNAME=nvim-LaTeX nvim'              # LaTeX config
+  alias lazyide='NVIM_APPNAME=nvim-LazyIde nvim'             # LazyIde
+  alias lunaride='NVIM_APPNAME=nvim-LunarIde nvim'           # LunarIde
+  alias lvimide='NVIM_APPNAME=nvim-LvimIde nvim'             # LvimIde
+  alias magidc='NVIM_APPNAME=nvim-Magidc nvim'               # Magidc (C/C++)
+  alias nvlang='NVIM_APPNAME=nvim-Nv nvim'                   # Nv (language-focused)
+  alias nv-ide='NVIM_APPNAME=nvim-NV-IDE nvim'               # NV-IDE
+  alias orange='NVIM_APPNAME=nvim-Orange nvim'               # Orange
+  alias pythonvim='NVIM_APPNAME=nvim-Python nvim'           # Python config
+  alias rustvim='NVIM_APPNAME=nvim-Rust nvim'                # Rust config
+  alias salevim='NVIM_APPNAME=nvim-SaleVim nvim'             # SaleVim
+  alias shuvro='NVIM_APPNAME=nvim-Shuvro nvim'               # Shuvro
+  alias webdev='NVIM_APPNAME=nvim-Webdev nvim'               # Webdev
+  
+  # Personal configurations - Personal configs with interesting features
+  alias adib='NVIM_APPNAME=nvim-Adib nvim'                   # Adib
+  alias ahsan='NVIM_APPNAME=nvim-Ahsan nvim'                 # Ahsan
+  alias artur='NVIM_APPNAME=nvim-Artur nvim'                 # Artur
+  alias beethoven='NVIM_APPNAME=nvim-Beethoven nvim'         # Beethoven
+  alias brain='NVIM_APPNAME=nvim-Brain nvim'                 # Brain
+  alias charles='NVIM_APPNAME=nvim-Charles nvim'             # Charles
+  alias chokerman='NVIM_APPNAME=nvim-Chokerman nvim'         # Chokerman
+  alias craftzdog='NVIM_APPNAME=nvim-Craftzdog nvim'         # Craftzdog
+  alias dillon='NVIM_APPNAME=nvim-Dillon nvim'               # Dillon
+  alias elianiva='NVIM_APPNAME=nvim-Elianiva nvim'           # Elianiva
+  alias elijah='NVIM_APPNAME=nvim-Elijah nvim'               # Elijah
+  alias enrique='NVIM_APPNAME=nvim-Enrique nvim'             # Enrique
+  alias heiker='NVIM_APPNAME=nvim-Heiker nvim'               # Heiker
+  alias j4de='NVIM_APPNAME=nvim-J4de nvim'                   # J4de
+  alias jdhao='NVIM_APPNAME=nvim-Jdhao nvim'                 # Jdhao
+  alias josean='NVIM_APPNAME=nvim-Josean nvim'               # Josean
+  alias justinnvim='NVIM_APPNAME=nvim-JustinNvim nvim'       # JustinNvim
+  alias kodo='NVIM_APPNAME=nvim-Kodo nvim'                   # Kodo
+  alias kristijan='NVIM_APPNAME=nvim-Kristijan nvim'         # Kristijan
+  alias lamarvim='NVIM_APPNAME=nvim-LamarVim nvim'           # LamarVim
+  alias maddison='NVIM_APPNAME=nvim-Maddison nvim'           # Maddison
+  alias metis='NVIM_APPNAME=nvim-Metis nvim'                 # Metis
+  alias mini='NVIM_APPNAME=nvim-Mini nvim'                   # Mini
+  alias onmyway='NVIM_APPNAME=nvim-OnMyWay nvim'             # OnMyWay
+  alias onno='NVIM_APPNAME=nvim-ONNO nvim'                   # ONNO
+  alias optixal='NVIM_APPNAME=nvim-Optixal nvim'             # Optixal
+  alias orhun='NVIM_APPNAME=nvim-Orhun nvim'                 # Orhun
+  alias primeagen='NVIM_APPNAME=nvim-Primeagen nvim'         # Primeagen
+  alias rafi='NVIM_APPNAME=nvim-Rafi nvim'                   # Rafi
+  alias rnvim='NVIM_APPNAME=nvim-RNvim nvim'                 # RNvim
+  alias roiz='NVIM_APPNAME=nvim-Roiz nvim'                   # Roiz
+  alias seniormars='NVIM_APPNAME=nvim-SeniorMars nvim'       # SeniorMars
+  alias simple='NVIM_APPNAME=nvim-Simple nvim'               # Simple
+  alias slydragonn='NVIM_APPNAME=nvim-Slydragonn nvim'       # Slydragonn
+  alias spider='NVIM_APPNAME=nvim-Spider nvim'               # Spider
+  alias traap='NVIM_APPNAME=nvim-Traap nvim'                 # Traap
+  alias vimacs='NVIM_APPNAME=nvim-Vimacs nvim'               # Vimacs
+  alias wuelner='NVIM_APPNAME=nvim-Wuelner nvim'             # Wuelner
+  alias xero='NVIM_APPNAME=nvim-xero nvim'                   # xero
+  alias xiao='NVIM_APPNAME=nvim-Xiao nvim'                   # Xiao
+  
+  # Starter configurations - Great starting points for custom configs
+  alias astronvimstart='NVIM_APPNAME=nvim-AstroNvimStart nvim'  # AstroNvimStart
+  alias barebones='NVIM_APPNAME=nvim-Barebones nvim'            # Barebones
+  alias basic='NVIM_APPNAME=nvim-Basic nvim'                    # Basic
+  alias codeart='NVIM_APPNAME=nvim-CodeArt nvim'                # CodeArt
+  alias cosmic='NVIM_APPNAME=nvim-Cosmic nvim'                  # CosmicNvim
+  alias ember='NVIM_APPNAME=nvim-Ember nvim'                    # Ember
+  alias fennel='NVIM_APPNAME=nvim-Fennel nvim'                  # Fennel
+  alias hardhacker='NVIM_APPNAME=nvim-HardHacker nvim'          # HardHacker
+  alias justinohmy='NVIM_APPNAME=nvim-JustinOhMy nvim'          # JustinOhMy
+  alias kickstart='NVIM_APPNAME=nvim-Kickstart nvim'            # Kickstart.nvim
+  alias kickstartpython='NVIM_APPNAME=nvim-KickstartPython nvim' # KickstartPython
+  alias kabin='NVIM_APPNAME=nvim-Kabin nvim'                     # Kabin
+  alias micah='NVIM_APPNAME=nvim-Micah nvim'                     # Micah
+  alias modern='NVIM_APPNAME=nvim-Modern nvim'                  # Modern
+  alias normal='NVIM_APPNAME=nvim-Normal nvim'                  # Normal
+  alias nvim2k='NVIM_APPNAME=nvim-2k nvim'                      # nvim2k
+  alias nvpak='NVIM_APPNAME=nvim-NvPak nvim'                    # NvPak
+  alias pde='NVIM_APPNAME=nvim-pde nvim'                        # PDE
+  alias rohit='NVIM_APPNAME=nvim-Rohit nvim'                    # Rohit
+  alias scratch='NVIM_APPNAME=nvim-Scratch nvim'                # Scratch
+  alias singlefile='NVIM_APPNAME=nvim-SingleFile nvim'          # SingleFile
+  
+  # VonHeikemen starter configurations - From the LSP Zero author
+  alias basiclsp='NVIM_APPNAME=nvim-BasicLsp nvim'              # BasicLsp
+  alias basicmason='NVIM_APPNAME=nvim-BasicMason nvim'          # BasicMason
+  alias extralight='NVIM_APPNAME=nvim-Extralight nvim'          # Extralight
+  alias lspcmp='NVIM_APPNAME=nvim-LspCmp nvim'                  # LspCmp
+  alias minimal='NVIM_APPNAME=nvim-Minimal nvim'                # Minimal
+  alias modular='NVIM_APPNAME=nvim-Modular nvim'                # Modular
+  alias opinion='NVIM_APPNAME=nvim-Opinion nvim'                # Opinionated
+  alias startbase='NVIM_APPNAME=nvim-StartBase nvim'            # StartBase
+  alias startlsp='NVIM_APPNAME=nvim-StartLsp nvim'              # StartLsp
+  alias startmason='NVIM_APPNAME=nvim-StartMason nvim'          # StartMason
+  
+  # Special Lazyman configuration
+  alias lazyman='NVIM_APPNAME=nvim-Lazyman nvim'                # Lazyman itself
+  
+  # Configuration management functions
+  nvim-switch() {
+    [[ -z "$1" ]] && {
+      echo "🔧 Available Neovim configurations (Lazyman compatible):"
+      echo ""
+      echo "🔵 Base Configurations (Well-tested, full-featured):"
+      echo "  abstract, astronvimplus, basicide, ecovim, lazyvim, lunarvim (lvim)"
+      echo "  magicvim, nvchad, spacevim"
+      echo ""
+      echo "🔴 Language Configurations (Language-specific):"
+      echo "  alanvim, allaman, catnvim, cppvim, govim, go2one, insis, knvim"
+      echo "  latexvim, lazyide, lunaride, lvimide, magidc, nvlang, nv-ide"
+      echo "  orange, pythonvim, rustvim, salevim, shuvro, webdev"
+      echo ""
+      echo "🟡 Personal Configurations (Interesting personal setups):"
+      echo "  adib, ahsan, artur, beethoven, brain, charles, chokerman, craftzdog"
+      echo "  dillon, elianiva, elijah, enrique, heiker, j4de, jdhao, josean"
+      echo "  justinnvim, kodo, kristijan, lamarvim, maddison, metis, mini"
+      echo "  onmyway, onno, optixal, orhun, primeagen, rafi, rnvim, roiz"
+      echo "  seniormars, simple, slydragonn, spider, traap, vimacs, wuelner, xero, xiao"
+      echo ""
+      echo "🟢 Starter Configurations (Great starting points):"
+      echo "  astronvimstart, barebones, basic, codeart, cosmic, ember, fennel"
+      echo "  hardhacker, justinohmy, kickstart, kickstartpython, kabin, micah"
+      echo "  modern, normal, nvim2k, nvpak, pde, rohit, scratch, singlefile"
+      echo ""
+      echo "🟣 VonHeikemen Starters (From LSP Zero author):"
+      echo "  basiclsp, basicmason, extralight, lspcmp, minimal, modular"
+      echo "  opinion, startbase, startlsp, startmason"
+      echo ""
+      echo "🎆 Special:"
+      echo "  lazyman        - The Lazyman configuration itself"
+      echo "  nvim-default   - Your default configuration"
+      echo ""
+      echo "📖 Usage: nvim-switch <config_name> [file]"
+      echo "💡 Example: nvim-switch lazyvim myfile.lua"
+      echo "📝 Note: These configs should be installed via lazyman first"
+      return 1
+    }
+    
+    local config="$1"
+    shift  # Remove first argument, keep the rest for nvim
+    
+    case "$config" in
+      # Default
+      "default")        nvim "$@" ;;
+      
+      # Base configurations
+      "abstract")       NVIM_APPNAME=nvim-Abstract nvim "$@" ;;
+      "astronvimplus")  NVIM_APPNAME=nvim-AstroNvimPlus nvim "$@" ;;
+      "basicide")       NVIM_APPNAME=nvim-BasicIde nvim "$@" ;;
+      "ecovim")         NVIM_APPNAME=nvim-Ecovim nvim "$@" ;;
+      "lazyvim")        NVIM_APPNAME=nvim-LazyVim nvim "$@" ;;
+      "lunarvim"|"lvim") NVIM_APPNAME=nvim-LunarVim nvim "$@" ;;
+      "magicvim")       NVIM_APPNAME=nvim-MagicVim nvim "$@" ;;
+      "nvchad")         NVIM_APPNAME=nvim-NvChad nvim "$@" ;;
+      "spacevim")       NVIM_APPNAME=nvim-SpaceVim nvim "$@" ;;
+      
+      # Language configurations
+      "alanvim")        NVIM_APPNAME=nvim-AlanVim nvim "$@" ;;
+      "allaman")        NVIM_APPNAME=nvim-Allaman nvim "$@" ;;
+      "catnvim")        NVIM_APPNAME=nvim-CatNvim nvim "$@" ;;
+      "cppvim")         NVIM_APPNAME=nvim-Cpp nvim "$@" ;;
+      "govim")          NVIM_APPNAME=nvim-Go nvim "$@" ;;
+      "go2one")         NVIM_APPNAME=nvim-Go2one nvim "$@" ;;
+      "insis")          NVIM_APPNAME=nvim-Insis nvim "$@" ;;
+      "knvim")          NVIM_APPNAME=nvim-Knvim nvim "$@" ;;
+      "latexvim")       NVIM_APPNAME=nvim-LaTeX nvim "$@" ;;
+      "lazyide")        NVIM_APPNAME=nvim-LazyIde nvim "$@" ;;
+      "lunaride")       NVIM_APPNAME=nvim-LunarIde nvim "$@" ;;
+      "lvimide")        NVIM_APPNAME=nvim-LvimIde nvim "$@" ;;
+      "magidc")         NVIM_APPNAME=nvim-Magidc nvim "$@" ;;
+      "nvlang")         NVIM_APPNAME=nvim-Nv nvim "$@" ;;
+      "nv-ide")         NVIM_APPNAME=nvim-NV-IDE nvim "$@" ;;
+      "orange")         NVIM_APPNAME=nvim-Orange nvim "$@" ;;
+      "pythonvim")      NVIM_APPNAME=nvim-Python nvim "$@" ;;
+      "rustvim")        NVIM_APPNAME=nvim-Rust nvim "$@" ;;
+      "salevim")        NVIM_APPNAME=nvim-SaleVim nvim "$@" ;;
+      "shuvro")         NVIM_APPNAME=nvim-Shuvro nvim "$@" ;;
+      "webdev")         NVIM_APPNAME=nvim-Webdev nvim "$@" ;;
+      
+      # Personal configurations
+      "adib")           NVIM_APPNAME=nvim-Adib nvim "$@" ;;
+      "ahsan")          NVIM_APPNAME=nvim-Ahsan nvim "$@" ;;
+      "artur")          NVIM_APPNAME=nvim-Artur nvim "$@" ;;
+      "beethoven")      NVIM_APPNAME=nvim-Beethoven nvim "$@" ;;
+      "brain")          NVIM_APPNAME=nvim-Brain nvim "$@" ;;
+      "charles")        NVIM_APPNAME=nvim-Charles nvim "$@" ;;
+      "chokerman")      NVIM_APPNAME=nvim-Chokerman nvim "$@" ;;
+      "craftzdog")      NVIM_APPNAME=nvim-Craftzdog nvim "$@" ;;
+      "dillon")         NVIM_APPNAME=nvim-Dillon nvim "$@" ;;
+      "elianiva")       NVIM_APPNAME=nvim-Elianiva nvim "$@" ;;
+      "elijah")         NVIM_APPNAME=nvim-Elijah nvim "$@" ;;
+      "enrique")        NVIM_APPNAME=nvim-Enrique nvim "$@" ;;
+      "heiker")         NVIM_APPNAME=nvim-Heiker nvim "$@" ;;
+      "j4de")           NVIM_APPNAME=nvim-J4de nvim "$@" ;;
+      "jdhao")          NVIM_APPNAME=nvim-Jdhao nvim "$@" ;;
+      "josean")         NVIM_APPNAME=nvim-Josean nvim "$@" ;;
+      "justinnvim")     NVIM_APPNAME=nvim-JustinNvim nvim "$@" ;;
+      "kodo")           NVIM_APPNAME=nvim-Kodo nvim "$@" ;;
+      "kristijan")      NVIM_APPNAME=nvim-Kristijan nvim "$@" ;;
+      "lamarvim")       NVIM_APPNAME=nvim-LamarVim nvim "$@" ;;
+      "maddison")       NVIM_APPNAME=nvim-Maddison nvim "$@" ;;
+      "metis")          NVIM_APPNAME=nvim-Metis nvim "$@" ;;
+      "mini")           NVIM_APPNAME=nvim-Mini nvim "$@" ;;
+      "onmyway")        NVIM_APPNAME=nvim-OnMyWay nvim "$@" ;;
+      "onno")           NVIM_APPNAME=nvim-ONNO nvim "$@" ;;
+      "optixal")        NVIM_APPNAME=nvim-Optixal nvim "$@" ;;
+      "orhun")          NVIM_APPNAME=nvim-Orhun nvim "$@" ;;
+      "primeagen")      NVIM_APPNAME=nvim-Primeagen nvim "$@" ;;
+      "rafi")           NVIM_APPNAME=nvim-Rafi nvim "$@" ;;
+      "rnvim")          NVIM_APPNAME=nvim-RNvim nvim "$@" ;;
+      "roiz")           NVIM_APPNAME=nvim-Roiz nvim "$@" ;;
+      "seniormars")     NVIM_APPNAME=nvim-SeniorMars nvim "$@" ;;
+      "simple")         NVIM_APPNAME=nvim-Simple nvim "$@" ;;
+      "slydragonn")     NVIM_APPNAME=nvim-Slydragonn nvim "$@" ;;
+      "spider")         NVIM_APPNAME=nvim-Spider nvim "$@" ;;
+      "traap")          NVIM_APPNAME=nvim-Traap nvim "$@" ;;
+      "vimacs")         NVIM_APPNAME=nvim-Vimacs nvim "$@" ;;
+      "wuelner")        NVIM_APPNAME=nvim-Wuelner nvim "$@" ;;
+      "xero")           NVIM_APPNAME=nvim-xero nvim "$@" ;;
+      "xiao")           NVIM_APPNAME=nvim-Xiao nvim "$@" ;;
+      
+      # Starter configurations
+      "astronvimstart") NVIM_APPNAME=nvim-AstroNvimStart nvim "$@" ;;
+      "barebones")      NVIM_APPNAME=nvim-Barebones nvim "$@" ;;
+      "basic")          NVIM_APPNAME=nvim-Basic nvim "$@" ;;
+      "codeart")        NVIM_APPNAME=nvim-CodeArt nvim "$@" ;;
+      "cosmic")         NVIM_APPNAME=nvim-Cosmic nvim "$@" ;;
+      "ember")          NVIM_APPNAME=nvim-Ember nvim "$@" ;;
+      "fennel")         NVIM_APPNAME=nvim-Fennel nvim "$@" ;;
+      "hardhacker")     NVIM_APPNAME=nvim-HardHacker nvim "$@" ;;
+      "justinohmy")     NVIM_APPNAME=nvim-JustinOhMy nvim "$@" ;;
+      "kickstart")      NVIM_APPNAME=nvim-Kickstart nvim "$@" ;;
+      "kickstartpython") NVIM_APPNAME=nvim-KickstartPython nvim "$@" ;;
+      "kabin")          NVIM_APPNAME=nvim-Kabin nvim "$@" ;;
+      "micah")          NVIM_APPNAME=nvim-Micah nvim "$@" ;;
+      "modern")         NVIM_APPNAME=nvim-Modern nvim "$@" ;;
+      "normal")         NVIM_APPNAME=nvim-Normal nvim "$@" ;;
+      "nvim2k")         NVIM_APPNAME=nvim-2k nvim "$@" ;;
+      "nvpak")          NVIM_APPNAME=nvim-NvPak nvim "$@" ;;
+      "pde")            NVIM_APPNAME=nvim-pde nvim "$@" ;;
+      "rohit")          NVIM_APPNAME=nvim-Rohit nvim "$@" ;;
+      "scratch")        NVIM_APPNAME=nvim-Scratch nvim "$@" ;;
+      "singlefile")     NVIM_APPNAME=nvim-SingleFile nvim "$@" ;;
+      
+      # VonHeikemen starters
+      "basiclsp")       NVIM_APPNAME=nvim-BasicLsp nvim "$@" ;;
+      "basicmason")     NVIM_APPNAME=nvim-BasicMason nvim "$@" ;;
+      "extralight")     NVIM_APPNAME=nvim-Extralight nvim "$@" ;;
+      "lspcmp")         NVIM_APPNAME=nvim-LspCmp nvim "$@" ;;
+      "minimal")        NVIM_APPNAME=nvim-Minimal nvim "$@" ;;
+      "modular")        NVIM_APPNAME=nvim-Modular nvim "$@" ;;
+      "opinion")        NVIM_APPNAME=nvim-Opinion nvim "$@" ;;
+      "startbase")      NVIM_APPNAME=nvim-StartBase nvim "$@" ;;
+      "startlsp")       NVIM_APPNAME=nvim-StartLsp nvim "$@" ;;
+      "startmason")     NVIM_APPNAME=nvim-StartMason nvim "$@" ;;
+      
+      # Special
+      "lazyman")        NVIM_APPNAME=nvim-Lazyman nvim "$@" ;;
+      
+      *)
+        echo "❌ Unknown configuration: $config"
+        echo "Run 'nvim-switch' without arguments to see available configs"
+        return 1
+        ;;
+    esac
+  }
+  
+  # List installed configurations
+  nvim-list() {
+    echo "📁 Installed Neovim configurations:"
+    local config_base="$HOME/.config"
+    local base_configs=("nvim" "nvim-Abstract" "nvim-AstroNvimPlus" "nvim-BasicIde" "nvim-Ecovim" 
+                       "nvim-LazyVim" "nvim-LunarVim" "nvim-MagicVim" "nvim-NvChad" "nvim-SpaceVim")
+    local lang_configs=("nvim-AlanVim" "nvim-Allaman" "nvim-CatNvim" "nvim-Cpp" "nvim-Go" "nvim-Go2one"
+                       "nvim-Insis" "nvim-Knvim" "nvim-LaTeX" "nvim-LazyIde" "nvim-LunarIde" "nvim-LvimIde"
+                       "nvim-Magidc" "nvim-Nv" "nvim-NV-IDE" "nvim-Orange" "nvim-Python" "nvim-Rust"
+                       "nvim-SaleVim" "nvim-Shuvro" "nvim-Webdev")
+    local personal_configs=("nvim-Adib" "nvim-Ahsan" "nvim-Artur" "nvim-Beethoven" "nvim-Brain" "nvim-Charles"
+                           "nvim-Chokerman" "nvim-Craftzdog" "nvim-Dillon" "nvim-Elianiva" "nvim-Elijah"
+                           "nvim-Enrique" "nvim-Heiker" "nvim-J4de" "nvim-Jdhao" "nvim-Josean" "nvim-JustinNvim"
+                           "nvim-Kodo" "nvim-Kristijan" "nvim-LamarVim" "nvim-Maddison" "nvim-Metis" "nvim-Mini"
+                           "nvim-OnMyWay" "nvim-ONNO" "nvim-Optixal" "nvim-Orhun" "nvim-Primeagen" "nvim-Rafi"
+                           "nvim-RNvim" "nvim-Roiz" "nvim-SeniorMars" "nvim-Simple" "nvim-Slydragonn" "nvim-Spider"
+                           "nvim-Traap" "nvim-Vimacs" "nvim-Wuelner" "nvim-xero" "nvim-Xiao")
+    local starter_configs=("nvim-AstroNvimStart" "nvim-Barebones" "nvim-Basic" "nvim-CodeArt" "nvim-Cosmic"
+                          "nvim-Ember" "nvim-Fennel" "nvim-HardHacker" "nvim-JustinOhMy" "nvim-Kickstart"
+                          "nvim-KickstartPython" "nvim-Kabin" "nvim-Micah" "nvim-Modern" "nvim-Normal"
+                          "nvim-2k" "nvim-NvPak" "nvim-pde" "nvim-Rohit" "nvim-Scratch" "nvim-SingleFile")
+    local vonheikemen_configs=("nvim-BasicLsp" "nvim-BasicMason" "nvim-Extralight" "nvim-LspCmp" "nvim-Minimal"
+                              "nvim-Modular" "nvim-Opinion" "nvim-StartBase" "nvim-StartLsp" "nvim-StartMason")
+    local special_configs=("nvim-Lazyman")
+    
+    echo ""
+    echo "🔵 Base Configurations:"
+    for config in "${base_configs[@]}"; do
+      local config_path="$config_base/$config"
+      if [[ -d "$config_path" ]]; then
+        local size=$(du -sh "$config_path" 2>/dev/null | cut -f1)
+        echo "  ✅ $config - $size"
+      else
+        echo "  ❌ $config (not installed)"
+      fi
+    done
+    
+    echo ""
+    echo "🔴 Language Configurations:"
+    for config in "${lang_configs[@]}"; do
+      local config_path="$config_base/$config"
+      if [[ -d "$config_path" ]]; then
+        local size=$(du -sh "$config_path" 2>/dev/null | cut -f1)
+        echo "  ✅ $config - $size"
+      else
+        echo "  ❌ $config (not installed)"
+      fi
+    done
+    
+    echo ""
+    echo "🟡 Personal Configurations:"
+    for config in "${personal_configs[@]}"; do
+      local config_path="$config_base/$config"
+      if [[ -d "$config_path" ]]; then
+        local size=$(du -sh "$config_path" 2>/dev/null | cut -f1)
+        echo "  ✅ $config - $size"
+      else
+        echo "  ❌ $config (not installed)"
+      fi
+    done
+    
+    echo ""
+    echo "🟢 Starter Configurations:"
+    for config in "${starter_configs[@]}"; do
+      local config_path="$config_base/$config"
+      if [[ -d "$config_path" ]]; then
+        local size=$(du -sh "$config_path" 2>/dev/null | cut -f1)
+        echo "  ✅ $config - $size"
+      else
+        echo "  ❌ $config (not installed)"
+      fi
+    done
+    
+    echo ""
+    echo "🟣 VonHeikemen Starters:"
+    for config in "${vonheikemen_configs[@]}"; do
+      local config_path="$config_base/$config"
+      if [[ -d "$config_path" ]]; then
+        local size=$(du -sh "$config_path" 2>/dev/null | cut -f1)
+        echo "  ✅ $config - $size"
+      else
+        echo "  ❌ $config (not installed)"
+      fi
+    done
+    
+    echo ""
+    echo "🎆 Special Configurations:"
+    for config in "${special_configs[@]}"; do
+      local config_path="$config_base/$config"
+      if [[ -d "$config_path" ]]; then
+        local size=$(du -sh "$config_path" 2>/dev/null | cut -f1)
+        echo "  ✅ $config - $size"
+      else
+        echo "  ❌ $config (not installed)"
+      fi
+    done
+  }
+  
+  # Quick configuration backup
+  nvim-backup() {
+    local config="${1:-nvim}"
+    # Handle both nvim-ConfigName and ConfigName formats
+    [[ "$config" != nvim-* ]] && [[ "$config" != "nvim" ]] && config="nvim-$config"
+    local config_path="$HOME/.config/$config"
+    local backup_path="$HOME/.config/$config.backup.$(date +%Y%m%d_%H%M%S)"
+    
+    [[ ! -d "$config_path" ]] && { echo "❌ Configuration $config not found"; return 1; }
+    
+    cp -r "$config_path" "$backup_path"
+    echo "💾 Configuration '$config' backed up to: $backup_path"
+  }
+  
+  # Interactive configuration selector using fzf (if available)
+  if command -v fzf &>/dev/null; then
+    nvim-fzf() {
+      local configs=("default" "lazyman")
+      # Add all configurations to the fzf list
+      configs+=("abstract" "astronvimplus" "basicide" "ecovim" "lazyvim" "lunarvim" "magicvim" "nvchad" "spacevim")
+      configs+=("alanvim" "allaman" "catnvim" "cppvim" "govim" "go2one" "insis" "knvim" "latexvim" "lazyide")
+      configs+=("lunaride" "lvimide" "magidc" "nvlang" "nv-ide" "orange" "pythonvim" "rustvim" "salevim" "shuvro" "webdev")
+      configs+=("adib" "ahsan" "artur" "beethoven" "brain" "charles" "chokerman" "craftzdog" "dillon" "elianiva")
+      configs+=("elijah" "enrique" "heiker" "j4de" "jdhao" "josean" "justinnvim" "kodo" "kristijan" "lamarvim")
+      configs+=("maddison" "metis" "mini" "onmyway" "onno" "optixal" "orhun" "primeagen" "rafi" "rnvim")
+      configs+=("roiz" "seniormars" "simple" "slydragonn" "spider" "traap" "vimacs" "wuelner" "xero" "xiao")
+      configs+=("astronvimstart" "barebones" "basic" "codeart" "cosmic" "ember" "fennel" "hardhacker" "justinohmy")
+      configs+=("kickstart" "kickstartpython" "kabin" "micah" "modern" "normal" "nvim2k" "nvpak" "pde" "rohit" "scratch" "singlefile")
+      configs+=("basiclsp" "basicmason" "extralight" "lspcmp" "minimal" "modular" "opinion" "startbase" "startlsp" "startmason")
+      
+      local selected
+      selected=$(printf "%s\n" "${configs[@]}" | fzf --prompt="🎆 Select Neovim config: " --height=40% --border --preview="echo 'Launch Neovim with {} configuration'")
+      [[ -n "$selected" ]] && nvim-switch "$selected" "$@"
+    }
+    alias nv-select='nvim-fzf'
+  fi
+  
+  # Lazyman integration helpers (if lazyman is installed)
+  if command -v lazyman &>/dev/null; then
+    # Install missing configurations
+    nvim-install() {
+      local category="$1"
+      echo "🚀 Installing Neovim configurations..."
+      case "$category" in
+        "base"|"B")      lazyman -B ;;
+        "language"|"L") lazyman -L all ;;
+        "personal"|"W") lazyman -W ;;
+        "starter"|"X")  lazyman -X ;;
+        "all"|"A")      lazyman -A ;;
+        *)
+          echo "Usage: nvim-install [base|language|personal|starter|all]"
+          echo "  base     - Install all base configurations"
+          echo "  language - Install all language configurations"
+          echo "  personal - Install all personal configurations"
+          echo "  starter  - Install all starter configurations"
+          echo "  all      - Install all supported configurations"
+          return 1
+          ;;
+      esac
+    }
+    
+    # Update configurations
+    nvim-update() {
+      local config="${1:-all}"
+      if [[ "$config" == "all" ]]; then
+        echo "🔄 Updating all configurations..."
+        lazyman -U -A
+      else
+        # Handle both nvim-ConfigName and ConfigName formats
+        [[ "$config" != nvim-* ]] && [[ "$config" != "nvim" ]] && config="nvim-$config"
+        echo "🔄 Updating $config..."
+        lazyman -U -N "$config"
+      fi
+    }
+    
+    # Remove configurations
+    nvim-remove() {
+      local config="$1"
+      [[ -z "$config" ]] && { echo "Usage: nvim-remove <config_name>"; return 1; }
+      # Handle both nvim-ConfigName and ConfigName formats
+      [[ "$config" != nvim-* ]] && [[ "$config" != "nvim" ]] && config="nvim-$config"
+      echo "🗑️ Removing $config..."
+      lazyman -N "$config" -r
+    }
+  else
+    echo "📝 Note: Install lazyman for enhanced Neovim configuration management:"
+    echo "    git clone https://github.com/doctorfree/nvim-lazyman \$HOME/.config/nvim-Lazyman"
+    echo "    \$HOME/.config/nvim-Lazyman/lazyman.sh"
+  fi
+fi
+
+# ----------------------------------------------------------------------------
+# Quick Utilities & Shortcuts
+# ----------------------------------------------------------------------------
+
+# URL tools
+open-url() {
+  [[ -z "$1" ]] && { echo "Usage: open-url <url>" >&2; return 1; }
+  local url="$1"
+  [[ ! "$url" =~ ^https?:// ]] && url="https://$url"
+  
+  if command -v xdg-open &>/dev/null; then
+    xdg-open "$url"
+  else
+    echo "URL: $url (no browser opener found)"
+  fi
+}
+
+# Alias suggestions based on command usage
+alias-suggest() {
+  echo "🔍 Most used commands (potential aliases):"
+  history | awk '{print $2}' | sort | uniq -c | sort -rn | head -10 | awk '{printf "  %s\t(used %d times)\n", $2, $1}'
+}
+
+# Quick file server for sharing
+serve-here() {
+  local port="${1:-8080}"
+  local ip
+  ip=$(hostname -I | awk '{print $1}')
+  echo "📡 Serving current directory at http://$ip:$port"
+  echo "🔗 Press Ctrl+C to stop"
+  python3 -m http.server "$port"
+}
+
+# Enhanced clipboard operations (cross-platform)
+clip() {
+  if command -v xclip &>/dev/null; then
+    xclip -selection clipboard
+  elif command -v xsel &>/dev/null; then
+    xsel --clipboard --input
+  elif command -v wl-copy &>/dev/null; then
+    wl-copy
+  else
+    echo "❌ No clipboard tool found"
+    return 1
+  fi
+  echo "📋 Content copied to clipboard"
+}
+
+# ----------------------------------------------------------------------------
+# AUR-Safe, Memorable Aliases (Do NOT shadow core Unix commands)
+# ----------------------------------------------------------------------------
+# These aliases avoid overriding core Unix commands required by AUR build scripts
+# while providing memorable shortcuts to modern alternatives.
+
+# Fast search without shadowing system 'grep'
+if command -v rg &>/dev/null; then
+  alias g='rg'          # Short, memorable alternative to 'grep'
+fi
+
+# Safe delete without shadowing system 'rm'
+if command -v trash-put &>/dev/null; then
+  alias del='trash-put' # Memorable alternative to 'rm'
+fi
+
+# Better file viewer without shadowing system 'cat'
+if command -v bat &>/dev/null; then
+  alias view='bat -p'   # Memorable alternative to 'cat'
+fi
+
+# Extended listing without completely replacing 'ls'
+if command -v eza &>/dev/null; then
+  alias lx='eza --icons --group-directories-first'  # Extended 'ls' alternative
+  alias lxl='eza -al --icons --git --group-directories-first --time-style=long-iso'
+  alias lxt='eza --tree --level=3 --icons --git-ignore'
+elif command -v lsd &>/dev/null; then
+  alias lx='lsd --icon=auto --group-dirs=first'     # Extended 'ls' alternative
+  alias lxl='lsd -la --icon=auto --date=relative --group-dirs=first'
+  alias lxt='lsd --tree --depth=3 --icon=auto'
+fi
+
+# EOF marker for enhanced aliases
+
+
+
+
+# ----------------------------------------------------------------------------
+# Neovim Configuration Management (Lazyman Compatible)
+# ----------------------------------------------------------------------------
+
+# Multiple Neovim configurations support
+if command -v nvim &>/dev/null; then
+  # Default nvim (your main config)
+  alias nvim-default='nvim'
+  alias nv='nvim'  # Quick shortcut
+  
+  # Base configurations - Well tested, full-featured distributions
+  alias abstract='NVIM_APPNAME=nvim-Abstract nvim'           # Abstract
+  alias astronvimplus='NVIM_APPNAME=nvim-AstroNvimPlus nvim' # AstroNvimPlus
+  alias basicide='NVIM_APPNAME=nvim-BasicIde nvim'           # Basic IDE
+  alias ecovim='NVIM_APPNAME=nvim-Ecovim nvim'               # Ecovim
+  alias lazyvim='NVIM_APPNAME=nvim-LazyVim nvim'             # LazyVim
+  alias lunarvim='NVIM_APPNAME=nvim-LunarVim nvim'           # LunarVim
+  alias lvim='NVIM_APPNAME=nvim-LunarVim nvim'               # LunarVim alias
+  alias magicvim='NVIM_APPNAME=nvim-MagicVim nvim'           # MagicVim
+  alias nvchad='NVIM_APPNAME=nvim-NvChad nvim'               # NvChad
+  alias spacevim='NVIM_APPNAME=nvim-SpaceVim nvim'           # SpaceVim
+  
+  # Language configurations - Tailored for specific languages
+  alias alanvim='NVIM_APPNAME=nvim-AlanVim nvim'             # AlanVim (Go)
+  alias allaman='NVIM_APPNAME=nvim-Allaman nvim'             # Allaman (multi-language)
+  alias catnvim='NVIM_APPNAME=nvim-CatNvim nvim'             # CatNvim
+  alias cppvim='NVIM_APPNAME=nvim-Cpp nvim'                  # C/C++ config
+  alias govim='NVIM_APPNAME=nvim-Go nvim'                    # Go config
+  alias go2one='NVIM_APPNAME=nvim-Go2one nvim'               # Go2one
+  alias insis='NVIM_APPNAME=nvim-Insis nvim'                 # Insis
+  alias knvim='NVIM_APPNAME=nvim-Knvim nvim'                 # Knvim (Kotlin)
+  alias latexvim='NVIM_APPNAME=nvim-LaTeX nvim'              # LaTeX config
+  alias lazyide='NVIM_APPNAME=nvim-LazyIde nvim'             # LazyIde
+  alias lunaride='NVIM_APPNAME=nvim-LunarIde nvim'           # LunarIde
+  alias lvimide='NVIM_APPNAME=nvim-LvimIde nvim'             # LvimIde
+  alias magidc='NVIM_APPNAME=nvim-Magidc nvim'               # Magidc (C/C++)
+  alias nvlang='NVIM_APPNAME=nvim-Nv nvim'                   # Nv (language-focused)
+  alias nv-ide='NVIM_APPNAME=nvim-NV-IDE nvim'               # NV-IDE
+  alias orange='NVIM_APPNAME=nvim-Orange nvim'               # Orange
+  alias pythonvim='NVIM_APPNAME=nvim-Python nvim'           # Python config
+  alias rustvim='NVIM_APPNAME=nvim-Rust nvim'                # Rust config
+  alias salevim='NVIM_APPNAME=nvim-SaleVim nvim'             # SaleVim
+  alias shuvro='NVIM_APPNAME=nvim-Shuvro nvim'               # Shuvro
+  alias webdev='NVIM_APPNAME=nvim-Webdev nvim'               # Webdev
+  
+  # Personal configurations - Personal configs with interesting features
+  alias adib='NVIM_APPNAME=nvim-Adib nvim'                   # Adib
+  alias ahsan='NVIM_APPNAME=nvim-Ahsan nvim'                 # Ahsan
+  alias artur='NVIM_APPNAME=nvim-Artur nvim'                 # Artur
+  alias beethoven='NVIM_APPNAME=nvim-Beethoven nvim'         # Beethoven
+  alias brain='NVIM_APPNAME=nvim-Brain nvim'                 # Brain
+  alias charles='NVIM_APPNAME=nvim-Charles nvim'             # Charles
+  alias chokerman='NVIM_APPNAME=nvim-Chokerman nvim'         # Chokerman
+  alias craftzdog='NVIM_APPNAME=nvim-Craftzdog nvim'         # Craftzdog
+  alias dillon='NVIM_APPNAME=nvim-Dillon nvim'               # Dillon
+  alias elianiva='NVIM_APPNAME=nvim-Elianiva nvim'           # Elianiva
+  alias elijah='NVIM_APPNAME=nvim-Elijah nvim'               # Elijah
+  alias enrique='NVIM_APPNAME=nvim-Enrique nvim'             # Enrique
+  alias heiker='NVIM_APPNAME=nvim-Heiker nvim'               # Heiker
+  alias j4de='NVIM_APPNAME=nvim-J4de nvim'                   # J4de
+  alias jdhao='NVIM_APPNAME=nvim-Jdhao nvim'                 # Jdhao
+  alias josean='NVIM_APPNAME=nvim-Josean nvim'               # Josean
+  alias justinnvim='NVIM_APPNAME=nvim-JustinNvim nvim'       # JustinNvim
+  alias kodo='NVIM_APPNAME=nvim-Kodo nvim'                   # Kodo
+  alias kristijan='NVIM_APPNAME=nvim-Kristijan nvim'         # Kristijan
+  alias lamarvim='NVIM_APPNAME=nvim-LamarVim nvim'           # LamarVim
+  alias maddison='NVIM_APPNAME=nvim-Maddison nvim'           # Maddison
+  alias metis='NVIM_APPNAME=nvim-Metis nvim'                 # Metis
+  alias mini='NVIM_APPNAME=nvim-Mini nvim'                   # Mini
+  alias onmyway='NVIM_APPNAME=nvim-OnMyWay nvim'             # OnMyWay
+  alias onno='NVIM_APPNAME=nvim-ONNO nvim'                   # ONNO
+  alias optixal='NVIM_APPNAME=nvim-Optixal nvim'             # Optixal
+  alias orhun='NVIM_APPNAME=nvim-Orhun nvim'                 # Orhun
+  alias primeagen='NVIM_APPNAME=nvim-Primeagen nvim'         # Primeagen
+  alias rafi='NVIM_APPNAME=nvim-Rafi nvim'                   # Rafi
+  alias rnvim='NVIM_APPNAME=nvim-RNvim nvim'                 # RNvim
+  alias roiz='NVIM_APPNAME=nvim-Roiz nvim'                   # Roiz
+  alias seniormars='NVIM_APPNAME=nvim-SeniorMars nvim'       # SeniorMars
+  alias simple='NVIM_APPNAME=nvim-Simple nvim'               # Simple
+  alias slydragonn='NVIM_APPNAME=nvim-Slydragonn nvim'       # Slydragonn
+  alias spider='NVIM_APPNAME=nvim-Spider nvim'               # Spider
+  alias traap='NVIM_APPNAME=nvim-Traap nvim'                 # Traap
+  alias vimacs='NVIM_APPNAME=nvim-Vimacs nvim'               # Vimacs
+  alias wuelner='NVIM_APPNAME=nvim-Wuelner nvim'             # Wuelner
+  alias xero='NVIM_APPNAME=nvim-xero nvim'                   # xero
+  alias xiao='NVIM_APPNAME=nvim-Xiao nvim'                   # Xiao
+  
+  # Starter configurations - Great starting points for custom configs
+  alias astronvimstart='NVIM_APPNAME=nvim-AstroNvimStart nvim'  # AstroNvimStart
+  alias barebones='NVIM_APPNAME=nvim-Barebones nvim'            # Barebones
+  alias basic='NVIM_APPNAME=nvim-Basic nvim'                    # Basic
+  alias codeart='NVIM_APPNAME=nvim-CodeArt nvim'                # CodeArt
+  alias cosmic='NVIM_APPNAME=nvim-Cosmic nvim'                  # CosmicNvim
+  alias ember='NVIM_APPNAME=nvim-Ember nvim'                    # Ember
+  alias fennel='NVIM_APPNAME=nvim-Fennel nvim'                  # Fennel
+  alias hardhacker='NVIM_APPNAME=nvim-HardHacker nvim'          # HardHacker
+  alias justinohmy='NVIM_APPNAME=nvim-JustinOhMy nvim'          # JustinOhMy
+  alias kickstart='NVIM_APPNAME=nvim-Kickstart nvim'            # Kickstart.nvim
+  alias kickstartpython='NVIM_APPNAME=nvim-KickstartPython nvim' # KickstartPython
+  alias kabin='NVIM_APPNAME=nvim-Kabin nvim'                     # Kabin
+  alias micah='NVIM_APPNAME=nvim-Micah nvim'                     # Micah
+  alias modern='NVIM_APPNAME=nvim-Modern nvim'                  # Modern
+  alias normal='NVIM_APPNAME=nvim-Normal nvim'                  # Normal
+  alias nvim2k='NVIM_APPNAME=nvim-2k nvim'                      # nvim2k
+  alias nvpak='NVIM_APPNAME=nvim-NvPak nvim'                    # NvPak
+  alias pde='NVIM_APPNAME=nvim-pde nvim'                        # PDE
+  alias rohit='NVIM_APPNAME=nvim-Rohit nvim'                    # Rohit
+  alias scratch='NVIM_APPNAME=nvim-Scratch nvim'                # Scratch
+  alias singlefile='NVIM_APPNAME=nvim-SingleFile nvim'          # SingleFile
+  
+  # VonHeikemen starter configurations - From the LSP Zero author
+  alias basiclsp='NVIM_APPNAME=nvim-BasicLsp nvim'              # BasicLsp
+  alias basicmason='NVIM_APPNAME=nvim-BasicMason nvim'          # BasicMason
+  alias extralight='NVIM_APPNAME=nvim-Extralight nvim'          # Extralight
+  alias lspcmp='NVIM_APPNAME=nvim-LspCmp nvim'                  # LspCmp
+  alias minimal='NVIM_APPNAME=nvim-Minimal nvim'                # Minimal
+  alias modular='NVIM_APPNAME=nvim-Modular nvim'                # Modular
+  alias opinion='NVIM_APPNAME=nvim-Opinion nvim'                # Opinionated
+  alias startbase='NVIM_APPNAME=nvim-StartBase nvim'            # StartBase
+  alias startlsp='NVIM_APPNAME=nvim-StartLsp nvim'              # StartLsp
+  alias startmason='NVIM_APPNAME=nvim-StartMason nvim'          # StartMason
+  
+  # Special Lazyman configuration
+  alias lazyman='NVIM_APPNAME=nvim-Lazyman nvim'                # Lazyman itself
+  
+  # Configuration management functions
+  nvim-switch() {
+    [[ -z "$1" ]] && {
+      echo "🔧 Available Neovim configurations (Lazyman compatible):"
+      echo ""
+      echo "🔵 Base Configurations (Well-tested, full-featured):"
+      echo "  abstract, astronvimplus, basicide, ecovim, lazyvim, lunarvim (lvim)"
+      echo "  magicvim, nvchad, spacevim"
+      echo ""
+      echo "🔴 Language Configurations (Language-specific):"
+      echo "  alanvim, allaman, catnvim, cppvim, govim, go2one, insis, knvim"
+      echo "  latexvim, lazyide, lunaride, lvimide, magidc, nvlang, nv-ide"
+      echo "  orange, pythonvim, rustvim, salevim, shuvro, webdev"
+      echo ""
+      echo "🟡 Personal Configurations (Interesting personal setups):"
+      echo "  adib, ahsan, artur, beethoven, brain, charles, chokerman, craftzdog"
+      echo "  dillon, elianiva, elijah, enrique, heiker, j4de, jdhao, josean"
+      echo "  justinnvim, kodo, kristijan, lamarvim, maddison, metis, mini"
+      echo "  onmyway, onno, optixal, orhun, primeagen, rafi, rnvim, roiz"
+      echo "  seniormars, simple, slydragonn, spider, traap, vimacs, wuelner, xero, xiao"
+      echo ""
+      echo "🟢 Starter Configurations (Great starting points):"
+      echo "  astronvimstart, barebones, basic, codeart, cosmic, ember, fennel"
+      echo "  hardhacker, justinohmy, kickstart, kickstartpython, kabin, micah"
+      echo "  modern, normal, nvim2k, nvpak, pde, rohit, scratch, singlefile"
+      echo ""
+      echo "🟣 VonHeikemen Starters (From LSP Zero author):"
+      echo "  basiclsp, basicmason, extralight, lspcmp, minimal, modular"
+      echo "  opinion, startbase, startlsp, startmason"
+      echo ""
+      echo "🎆 Special:"
+      echo "  lazyman        - The Lazyman configuration itself"
+      echo "  nvim-default   - Your default configuration"
+      echo ""
+      echo "📖 Usage: nvim-switch <config_name> [file]"
+      echo "💡 Example: nvim-switch lazyvim myfile.lua"
+      echo "📝 Note: These configs should be installed via lazyman first"
+      return 1
+    }
+    
+    local config="$1"
+    shift  # Remove first argument, keep the rest for nvim
+    
+    case "$config" in
+      # Default
+      "default")        nvim "$@" ;;
+      
+      # Base configurations
+      "abstract")       NVIM_APPNAME=nvim-Abstract nvim "$@" ;;
+      "astronvimplus")  NVIM_APPNAME=nvim-AstroNvimPlus nvim "$@" ;;
+      "basicide")       NVIM_APPNAME=nvim-BasicIde nvim "$@" ;;
+      "ecovim")         NVIM_APPNAME=nvim-Ecovim nvim "$@" ;;
+      "lazyvim")        NVIM_APPNAME=nvim-LazyVim nvim "$@" ;;
+      "lunarvim"|"lvim") NVIM_APPNAME=nvim-LunarVim nvim "$@" ;;
+      "magicvim")       NVIM_APPNAME=nvim-MagicVim nvim "$@" ;;
+      "nvchad")         NVIM_APPNAME=nvim-NvChad nvim "$@" ;;
+      "spacevim")       NVIM_APPNAME=nvim-SpaceVim nvim "$@" ;;
+      
+      # Language configurations
+      "alanvim")        NVIM_APPNAME=nvim-AlanVim nvim "$@" ;;
+      "allaman")        NVIM_APPNAME=nvim-Allaman nvim "$@" ;;
+      "catnvim")        NVIM_APPNAME=nvim-CatNvim nvim "$@" ;;
+      "cppvim")         NVIM_APPNAME=nvim-Cpp nvim "$@" ;;
+      "govim")          NVIM_APPNAME=nvim-Go nvim "$@" ;;
+      "go2one")         NVIM_APPNAME=nvim-Go2one nvim "$@" ;;
+      "insis")          NVIM_APPNAME=nvim-Insis nvim "$@" ;;
+      "knvim")          NVIM_APPNAME=nvim-Knvim nvim "$@" ;;
+      "latexvim")       NVIM_APPNAME=nvim-LaTeX nvim "$@" ;;
+      "lazyide")        NVIM_APPNAME=nvim-LazyIde nvim "$@" ;;
+      "lunaride")       NVIM_APPNAME=nvim-LunarIde nvim "$@" ;;
+      "lvimide")        NVIM_APPNAME=nvim-LvimIde nvim "$@" ;;
+      "magidc")         NVIM_APPNAME=nvim-Magidc nvim "$@" ;;
+      "nvlang")         NVIM_APPNAME=nvim-Nv nvim "$@" ;;
+      "nv-ide")         NVIM_APPNAME=nvim-NV-IDE nvim "$@" ;;
+      "orange")         NVIM_APPNAME=nvim-Orange nvim "$@" ;;
+      "pythonvim")      NVIM_APPNAME=nvim-Python nvim "$@" ;;
+      "rustvim")        NVIM_APPNAME=nvim-Rust nvim "$@" ;;
+      "salevim")        NVIM_APPNAME=nvim-SaleVim nvim "$@" ;;
+      "shuvro")         NVIM_APPNAME=nvim-Shuvro nvim "$@" ;;
+      "webdev")         NVIM_APPNAME=nvim-Webdev nvim "$@" ;;
+      
+      # Personal configurations
+      "adib")           NVIM_APPNAME=nvim-Adib nvim "$@" ;;
+      "ahsan")          NVIM_APPNAME=nvim-Ahsan nvim "$@" ;;
+      "artur")          NVIM_APPNAME=nvim-Artur nvim "$@" ;;
+      "beethoven")      NVIM_APPNAME=nvim-Beethoven nvim "$@" ;;
+      "brain")          NVIM_APPNAME=nvim-Brain nvim "$@" ;;
+      "charles")        NVIM_APPNAME=nvim-Charles nvim "$@" ;;
+      "chokerman")      NVIM_APPNAME=nvim-Chokerman nvim "$@" ;;
+      "craftzdog")      NVIM_APPNAME=nvim-Craftzdog nvim "$@" ;;
+      "dillon")         NVIM_APPNAME=nvim-Dillon nvim "$@" ;;
+      "elianiva")       NVIM_APPNAME=nvim-Elianiva nvim "$@" ;;
+      "elijah")         NVIM_APPNAME=nvim-Elijah nvim "$@" ;;
+      "enrique")        NVIM_APPNAME=nvim-Enrique nvim "$@" ;;
+      "heiker")         NVIM_APPNAME=nvim-Heiker nvim "$@" ;;
+      "j4de")           NVIM_APPNAME=nvim-J4de nvim "$@" ;;
+      "jdhao")          NVIM_APPNAME=nvim-Jdhao nvim "$@" ;;
+      "josean")         NVIM_APPNAME=nvim-Josean nvim "$@" ;;
+      "justinnvim")     NVIM_APPNAME=nvim-JustinNvim nvim "$@" ;;
+      "kodo")           NVIM_APPNAME=nvim-Kodo nvim "$@" ;;
+      "kristijan")      NVIM_APPNAME=nvim-Kristijan nvim "$@" ;;
+      "lamarvim")       NVIM_APPNAME=nvim-LamarVim nvim "$@" ;;
+      "maddison")       NVIM_APPNAME=nvim-Maddison nvim "$@" ;;
+      "metis")          NVIM_APPNAME=nvim-Metis nvim "$@" ;;
+      "mini")           NVIM_APPNAME=nvim-Mini nvim "$@" ;;
+      "onmyway")        NVIM_APPNAME=nvim-OnMyWay nvim "$@" ;;
+      "onno")           NVIM_APPNAME=nvim-ONNO nvim "$@" ;;
+      "optixal")        NVIM_APPNAME=nvim-Optixal nvim "$@" ;;
+      "orhun")          NVIM_APPNAME=nvim-Orhun nvim "$@" ;;
+      "primeagen")      NVIM_APPNAME=nvim-Primeagen nvim "$@" ;;
+      "rafi")           NVIM_APPNAME=nvim-Rafi nvim "$@" ;;
+      "rnvim")          NVIM_APPNAME=nvim-RNvim nvim "$@" ;;
+      "roiz")           NVIM_APPNAME=nvim-Roiz nvim "$@" ;;
+      "seniormars")     NVIM_APPNAME=nvim-SeniorMars nvim "$@" ;;
+      "simple")         NVIM_APPNAME=nvim-Simple nvim "$@" ;;
+      "slydragonn")     NVIM_APPNAME=nvim-Slydragonn nvim "$@" ;;
+      "spider")         NVIM_APPNAME=nvim-Spider nvim "$@" ;;
+      "traap")          NVIM_APPNAME=nvim-Traap nvim "$@" ;;
+      "vimacs")         NVIM_APPNAME=nvim-Vimacs nvim "$@" ;;
+      "wuelner")        NVIM_APPNAME=nvim-Wuelner nvim "$@" ;;
+      "xero")           NVIM_APPNAME=nvim-xero nvim "$@" ;;
+      "xiao")           NVIM_APPNAME=nvim-Xiao nvim "$@" ;;
+      
+      # Starter configurations
+      "astronvimstart") NVIM_APPNAME=nvim-AstroNvimStart nvim "$@" ;;
+      "barebones")      NVIM_APPNAME=nvim-Barebones nvim "$@" ;;
+      "basic")          NVIM_APPNAME=nvim-Basic nvim "$@" ;;
+      "codeart")        NVIM_APPNAME=nvim-CodeArt nvim "$@" ;;
+      "cosmic")         NVIM_APPNAME=nvim-Cosmic nvim "$@" ;;
+      "ember")          NVIM_APPNAME=nvim-Ember nvim "$@" ;;
+      "fennel")         NVIM_APPNAME=nvim-Fennel nvim "$@" ;;
+      "hardhacker")     NVIM_APPNAME=nvim-HardHacker nvim "$@" ;;
+      "justinohmy")     NVIM_APPNAME=nvim-JustinOhMy nvim "$@" ;;
+      "kickstart")      NVIM_APPNAME=nvim-Kickstart nvim "$@" ;;
+      "kickstartpython") NVIM_APPNAME=nvim-KickstartPython nvim "$@" ;;
+      "kabin")          NVIM_APPNAME=nvim-Kabin nvim "$@" ;;
+      "micah")          NVIM_APPNAME=nvim-Micah nvim "$@" ;;
+      "modern")         NVIM_APPNAME=nvim-Modern nvim "$@" ;;
+      "normal")         NVIM_APPNAME=nvim-Normal nvim "$@" ;;
+      "nvim2k")         NVIM_APPNAME=nvim-2k nvim "$@" ;;
+      "nvpak")          NVIM_APPNAME=nvim-NvPak nvim "$@" ;;
+      "pde")            NVIM_APPNAME=nvim-pde nvim "$@" ;;
+      "rohit")          NVIM_APPNAME=nvim-Rohit nvim "$@" ;;
+      "scratch")        NVIM_APPNAME=nvim-Scratch nvim "$@" ;;
+      "singlefile")     NVIM_APPNAME=nvim-SingleFile nvim "$@" ;;
+      
+      # VonHeikemen starters
+      "basiclsp")       NVIM_APPNAME=nvim-BasicLsp nvim "$@" ;;
+      "basicmason")     NVIM_APPNAME=nvim-BasicMason nvim "$@" ;;
+      "extralight")     NVIM_APPNAME=nvim-Extralight nvim "$@" ;;
+      "lspcmp")         NVIM_APPNAME=nvim-LspCmp nvim "$@" ;;
+      "minimal")        NVIM_APPNAME=nvim-Minimal nvim "$@" ;;
+      "modular")        NVIM_APPNAME=nvim-Modular nvim "$@" ;;
+      "opinion")        NVIM_APPNAME=nvim-Opinion nvim "$@" ;;
+      "startbase")      NVIM_APPNAME=nvim-StartBase nvim "$@" ;;
+      "startlsp")       NVIM_APPNAME=nvim-StartLsp nvim "$@" ;;
+      "startmason")     NVIM_APPNAME=nvim-StartMason nvim "$@" ;;
+      
+      # Special
+      "lazyman")        NVIM_APPNAME=nvim-Lazyman nvim "$@" ;;
+      
+      *)
+        echo "❌ Unknown configuration: $config"
+        echo "Run 'nvim-switch' without arguments to see available configs"
+        return 1
+        ;;
+    esac
+  }
+  
+  # List installed configurations
+  nvim-list() {
+    echo "📁 Installed Neovim configurations:"
+    local config_base="$HOME/.config"
+    local base_configs=("nvim" "nvim-Abstract" "nvim-AstroNvimPlus" "nvim-BasicIde" "nvim-Ecovim" 
+                       "nvim-LazyVim" "nvim-LunarVim" "nvim-MagicVim" "nvim-NvChad" "nvim-SpaceVim")
+    local lang_configs=("nvim-AlanVim" "nvim-Allaman" "nvim-CatNvim" "nvim-Cpp" "nvim-Go" "nvim-Go2one"
+                       "nvim-Insis" "nvim-Knvim" "nvim-LaTeX" "nvim-LazyIde" "nvim-LunarIde" "nvim-LvimIde"
+                       "nvim-Magidc" "nvim-Nv" "nvim-NV-IDE" "nvim-Orange" "nvim-Python" "nvim-Rust"
+                       "nvim-SaleVim" "nvim-Shuvro" "nvim-Webdev")
+    local personal_configs=("nvim-Adib" "nvim-Ahsan" "nvim-Artur" "nvim-Beethoven" "nvim-Brain" "nvim-Charles"
+                           "nvim-Chokerman" "nvim-Craftzdog" "nvim-Dillon" "nvim-Elianiva" "nvim-Elijah"
+                           "nvim-Enrique" "nvim-Heiker" "nvim-J4de" "nvim-Jdhao" "nvim-Josean" "nvim-JustinNvim"
+                           "nvim-Kodo" "nvim-Kristijan" "nvim-LamarVim" "nvim-Maddison" "nvim-Metis" "nvim-Mini"
+                           "nvim-OnMyWay" "nvim-ONNO" "nvim-Optixal" "nvim-Orhun" "nvim-Primeagen" "nvim-Rafi"
+                           "nvim-RNvim" "nvim-Roiz" "nvim-SeniorMars" "nvim-Simple" "nvim-Slydragonn" "nvim-Spider"
+                           "nvim-Traap" "nvim-Vimacs" "nvim-Wuelner" "nvim-xero" "nvim-Xiao")
+    local starter_configs=("nvim-AstroNvimStart" "nvim-Barebones" "nvim-Basic" "nvim-CodeArt" "nvim-Cosmic"
+                          "nvim-Ember" "nvim-Fennel" "nvim-HardHacker" "nvim-JustinOhMy" "nvim-Kickstart"
+                          "nvim-KickstartPython" "nvim-Kabin" "nvim-Micah" "nvim-Modern" "nvim-Normal"
+                          "nvim-2k" "nvim-NvPak" "nvim-pde" "nvim-Rohit" "nvim-Scratch" "nvim-SingleFile")
+    local vonheikemen_configs=("nvim-BasicLsp" "nvim-BasicMason" "nvim-Extralight" "nvim-LspCmp" "nvim-Minimal"
+                              "nvim-Modular" "nvim-Opinion" "nvim-StartBase" "nvim-StartLsp" "nvim-StartMason")
+    local special_configs=("nvim-Lazyman")
+    
+    echo ""
+    echo "🔵 Base Configurations:"
+    for config in "${base_configs[@]}"; do
+      local config_path="$config_base/$config"
+      if [[ -d "$config_path" ]]; then
+        local size=$(du -sh "$config_path" 2>/dev/null | cut -f1)
+        echo "  ✅ $config - $size"
+      else
+        echo "  ❌ $config (not installed)"
+      fi
+    done
+    
+    echo ""
+    echo "🔴 Language Configurations:"
+    for config in "${lang_configs[@]}"; do
+      local config_path="$config_base/$config"
+      if [[ -d "$config_path" ]]; then
+        local size=$(du -sh "$config_path" 2>/dev/null | cut -f1)
+        echo "  ✅ $config - $size"
+      else
+        echo "  ❌ $config (not installed)"
+      fi
+    done
+    
+    echo ""
+    echo "🟡 Personal Configurations:"
+    for config in "${personal_configs[@]}"; do
+      local config_path="$config_base/$config"
+      if [[ -d "$config_path" ]]; then
+        local size=$(du -sh "$config_path" 2>/dev/null | cut -f1)
+        echo "  ✅ $config - $size"
+      else
+        echo "  ❌ $config (not installed)"
+      fi
+    done
+    
+    echo ""
+    echo "🟢 Starter Configurations:"
+    for config in "${starter_configs[@]}"; do
+      local config_path="$config_base/$config"
+      if [[ -d "$config_path" ]]; then
+        local size=$(du -sh "$config_path" 2>/dev/null | cut -f1)
+        echo "  ✅ $config - $size"
+      else
+        echo "  ❌ $config (not installed)"
+      fi
+    done
+    
+    echo ""
+    echo "🟣 VonHeikemen Starters:"
+    for config in "${vonheikemen_configs[@]}"; do
+      local config_path="$config_base/$config"
+      if [[ -d "$config_path" ]]; then
+        local size=$(du -sh "$config_path" 2>/dev/null | cut -f1)
+        echo "  ✅ $config - $size"
+      else
+        echo "  ❌ $config (not installed)"
+      fi
+    done
+    
+    echo ""
+    echo "🎆 Special Configurations:"
+    for config in "${special_configs[@]}"; do
+      local config_path="$config_base/$config"
+      if [[ -d "$config_path" ]]; then
+        local size=$(du -sh "$config_path" 2>/dev/null | cut -f1)
+        echo "  ✅ $config - $size"
+      else
+        echo "  ❌ $config (not installed)"
+      fi
+    done
+  }
+  
+  # Quick configuration backup
+  nvim-backup() {
+    local config="${1:-nvim}"
+    # Handle both nvim-ConfigName and ConfigName formats
+    [[ "$config" != nvim-* ]] && [[ "$config" != "nvim" ]] && config="nvim-$config"
+    local config_path="$HOME/.config/$config"
+    local backup_path="$HOME/.config/$config.backup.$(date +%Y%m%d_%H%M%S)"
+    
+    [[ ! -d "$config_path" ]] && { echo "❌ Configuration $config not found"; return 1; }
+    
+    cp -r "$config_path" "$backup_path"
+    echo "💾 Configuration '$config' backed up to: $backup_path"
+  }
+  
+  # Interactive configuration selector using fzf (if available)
+  if command -v fzf &>/dev/null; then
+    nvim-fzf() {
+      local configs=("default" "lazyman")
+      # Add all configurations to the fzf list
+      configs+=("abstract" "astronvimplus" "basicide" "ecovim" "lazyvim" "lunarvim" "magicvim" "nvchad" "spacevim")
+      configs+=("alanvim" "allaman" "catnvim" "cppvim" "govim" "go2one" "insis" "knvim" "latexvim" "lazyide")
+      configs+=("lunaride" "lvimide" "magidc" "nvlang" "nv-ide" "orange" "pythonvim" "rustvim" "salevim" "shuvro" "webdev")
+      configs+=("adib" "ahsan" "artur" "beethoven" "brain" "charles" "chokerman" "craftzdog" "dillon" "elianiva")
+      configs+=("elijah" "enrique" "heiker" "j4de" "jdhao" "josean" "justinnvim" "kodo" "kristijan" "lamarvim")
+      configs+=("maddison" "metis" "mini" "onmyway" "onno" "optixal" "orhun" "primeagen" "rafi" "rnvim")
+      configs+=("roiz" "seniormars" "simple" "slydragonn" "spider" "traap" "vimacs" "wuelner" "xero" "xiao")
+      configs+=("astronvimstart" "barebones" "basic" "codeart" "cosmic" "ember" "fennel" "hardhacker" "justinohmy")
+      configs+=("kickstart" "kickstartpython" "kabin" "micah" "modern" "normal" "nvim2k" "nvpak" "pde" "rohit" "scratch" "singlefile")
+      configs+=("basiclsp" "basicmason" "extralight" "lspcmp" "minimal" "modular" "opinion" "startbase" "startlsp" "startmason")
+      
+      local selected
+      selected=$(printf "%s\n" "${configs[@]}" | fzf --prompt="🎆 Select Neovim config: " --height=40% --border --preview="echo 'Launch Neovim with {} configuration'")
+      [[ -n "$selected" ]] && nvim-switch "$selected" "$@"
+    }
+    alias nv-select='nvim-fzf'
+  fi
+  
+  # Lazyman integration helpers (if lazyman is installed)
+  if command -v lazyman &>/dev/null; then
+    # Install missing configurations
+    nvim-install() {
+      local category="$1"
+      echo "🚀 Installing Neovim configurations..."
+      case "$category" in
+        "base"|"B")      lazyman -B ;;
+        "language"|"L") lazyman -L all ;;
+        "personal"|"W") lazyman -W ;;
+        "starter"|"X")  lazyman -X ;;
+        "all"|"A")      lazyman -A ;;
+        *)
+          echo "Usage: nvim-install [base|language|personal|starter|all]"
+          echo "  base     - Install all base configurations"
+          echo "  language - Install all language configurations"
+          echo "  personal - Install all personal configurations"
+          echo "  starter  - Install all starter configurations"
+          echo "  all      - Install all supported configurations"
+          return 1
+          ;;
+      esac
+    }
+    
+    # Update configurations
+    nvim-update() {
+      local config="${1:-all}"
+      if [[ "$config" == "all" ]]; then
+        echo "🔄 Updating all configurations..."
+        lazyman -U -A
+      else
+        # Handle both nvim-ConfigName and ConfigName formats
+        [[ "$config" != nvim-* ]] && [[ "$config" != "nvim" ]] && config="nvim-$config"
+        echo "🔄 Updating $config..."
+        lazyman -U -N "$config"
+      fi
+    }
+    
+    # Remove configurations
+    nvim-remove() {
+      local config="$1"
+      [[ -z "$config" ]] && { echo "Usage: nvim-remove <config_name>"; return 1; }
+      # Handle both nvim-ConfigName and ConfigName formats
+      [[ "$config" != nvim-* ]] && [[ "$config" != "nvim" ]] && config="nvim-$config"
+      echo "🗑️ Removing $config..."
+      lazyman -N "$config" -r
+    }
+  else
+    echo "📝 Note: Install lazyman for enhanced Neovim configuration management:"
+    echo "    git clone https://github.com/doctorfree/nvim-lazyman \$HOME/.config/nvim-Lazyman"
+    echo "    \$HOME/.config/nvim-Lazyman/lazyman.sh"
+  fi
+fi
