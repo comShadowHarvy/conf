@@ -647,8 +647,18 @@ _install_fonts() {
   local fonts_dir="$XDG_DATA_HOME/fonts"
   local fonts_lock_file="$XDG_CACHE_HOME/zsh/fonts_installed"
 
-  # Check if already run
-  [[ -f "$fonts_lock_file" ]] && return 0
+  # Check if already run or if nerd fonts are already available
+  if [[ -f "$fonts_lock_file" ]]; then
+    return 0
+  fi
+  
+  # Check if nerd fonts are already installed system-wide or user-wide
+  if fc-list 2>/dev/null | grep -qi "nerd.*font"; then
+    # Fonts are available, create lock file to prevent future prompts
+    mkdir -p "$(dirname "$fonts_lock_file")"
+    touch "$fonts_lock_file"
+    return 0
+  fi
 
   print -n "Set up Nerd Fonts? (Requires wget/curl and unzip) [y/N] "
   read -r response
