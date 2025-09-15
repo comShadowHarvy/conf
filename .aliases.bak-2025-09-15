@@ -99,8 +99,7 @@ alias mkdir='mkdir -pv'
 # Use fd instead of find if it exists
 if command -v fd &>/dev/null; then
   alias findr='fd'
-  alias f='fd'        # Short, memorable alternative to 'find'
-  # alias find='fd'   # DISABLED: AUR builds need real find - use 'f' instead
+  alias find='fd'  # Bold replacement, comment out if you prefer traditional find
 fi
 
 # Find text in files, preferring ripgrep (rg)
@@ -486,7 +485,7 @@ fi
 # Use bat as a pager and for cat if available
 if command -v bat &>/dev/null; then
   export MANPAGER="sh -c 'col -bx | bat -l man -p'"
-  # alias cat='bat -p'  # DISABLED: AUR builds need real cat - use 'view' instead
+  alias cat='bat -p'
 fi
 
 # Installer shortcuts
@@ -580,8 +579,8 @@ alias jc='journalctl'
 alias jcu='journalctl --user'
 
 # Modern file management
-# command -v trash-put &>/dev/null && alias rm='trash-put'  # DISABLED: AUR builds need real rm - use 'del' instead
-# command -v rg &>/dev/null && alias grep='rg'  # DISABLED: AUR builds need real grep - use 'g' instead
+command -v trash-put &>/dev/null && alias rm='trash-put'  # Use trash instead of rm
+command -v rg &>/dev/null && alias grep='rg'  # Use ripgrep instead of grep
 
 # ----------------------------------------------------------------------------
 # Productivity Functions & Advanced Utilities
@@ -833,8 +832,8 @@ if command -v fzf &>/dev/null; then
 fi
 
 # Modern alternatives shortcuts
-# alias cat='bat --paging=never' 2>/dev/null || alias cat='cat'  # DISABLED: AUR builds need real cat
-# alias find='fd' 2>/dev/null || alias find='find'  # DISABLED: AUR builds need real find
+alias cat='bat --paging=never' 2>/dev/null || alias cat='cat'
+alias find='fd' 2>/dev/null || alias find='find'
 
 # ----------------------------------------------------------------------------
 # Quick utilities and one-liners
@@ -1686,37 +1685,5 @@ clip() {
   fi
   echo "📋 Content copied to clipboard"
 }
-
-# ----------------------------------------------------------------------------
-# AUR-Safe, Memorable Aliases (Do NOT shadow core Unix commands)
-# ----------------------------------------------------------------------------
-# These aliases avoid overriding core Unix commands required by AUR build scripts
-# while providing memorable shortcuts to modern alternatives.
-
-# Fast search without shadowing system 'grep'
-if command -v rg &>/dev/null; then
-  alias g='rg'          # Short, memorable alternative to 'grep'
-fi
-
-# Safe delete without shadowing system 'rm'
-if command -v trash-put &>/dev/null; then
-  alias del='trash-put' # Memorable alternative to 'rm'
-fi
-
-# Better file viewer without shadowing system 'cat'
-if command -v bat &>/dev/null; then
-  alias view='bat -p'   # Memorable alternative to 'cat'
-fi
-
-# Extended listing without completely replacing 'ls'
-if command -v eza &>/dev/null; then
-  alias lx='eza --icons --group-directories-first'  # Extended 'ls' alternative
-  alias lxl='eza -al --icons --git --group-directories-first --time-style=long-iso'
-  alias lxt='eza --tree --level=3 --icons --git-ignore'
-elif command -v lsd &>/dev/null; then
-  alias lx='lsd --icon=auto --group-dirs=first'     # Extended 'ls' alternative
-  alias lxl='lsd -la --icon=auto --date=relative --group-dirs=first'
-  alias lxt='lsd --tree --depth=3 --icon=auto'
-fi
 
 # EOF marker for enhanced aliases
