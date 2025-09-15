@@ -299,7 +299,6 @@ _run_deferred_startup_visuals() {
 }
 
 # --- Completion System (Native Zsh) ---
-autoload -Uz compinit
 ZSH_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/zsh"
 mkdir -p "$ZSH_CACHE_DIR"
 local compinit_cache_file="$ZSH_CACHE_DIR/zcompdump"
@@ -310,14 +309,6 @@ else
   compinit -i -d "$compinit_cache_file"
 fi
 
-# Enhanced completion styling
-zstyle ':completion:*' menu select
-zstyle ':completion:*:default' list-colors ${(s.:.)LS_COLORS}
-zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}' 'r:|[._-]=* r:|=*' 'l:|=* r:|=*'
-zstyle ':completion:*' group-name ''
-zstyle ':completion:*:descriptions' format '%F{yellow}%B--- %d%b%f'
-zstyle ':completion:*' verbose yes
-zstyle ':completion:*:warnings' format '%F{red}%BNo matches found%b%f'
 
 # --- Shell Enhancements ---
 
@@ -325,10 +316,6 @@ zstyle ':completion:*:warnings' format '%F{red}%BNo matches found%b%f'
 _set_term_title() {
   print -Pn "\\e]0;${USER}@${HOSTNAME%%.*}:${PWD/#$HOME/\\~}\\a"
 }
-# Register function to run before each prompt and upon directory change
-autoload -Uz add-zsh-hook
-add-zsh-hook precmd _set_term_title
-add-zsh-hook chpwd _set_term_title # Update title on cd
 
 # Optimized Git update checker - only run when needed
 _check_git_updates() {
