@@ -1,22 +1,36 @@
 {
   "summary": {
-    "total_aliases": 173,
-    "total_functions": 59,
-    "duplicates": 0,
+    "total_aliases": 319,
+    "total_functions": 86,
+    "duplicates": 1,
     "path_issues": 1,
     "conflicts": 0
   },
-  "duplicates": [],
+  "duplicates": [
+    {
+      "type": "alias_duplicate",
+      "name": "reload-zsh",
+      "files": [
+        ".aliases:447",
+        ".zshrc:1003"
+      ],
+      "values": [
+        "\"source \\${ZDOTDIR:-\\$HOME}/.zshrc\"",
+        "\"exec zsh -l\""
+      ]
+    }
+  ],
   "path_issues": [
     {
       "type": "hardcoded_path",
-      "line": 615,
+      "line": 870,
       "content": "PYTHON_ENV_PATH=\"/home/me/python_packages_env/bin/activate\"",
       "issue": "Hardcoded /home/me path - should use $HOME"
     }
   ],
   "conflicts": [],
   "recommendations": [
+    "Comment out duplicate aliases, keeping the most modern/portable version",
     "Replace hardcoded paths with $HOME and XDG variables"
   ]
 }

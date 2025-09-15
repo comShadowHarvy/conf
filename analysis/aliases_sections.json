@@ -1,0 +1,149 @@
+{
+  "00-core": {
+    "start_line": 15,
+    "end_line": 60,
+    "priority": 0,
+    "depends": [],
+    "load_condition": "always",
+    "line_count": 46
+  },
+  "10-files": {
+    "start_line": 61,
+    "end_line": 173,
+    "priority": 1,
+    "depends": [],
+    "load_condition": "always",
+    "line_count": 113
+  },
+  "15-yazi": {
+    "start_line": 174,
+    "end_line": 188,
+    "priority": 2,
+    "depends": [
+      "yazi"
+    ],
+    "load_condition": "(( ${+commands[yazi]} ))",
+    "line_count": 15
+  },
+  "20-system": {
+    "start_line": 189,
+    "end_line": 240,
+    "priority": 3,
+    "depends": [],
+    "load_condition": "always",
+    "line_count": 52
+  },
+  "30-package": {
+    "start_line": 241,
+    "end_line": 343,
+    "priority": 4,
+    "depends": [
+      "pacman"
+    ],
+    "load_condition": "(( ${+commands[pacman]} || ${+commands[brew]} ))",
+    "line_count": 103
+  },
+  "40-media": {
+    "start_line": 344,
+    "end_line": 367,
+    "priority": 5,
+    "depends": [
+      "youtube-dl",
+      "yt-dlp"
+    ],
+    "load_condition": "(( ${+commands[yt-dlp]} || ${+commands[youtube-dl]} ))",
+    "line_count": 24
+  },
+  "50-git": {
+    "start_line": 368,
+    "end_line": 432,
+    "priority": 6,
+    "depends": [
+      "git"
+    ],
+    "load_condition": "(( ${+commands[git]} ))",
+    "line_count": 65
+  },
+  "55-tmux": {
+    "start_line": 433,
+    "end_line": 441,
+    "priority": 7,
+    "depends": [
+      "tmux"
+    ],
+    "load_condition": "(( ${+commands[tmux]} ))",
+    "line_count": 9
+  },
+  "60-apps": {
+    "start_line": 442,
+    "end_line": 499,
+    "priority": 8,
+    "depends": [],
+    "load_condition": "always",
+    "line_count": 58
+  },
+  "65-ai": {
+    "start_line": 500,
+    "end_line": 585,
+    "priority": 9,
+    "depends": [
+      "ollama"
+    ],
+    "load_condition": "(( ${+commands[ollama]} ))",
+    "line_count": 86
+  },
+  "70-productivity": {
+    "start_line": 586,
+    "end_line": 797,
+    "priority": 10,
+    "depends": [],
+    "load_condition": "always",
+    "line_count": 212
+  },
+  "75-modern": {
+    "start_line": 798,
+    "end_line": 890,
+    "priority": 11,
+    "depends": [
+      "fd",
+      "rg",
+      "bat"
+    ],
+    "load_condition": "always",
+    "line_count": 93
+  },
+  "80-performance": {
+    "start_line": 891,
+    "end_line": 914,
+    "priority": 12,
+    "depends": [],
+    "load_condition": "always",
+    "line_count": 24
+  },
+  "85-development": {
+    "start_line": 915,
+    "end_line": 961,
+    "priority": 13,
+    "depends": [
+      "nvim"
+    ],
+    "load_condition": "(( ${+commands[nvim]} ))",
+    "line_count": 47
+  },
+  "90-operations": {
+    "start_line": 962,
+    "end_line": 1689,
+    "priority": 14,
+    "depends": [],
+    "load_condition": "always",
+    "line_count": 728
+  },
+  "95-aur-safe": {
+    "start_line": 1690,
+    "end_line": 2207,
+    "priority": 15,
+    "depends": [],
+    "load_condition": "always",
+    "line_count": 518
+  }
+}

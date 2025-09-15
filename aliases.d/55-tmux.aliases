@@ -1,0 +1,18 @@
+# ------------------------------------------------------------------
+# Module: tmux
+# Loaded when: conditional ((( ${+commands[tmux]} )))
+# Depends: tmux
+# ------------------------------------------------------------------
+
+# Tmux Shortcuts
+# ----------------------------------------------------------------------------
+
+alias ts='tmux new -s'
+alias ta='tmux attach -t'
+alias tl='tmux list-sessions'
+alias tk='tmux kill-session -t'
+
+# ----------------------------------------------------------------------------
+
+# Module loaded successfully
+return 0

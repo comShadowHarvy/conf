@@ -1,0 +1,61 @@
+# ------------------------------------------------------------------
+# Module: system
+# Loaded when: always
+# Depends: none
+# ------------------------------------------------------------------
+
+# System Management
+# ----------------------------------------------------------------------------
+
+alias h='history'
+alias j='jobs -l'
+alias reload='exec "$SHELL" -l'
+alias :q='exit'
+alias please='sudo !!'
+
+# System info and resource usage
+alias psa='ps auxf'
+alias psgrep='ps aux | grep -v grep | grep -i -e VSZ -e'
+alias psmem='ps auxf | sort -nrk 4 | head -10'
+alias pscpu='ps auxf | sort -nrk 3 | head -10'
+alias meminfo='free -h'
+alias cpuinfo='lscpu'
+alias df='df -h'
+alias du='du -h'
+alias syswatch='watch -n 2 "echo \"## Memory Usage ##\"; free -h; echo; echo \"## Disk Usage ##\"; df -h -T /"'
+alias tempcheck='sensors | grep -i "core"'
+
+# Summarize directory contents
+dirsummary() {
+  local dir="${1:-.}"
+  [[ ! -d "$dir" ]] && { echo "Error: Directory '$dir' not found." >&2; return 1; }
+  echo "📂 Directory Summary for: $(realpath "$dir")"
+  echo "───────────────────────────────────────"
+  local files
+  local dirs
+  files=$(find "$dir" -type f | wc -l)
+  dirs=$(find "$dir" -type d | wc -l)
+  local size
+  size=$(du -sh "$dir" | cut -f1)
+
+  echo "📊 Stats:"
+  printf "  Files: %'d, Directories: %'d, Total Size: %s\n" "$files" "$dirs" "$size"
+  echo -e "\n📑 Top 5 File Types:"
+  find "$dir" -type f -not -path '*/.*' -exec file {} + | sed 's/.*: //' | sort | uniq -c | sort -nr | head -5
+  echo -e "\n📁 Top 5 Largest Subdirectories:"
+  du -h --max-depth=1 "$dir" | sort -hr | head -n 6 | tail -n 5 # head -n 6 to include parent, tail -n 5 to exclude it
+}
+
+# Quick system overview
+sysinfo() {
+  echo "📊 System Information:"
+  echo "  - Kernel: $(uname -rs)"
+  echo "  - Uptime: $(uptime -p)"
+  command -v free &>/dev/null && echo "  - Memory: $(free -h | awk '/^Mem:/ {printf "%s / %s (%s used)", $3, $2, $7}')"
+  command -v df &>/dev/null && echo "  - Disk (/): $(df -h / | awk 'NR==2 {printf "%s / %s (%s used)", $3, $2, $5}')"
+}
+
+# ----------------------------------------------------------------------------
+
+# Module loaded successfully
+return 0

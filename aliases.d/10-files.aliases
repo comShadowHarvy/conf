@@ -1,0 +1,122 @@
+# ------------------------------------------------------------------
+# Module: files
+# Loaded when: always
+# Depends: none
+# ------------------------------------------------------------------
+
+# File & Directory Management
+# ----------------------------------------------------------------------------
+
+# Use modern, feature-rich tools if available, with robust fallbacks
+if command -v eza &>/dev/null; then
+  alias ls='eza --icons --group-directories-first'
+  alias ll='eza -al --icons --git --group-directories-first --time-style=long-iso'
+  alias lt='eza --tree --level=3 --icons --git-ignore'
+  alias la='eza -a --icons --group-directories-first' # List all, including dots
+  alias l='eza -l --icons --git --group-directories-first'
+  alias lm='eza -al --sort=modified --icons --time-style=relative'
+  alias lS='eza -al --sort=size --icons --binary'
+  alias lr='eza -R --icons --level=2' # Recursive 2 levels
+elif command -v lsd &>/dev/null; then
+  alias ls='lsd --icon=auto --group-dirs=first'
+  alias ll='lsd -la --icon=auto --date=relative --group-dirs=first'
+  alias lt='lsd --tree --depth=3 --icon=auto'
+  alias la='lsd -A --icon=auto --group-dirs=first'
+  alias l='lsd -l --icon=auto --group-dirs=first'
+  alias lm='lsd -la --sort=time --icon=auto'
+  alias lS='lsd -la --sort=size --icon=auto'
+else
+  # Colorized ls fallbacks
+  alias ls="ls --color=auto --group-directories-first"
+  alias ll="ls -alh --color=auto --group-directories-first --time-style=long-iso"
+  alias la="ls -A --color=auto --group-directories-first"
+  alias l="ls -l --color=auto --group-directories-first"
+  alias l.="ls -ld .* --color=auto"
+  alias lm="ls -alht --color=auto"
+  alias lS="ls -alhS --color=auto"
+fi
+
+# Use rsync for cp/mv to get progress bars
+alias ccp='rsync -avhP --info=progress2'
+alias mmv='rsync -avhP --info=progress2 --remove-source-files'
+alias mkdir='mkdir -pv'
+
+# Use fd instead of find if it exists
+if command -v fd &>/dev/null; then
+  alias findr='fd'
+  alias f='fd'        # Short, memorable alternative to 'find'
+  # alias find='fd'   # DISABLED: AUR builds need real find - use 'f' instead
+fi
+
+# Find text in files, preferring ripgrep (rg)
+ftext() {
+  [[ $# -eq 0 ]] && { echo "Usage: ftext <pattern> [path]" >&2; return 1; }
+  local pattern="$1"
+  local path="${2:-.}"
+  if command -v rg &>/dev/null; then
+    rg --color=always --line-number --no-heading --smart-case "$pattern" "$path"
+  else
+    grep -rni --color=always "$pattern" "$path"
+  fi
+}
+
+# Find directories by name, preferring fd
+fdir() {
+  [[ -z "$1" ]] && { echo "Usage: fdir <pattern> [depth]" >&2; return 1; }
+  local pattern="$1"
+  local depth="${2:-3}"
+  if command -v fd &>/dev/null; then
+    fd --type d --max-depth "$depth" --ignore-case "$pattern"
+  else
+    find . -maxdepth "$depth" -type d -iname "*$pattern*"
+  fi
+}
+
+# Extract almost any archive format
+extract() {
+  [[ -z "$1" ]] && { echo "Usage: extract <archive_file>" >&2; return 1; }
+  local file="$1"
+  [[ ! -f "$file" ]] && { echo "Error: File '$file' not found." >&2; return 1; }
+
+  echo "Extracting '$file'..."
+  case "$file" in
+    *.tar.bz2|*.tbz2|*.tbz) tar xjf "$file" ;;
+    *.tar.gz|*.tgz)        tar xzf "$file" ;;
+    *.tar.xz|*.txz)        tar xJf "$file" ;;
+    *.tar|*.cbt)           tar xf "$file"  ;;
+    *.zip|*.cbz|*.epub)    unzip "$file"   ;;
+    *.rar|*.cbr)           unrar x "$file" ;;
+    *.7z|*.cb7)            7z x "$file"    ;;
+    *.gz)                  gunzip "$file"  ;;
+    *.bz2)                 bunzip2 "$file" ;;
+    *.xz)                  unxz "$file"    ;;
+    *)
+      echo "Error: Unsupported file type: '$file'" >&2
+      return 1
+      ;;
+  esac
+}
+
+# **[FIXED]** Extract all archives in the current directory into their own subdirectories
+extract-all() {
+    for archive in *.tar.bz2 *.tbz2 *.tbz *.tar.gz *.tgz *.tar.xz *.txz *.tar *.cbt *.zip *.cbz *.epub *.rar *.cbr *.7z *.cb7 *.gz *.bz2 *.xz; do
+        if [[ -f "$archive" ]]; then
+            # Create a directory named after the archive, without the extension.
+            # This handles complex extensions like .tar.gz
+            local dest_dir
+            dest_dir=$(basename "$archive" | sed -E 's/(\.tar\.(gz|bz2|xz)|.t(gz|bz2|xz))$//; s/\.[^.]+$//')
+            
+            mkdir -p -- "$dest_dir"
+            echo "--- Extracting $archive to $dest_dir/ ---"
+            # Use a subshell to extract into the new directory without changing the current shell's directory
+            (cd -- "$dest_dir" && tar -xf "../$archive") || echo "Failed to extract $archive" >&2
+        fi
+    done
+    echo "--- All archives processed. ---"
+}
+
+
+# ----------------------------------------------------------------------------
+
+# Module loaded successfully
+return 0

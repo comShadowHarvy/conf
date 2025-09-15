@@ -1,0 +1,95 @@
+# ------------------------------------------------------------------
+# Module: ai
+# Loaded when: conditional ((( ${+commands[ollama]} )))
+# Depends: ollama
+# ------------------------------------------------------------------
+
+# AI/Ollama Tools
+alias ffabric='fabric --fast' # default to fast model
+alias run_llama3='ollama run llama3:8b'
+
+# Password generator
+genpass() {
+  local length="${1:-16}"
+  [[ ! "$length" =~ ^[0-9]+$ || "$length" -lt 8 ]] && { echo "Specify a valid length (min 8)" >&2; return 1; }
+  # Use a more robust character set and avoid special chars that cause issues in URLs/shells
+  LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c "$length" ; echo
+}
+
+# Modern alternatives and enhancements
+command -v btop &>/dev/null && alias top='btop'
+command -v htop &>/dev/null && alias top='htop'
+command -v ncdu &>/dev/null && alias du='ncdu'
+command -v duf &>/dev/null && alias df='duf'
+command -v procs &>/dev/null && alias ps='procs'
+command -v dog &>/dev/null && alias dig='dog'
+command -v gping &>/dev/null && alias ping='gping'
+command -v httpie &>/dev/null && alias http='httpie'
+
+# Misc Tools & Fun
+command -v lolcat &>/dev/null && {
+  alias neofetch="neofetch | lolcat"
+  alias loo="| lolcat"
+}
+alias lweather="ansiweather -l Palmerston,Ontario"
+alias week="date +%V"
+alias now="date +%T"
+alias today='date "+%Y-%m-%d"'
+alias yesterday='date -d yesterday "+%Y-%m-%d"'
+alias tomorrow='date -d tomorrow "+%Y-%m-%d"'
+alias timestamp='date +%s'
+alias tb="nc termbin.com 9999"
+alias ix="curl -F 'f:1=<-' ix.io"  # Another pastebin service
+alias bc="bc -l"
+alias calc='qalc'  # Better calculator if available
+alias sha1="openssl sha1"
+alias sha256="openssl sha256"
+alias md5="openssl md5"
+alias base64='base64 -w 0'  # No line wrapping
+alias urlencode='python3 -c "import sys, urllib.parse as ul; print(ul.quote_plus(sys.argv[1]))"'
+alias urldecode='python3 -c "import sys, urllib.parse as ul; print(ul.unquote_plus(sys.argv[1]))"'
+alias flushmcd='echo "flush_all" | nc 10.10.27.11 11211'
+alias jctl="journalctl -p 3 -xb"
+alias jctlf="journalctl -f"  # Follow journal
+alias gpg-check="gpg2 --keyserver-options auto-key-retrieve --verify"
+alias gpg-retrieve="gpg2 --keyserver-options auto-key-retrieve --receive-keys"
+
+# Clipboard integration
+if command -v xclip &>/dev/null; then
+  alias pbcopy='xclip -selection clipboard'
+  alias pbpaste='xclip -selection clipboard -o'
+elif command -v xsel &>/dev/null; then
+  alias pbcopy='xsel --clipboard --input'
+  alias pbpaste='xsel --clipboard --output'
+elif command -v wl-copy &>/dev/null; then  # Wayland
+  alias pbcopy='wl-copy'
+  alias pbpaste='wl-paste'
+fi
+
+# Quick text manipulation
+alias trim="sed 's/^[ \t]*//;s/[ \t]*$//'"
+alias squeeze="tr -s ' '"
+alias lower="tr '[:upper:]' '[:lower:]'"
+alias upper="tr '[:lower:]' '[:upper:]'"
+
+# Internet and network tools
+alias speedtest='curl -s https://raw.githubusercontent.com/sivel/speedtest-cli/master/speedtest.py | python3 -'
+alias myip-fast='curl -s ipinfo.io/ip'
+alias myip-json='curl -s ipinfo.io/json'
+alias weather='curl -s "wttr.in?format=3"'
+alias weather-full='curl -s wttr.in'
+
+# Systemd shortcuts
+alias sc='systemctl'
+alias scu='systemctl --user'
+alias jc='journalctl'
+alias jcu='journalctl --user'
+
+# Modern file management
+# command -v trash-put &>/dev/null && alias rm='trash-put'  # DISABLED: AUR builds need real rm - use 'del' instead
+# command -v rg &>/dev/null && alias grep='rg'  # DISABLED: AUR builds need real grep - use 'g' instead
+
+# ----------------------------------------------------------------------------
+
+# Module loaded successfully
+return 0
