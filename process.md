@@ -194,6 +194,172 @@ Key functions tested:
 - `.aliases.orig` - Original backup
 - `.zshrc.orig` - Original backup
 
+## Modular Aliases Architecture
+
+### Overview
+In September 2025, the shell configuration system was enhanced with a revolutionary modular alias architecture that splits the monolithic `.aliases` file (2,208 lines, 96KB) into 16 specialized, lazy-loaded modules.
+
+### Architecture Components
+
+#### 1. Module Structure
+```bash
+aliases.d/
+├── 00-core.aliases      # Essential navigation & basic functions
+├── 10-files.aliases     # File management & directory operations  
+├── 15-yazi.aliases      # Yazi file manager integration
+├── 20-system.aliases    # System management & monitoring
+├── 30-package.aliases   # Package management (pacman, AUR, brew)
+├── 40-media.aliases     # Media downloads & processing
+├── 50-git.aliases       # Git operations & development
+├── 55-tmux.aliases      # Terminal multiplexer shortcuts
+├── 60-apps.aliases      # Shell applications & custom commands
+├── 65-ai.aliases        # AI tools & Ollama integration
+├── 70-productivity.aliases  # Workflow & productivity functions
+├── 75-modern.aliases    # Modern CLI tool shortcuts
+├── 80-performance.aliases   # CachyOS performance optimizations
+├── 85-development.aliases   # Development environment & Neovim
+├── 90-operations.aliases    # Advanced file operations
+├── 95-aur-safe.aliases     # AUR-compatible aliases
+└── legacy-loader.sh     # Compatibility loader for legacy scripts
+```
+
+#### 2. Smart Loading Strategy
+
+**Immediate Loading (Shell Startup)**
+- `00-core`, `10-files`, `20-system` - Essential for basic shell operation
+- Total startup overhead: ~200 lines vs. 2,208 lines (90% reduction)
+
+**Lazy Loading (After First Prompt)**  
+- Conditional modules loaded based on tool availability
+- 24-hour command existence cache for performance
+- Environment variable overrides: `DISABLE_GIT_ALIASES=true`
+
+**Performance Optimizations**
+```zsh
+# Command caching with 24-hour TTL
+_cached_command_exists() {
+  local cmd="$1" cache_key="cmd_$cmd"
+  local cache_file="$_alias_cmd_cache"
+  # [Cache logic implementation]
+}
+
+# Module loading guards
+load_alias_module() {
+  local module_id="LOADED_ALIAS_MODULE_${mod//-/_}"
+  [[ -v $module_id ]] && return 0  # Skip if already loaded
+  # [Loading implementation]
+}
+```
+
+#### 3. Conditional Loading Rules
+
+| Module | Load Condition | Environment Override |
+|--------|---------------|----------------------|
+| `15-yazi` | `yazi` command exists | `DISABLE_YAZI_ALIASES` |
+| `30-package` | `pacman` or `brew` exists | `DISABLE_PACKAGE_ALIASES` |
+| `40-media` | `yt-dlp` or `youtube-dl` exists | `DISABLE_MEDIA_ALIASES` |
+| `50-git` | `git` command exists | `DISABLE_GIT_ALIASES` |
+| `55-tmux` | `tmux` command exists | `DISABLE_TMUX_ALIASES` |
+| `65-ai` | `ollama` command exists | `DISABLE_AI_ALIASES` |
+| `85-development` | `nvim` command exists | `DISABLE_DEV_ALIASES` |
+
+#### 4. Backward Compatibility
+
+**Legacy Support**
+- Symlinked `~/.aliases` → `git/conf/aliases.d/legacy-loader.sh`
+- Loads all modules for scripts expecting monolithic file
+- `USE_LEGACY_ALIASES=true` environment variable support
+
+**AUR Build Safety**
+- Dedicated `95-aur-safe.aliases` module
+- Non-shadowing aliases: `g='rg'`, `f='fd'`, `view='bat -p'`
+- Preserves core Unix commands required by build scripts
+
+### Implementation Tools
+
+#### Analysis & Splitting Scripts
+```bash
+# Analyze original .aliases structure
+python app/analyze_aliases_sections.py
+
+# Split into modular files
+python app/split_aliases.py
+```
+
+#### Module Validation
+```bash
+# Syntax validation for all modules
+for file in aliases.d/*.aliases; do bash -n "$file"; done
+
+# Functional testing
+bash -c ". aliases.d/legacy-loader.sh && alias ll"
+```
+
+### Performance Impact
+
+**Startup Time Reduction**
+- Before: 2,208 lines processed at shell startup
+- After: ~200 lines processed immediately, rest loaded on-demand
+- Estimated 75-85% faster initial shell startup
+
+**Memory Efficiency** 
+- Only essential functions loaded initially
+- Tool-specific aliases loaded only when tools exist
+- Reduced memory footprint for minimal environments
+
+**Cache Performance**
+- Command existence cached for 24 hours
+- Avoids repeated filesystem checks
+- Smart cache invalidation and rotation
+
+### Development Guidelines
+
+#### Adding New Aliases
+1. **Choose the appropriate module** based on functionality
+2. **Follow naming conventions**: `XX-category.aliases`
+3. **Add dependencies** to module header if required
+4. **Test with both direct sourcing and lazy loading**
+
+#### Module Standards
+```bash
+# Standard module header
+# ------------------------------------------------------------------
+# Module: category-name
+# Loaded when: always|conditional (command)
+# Depends: command1, command2
+# ------------------------------------------------------------------
+
+# Module content here
+
+# Module loaded successfully
+return 0
+```
+
+#### Performance Considerations
+- Keep core modules minimal
+- Use conditional tool detection within modules
+- Cache expensive operations
+- Prefer lazy evaluation for complex functions
+
+### Migration Benefits
+
+1. **Performance**: 90% reduction in startup processing
+2. **Maintainability**: Isolated functionality for easier updates
+3. **Scalability**: Easy to add new categories without bloating core
+4. **Flexibility**: Environment-specific loading (development vs. production)
+5. **Compatibility**: Zero breaking changes for existing workflows
+6. **AUR Safety**: Dedicated safe aliases for package building
+
+### Future Enhancements
+
+- **Autoload Functions**: On-demand function loading with Zsh autoload
+- **Module Dependencies**: Smart dependency resolution between modules  
+- **Hot Reloading**: Live module updates without shell restart
+- **Profiling Tools**: Built-in performance monitoring and optimization
+- **User Modules**: Support for user-defined custom alias modules
+
+---
+
 ## Rollback Instructions
 
 ### Option 1: Git Revert

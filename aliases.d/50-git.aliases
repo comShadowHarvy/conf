@@ -1,0 +1,74 @@
+# ------------------------------------------------------------------
+# Module: git
+# Loaded when: conditional ((( ${+commands[git]} )))
+# Depends: git
+# ------------------------------------------------------------------
+
+# Git & Development
+# ----------------------------------------------------------------------------
+
+alias gs="git status -sb" # Short branch status
+alias ga="git add -A"
+alias gc="git commit -m"
+alias gca="git commit -am" # Stage and commit
+alias gp="git push"
+alias gpl="git pull"
+alias gf="git fetch"
+alias gco="git checkout"
+alias gb="git branch"
+alias glog="git log --graph --pretty='%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset'"
+alias gclean="git clean -fd"
+alias gclone="git clone"
+
+# Function to clone a repo and cd into it
+gcc() {
+  [[ -z "$1" ]] && { echo "Usage: gcc <repo_url> [dir_name]" >&2; return 1; }
+  local repo_url="$1"
+  # Smartly derive directory name if not provided
+  local dir_name="${2:-$(basename "$repo_url" .git)}"
+  git clone "$repo_url" "$dir_name" && cd "$dir_name"
+}
+
+# Quickly add, commit, and push all changes
+quickgit() {
+  [[ -z "$1" ]] && { echo "Usage: quickgit <commit message>" >&2; return 1; }
+  git rev-parse --is-inside-work-tree &>/dev/null || { echo "Error: Not a git repository." >&2; return 1; }
+
+  git add -A && git commit -m "$*" && git push
+}
+
+# A robust git pull using rebase and handling stashing
+gitupdate() {
+  git rev-parse --is-inside-work-tree &>/dev/null || { echo "Error: Not a git repository." >&2; return 1; }
+  
+  local stashed=false
+  # Only stash if there are uncommitted changes
+  if ! git diff --quiet || ! git diff --cached --quiet; then
+      echo "Stashing local changes..."
+      git stash push -u # -u includes untracked files
+      stashed=true
+  fi
+
+  echo "Fetching latest changes..."
+  git fetch --all --prune || { $stashed && git stash pop; return 1; }
+
+  local current_branch
+  current_branch=$(git rev-parse --abbrev-ref HEAD)
+  local upstream
+  upstream=$(git rev-parse --abbrev-ref "@{u}" 2>/dev/null)
+
+  if [[ -n "$upstream" ]]; then
+    echo "Rebasing onto '$upstream'..."
+    git rebase "$upstream" || { echo "Error: Rebase failed. Local changes remain stashed." >&2; $stashed && git stash pop; return 1; }
+  else
+    echo "No upstream branch configured for '$current_branch'. Skipping rebase."
+  fi
+  
+  $stashed && echo "Applying stashed changes..." && git stash pop
+  echo "✅ Update complete!"
+}
+
+# ----------------------------------------------------------------------------
+
+# Module loaded successfully
+return 0

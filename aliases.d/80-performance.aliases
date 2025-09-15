@@ -1,0 +1,33 @@
+# ------------------------------------------------------------------
+# Module: performance
+# Loaded when: always
+# Depends: none
+# ------------------------------------------------------------------
+
+# CachyOS & Performance Optimizations
+# ----------------------------------------------------------------------------
+
+# CPU performance and monitoring
+if command -v cpupower &>/dev/null; then
+  alias cpufreq='cpupower frequency-info'
+  alias cpugov='cpupower frequency-info -g'
+  alias cpuperf='sudo cpupower frequency-set -g performance'
+  alias cpusave='sudo cpupower frequency-set -g powersave'
+fi
+
+# System optimization helpers
+alias drop-caches='sudo sync && sudo sysctl vm.drop_caches=3'  # Clear system caches
+alias trim-ssd='sudo fstrim -av'  # Trim all mounted SSDs
+alias rebuild-initramfs='sudo mkinitcpio -P'  # Rebuild initramfs
+
+# CachyOS kernel management
+if [[ -f /etc/cachy-release ]]; then
+  alias kernel-list='ls /boot/vmlinuz-*'
+  alias cachy-version='cat /etc/cachy-release'
+  alias cachy-kernel='uname -r | grep -o cachy'
+fi
+
+# ----------------------------------------------------------------------------
+
+# Module loaded successfully
+return 0

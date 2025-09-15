@@ -1,0 +1,33 @@
+# ------------------------------------------------------------------
+# Module: media
+# Loaded when: conditional ((( ${+commands[yt-dlp]} || ${+commands[youtube-dl]} )))
+# Depends: youtube-dl, yt-dlp
+# ------------------------------------------------------------------
+
+# Media & Downloads
+# ----------------------------------------------------------------------------
+
+# Use yt-dlp if available, as it's more actively maintained
+if command -v yt-dlp &>/dev/null; then
+  alias ytmp3="yt-dlp --extract-audio --audio-format mp3 -o '%(title)s.%(ext)s'"
+  alias ytmp4="yt-dlp -f 'bv[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/best' -o '%(title)s.%(ext)s'"
+else
+  alias ytmp3="youtube-dl --extract-audio --audio-format mp3"
+  alias ytmp4="youtube-dl -f 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4'"
+fi
+
+# Enhanced wget with better defaults
+alias wget='wget -c --progress=bar --show-progress'
+alias get='wget -mpkc -R "index.html*"' # Mirror, page-requisites, convert-links
+
+# Modern curl aliases
+alias curl-json='curl -H "Content-Type: application/json"'
+alias curl-post='curl -X POST'
+alias curl-put='curl -X PUT'
+alias curl-delete='curl -X DELETE'
+alias curl-time='curl -w "@$HOME/.curl-format.txt"'
+
+# ----------------------------------------------------------------------------
+
+# Module loaded successfully
+return 0

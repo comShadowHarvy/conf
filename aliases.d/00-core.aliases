@@ -1,0 +1,55 @@
+# ------------------------------------------------------------------
+# Module: core
+# Loaded when: always
+# Depends: none
+# ------------------------------------------------------------------
+
+# General & Navigation Functions
+# ----------------------------------------------------------------------------
+
+# Create a directory and cd into it
+mkcd() {
+  [[ -z "$1" ]] && { echo "Usage: mkcd <directory>" >&2; return 1; }
+  mkdir -p "$1" && cd "$1"
+}
+
+# Use fzf to interactively cd into a subdirectory
+cdf() {
+  local dir
+  if command -v fd &>/dev/null; then
+    dir=$(fd --type d --max-depth 2 | fzf --height 20% --reverse --prompt="Select directory > ")
+  else
+    dir=$(find . -maxdepth 2 -type d | fzf --height 20% --reverse --prompt="Select directory > ")
+  fi
+  # Only cd if a directory was selected
+  [[ -n "$dir" ]] && cd "$dir"
+}
+
+# Go up a specified number of directories
+up() {
+  local d=""
+  local limit="${1:-1}"
+  # Ensure limit is a positive integer
+  [[ ! "$limit" =~ ^[1-9][0-9]*$ ]] && limit=1
+  for ((i=1; i<=limit; i++)); do
+    d+="../"
+  done
+  # Use pushd/popd logic for safer navigation if available, else cd
+  cd "$d" || echo "Error: Couldn't go up $limit level(s)." >&2
+}
+
+# Direct navigation aliases
+alias ..="cd .."
+alias ...="cd ../.."
+alias ....="cd ../../.."
+alias .....="cd ../../../.."
+alias ~="cd ~"
+alias dl="cd ~/Downloads"
+alias dt="cd ~/Desktop"
+alias p="cd ~/projects"
+alias doc="cd ~/Documents"
+
+# ----------------------------------------------------------------------------
+
+# Module loaded successfully
+return 0

@@ -658,11 +658,109 @@ bindkey '^[k' kill-line                 # Alt+k (might conflict)
 bindkey '^[b' backward-word             # Alt+b
 bindkey '^[f' forward-word              # Alt+f
 
+# --- Modular Alias System ---
+
+# Performance-optimized modular alias loader
+_alias_module_loaded=()
+_alias_cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/zsh"
+_alias_cmd_cache="$_alias_cache_dir/aliases_cmd_cache"
+mkdir -p "$_alias_cache_dir"
+
+# Load alias module with performance caching
+load_alias_module() {
+  local mod="$1" file="$HOME/git/conf/aliases.d/$mod.aliases"
+  local module_id="LOADED_ALIAS_MODULE_${mod//-/_}"
+  
+  # Skip if already loaded
+  [[ -v $module_id ]] && return 0
+  
+  # Check if file exists and is readable
+  [[ -r "$file" ]] || return 1
+  
+  # Source the module
+  if source "$file" 2>/dev/null; then
+    _alias_module_loaded+=("$mod")
+    typeset -g "$module_id"=1
+    return 0
+  else
+    _log_message "WARNING" "Failed to load alias module: $mod"
+    return 1
+  fi
+}
+
+# Check if command exists with 24-hour caching
+_cached_command_exists() {
+  local cmd="$1" cache_key="cmd_$cmd"
+  local cache_file="$_alias_cmd_cache"
+  
+  # Create cache if it doesn't exist
+  [[ -f "$cache_file" ]] || touch "$cache_file"
+  
+  # Check if cache is older than 24 hours
+  if [[ $(find "$cache_file" -mtime +1 2>/dev/null) ]]; then
+    # Cache is stale, clear it
+    > "$cache_file"
+  fi
+  
+  # Check cache first
+  if grep -q "^$cache_key:" "$cache_file" 2>/dev/null; then
+    local cached_result=$(grep "^$cache_key:" "$cache_file" | cut -d: -f2)
+    [[ "$cached_result" == "1" ]] && return 0 || return 1
+  fi
+  
+  # Not in cache, check command and cache result
+  local result=0
+  (( ${+commands[$cmd]} )) || result=1
+  
+  # Update cache (remove old entry if exists, add new)
+  grep -v "^$cache_key:" "$cache_file" > "$cache_file.tmp" 2>/dev/null || touch "$cache_file.tmp"
+  echo "$cache_key:$((1-result))" >> "$cache_file.tmp"
+  mv "$cache_file.tmp" "$cache_file"
+  
+  return $result
+}
+
+# Lazy alias loader - runs once after first prompt
+_lazy_alias_loader() {
+  # Remove this hook after first run
+  add-zsh-hook -d precmd _lazy_alias_loader
+  
+  # Load conditional modules based on available commands and env vars
+  [[ "$DISABLE_YAZI_ALIASES" != "true" ]] && _cached_command_exists "yazi" && load_alias_module "15-yazi"
+  [[ "$DISABLE_PACKAGE_ALIASES" != "true" ]] && { _cached_command_exists "pacman" || _cached_command_exists "brew"; } && load_alias_module "30-package"
+  [[ "$DISABLE_MEDIA_ALIASES" != "true" ]] && { _cached_command_exists "yt-dlp" || _cached_command_exists "youtube-dl"; } && load_alias_module "40-media"
+  [[ "$DISABLE_GIT_ALIASES" != "true" ]] && _cached_command_exists "git" && load_alias_module "50-git"
+  [[ "$DISABLE_TMUX_ALIASES" != "true" ]] && _cached_command_exists "tmux" && load_alias_module "55-tmux"
+  [[ "$DISABLE_AI_ALIASES" != "true" ]] && _cached_command_exists "ollama" && load_alias_module "65-ai"
+  [[ "$DISABLE_DEV_ALIASES" != "true" ]] && _cached_command_exists "nvim" && load_alias_module "85-development"
+  
+  # Always load these (they have internal tool detection)
+  load_alias_module "60-apps"      # Shell apps and custom commands
+  load_alias_module "70-productivity"  # Productivity functions
+  load_alias_module "75-modern"    # Modern CLI tools with fallbacks
+  load_alias_module "80-performance" # CachyOS performance optimizations
+  load_alias_module "90-operations" # File operations and analysis
+  load_alias_module "95-aur-safe"   # AUR-safe aliases
+}
+
+# Load core modules immediately (essential for basic shell operation)
+load_alias_module "00-core"     # Navigation, basic functions
+load_alias_module "10-files"    # File management, directory listing
+load_alias_module "20-system"   # System management, monitoring
+
+# Register lazy loader for conditional modules
+add-zsh-hook precmd _lazy_alias_loader
+
 # --- Load Custom Configurations ---
 # Source local files if they exist
-_safe_source "$ZDOTDIR/.aliases"
 _safe_source "$ZDOTDIR/.api_keys" # Be careful with sensitive data! Consider env vars or dedicated tools.
 _safe_source "$ZDOTDIR/.zshrc.local" # For user-specific overrides
+
+# Legacy .aliases support for backward compatibility
+if [[ -f "$ZDOTDIR/.aliases" ]] && [[ "$USE_LEGACY_ALIASES" == "true" ]]; then
+  _log_message "INFO" "Loading legacy .aliases file (consider migrating to modular system)"
+  _safe_source "$ZDOTDIR/.aliases"
+fi
 
 # --- Oh My Posh (Prompt) ---
 if [[ "$USE_OHMYPOSH" == "true" ]]; then

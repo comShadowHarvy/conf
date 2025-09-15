@@ -1,0 +1,24 @@
+# ------------------------------------------------------------------
+# Module: 15-yazi
+# Loaded when: conditional ((( ${+commands[yazi]} )))
+# Depends: yazi
+# ------------------------------------------------------------------
+
+# Yazi File Manager
+# ----------------------------------------------------------------------------
+alias y='yazi'
+ycd() {
+  local tmp cwd
+  tmp="$(mktemp -t "yazi-cwd.XXXXX")"
+  # Ensure yazi is called with any arguments passed to ycd
+  yazi --cwd-file="$tmp" "$@"
+  if cwd="$(cat -- "$tmp")" && [[ -n "$cwd" && "$cwd" != "$PWD" ]]; then
+    cd -- "$cwd"
+  fi
+  rm -f -- "$tmp"
+}
+
+# ----------------------------------------------------------------------------
+
+# Module loaded successfully
+return 0

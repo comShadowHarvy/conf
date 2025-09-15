@@ -1,0 +1,112 @@
+# ------------------------------------------------------------------
+# Module: package
+# Loaded when: conditional ((( ${+commands[pacman]} || ${+commands[brew]} )))
+# Depends: pacman
+# ------------------------------------------------------------------
+
+# Package Management (CachyOS/Arch Linux Optimized)
+# ----------------------------------------------------------------------------
+
+# Core Pacman aliases
+alias pacsyu='sudo pacman -Syu'  # System update
+alias pacs='sudo pacman -S'      # Install package
+alias pacr='sudo pacman -Rns'    # Remove package with deps
+alias pacss='pacman -Ss'         # Search packages
+alias pacsi='pacman -Si'         # Package info
+alias pacq='pacman -Q'           # Query installed
+alias pacqs='pacman -Qs'         # Search installed
+alias pacqi='pacman -Qi'         # Installed package info
+alias pacqo='pacman -Qo'         # Package owns file
+alias pacql='pacman -Ql'         # Package file list
+alias pacqdt='pacman -Qdt'       # List orphaned packages
+alias paclog='tail -f /var/log/pacman.log'  # Watch pacman log
+
+# CachyOS-specific optimizations
+if command -v cachyos-hello &>/dev/null; then
+  alias cachy='cachyos-hello'    # CachyOS welcome app
+fi
+
+# Enhanced AUR helpers (Paru preferred, yay fallback)
+if command -v paru &>/dev/null; then
+  alias aurinstall='paru -S'     # Install AUR package
+  alias aurupdate='paru -Sua'    # Update AUR packages only
+  alias aursync='paru -Syu'      # Full system update
+  alias aursearch='paru -Ss'     # Search AUR packages
+  alias aurinfo='paru -Si'       # AUR package info
+  alias aurclean='paru -Sc'      # Clean AUR cache
+elif command -v yay &>/dev/null; then
+  alias aurinstall='yay -S'
+  alias aurupdate='yay -Sua'
+  alias aursync='yay -Syu'
+  alias aursearch='yay -Ss'
+  alias aurinfo='yay -Si'
+  alias aurclean='yay -Sc'
+fi
+
+# Package maintenance shortcuts
+alias pacclean='sudo pacman -Scc && sudo pacman -Qtdq | sudo pacman -Rns -'  # Deep clean
+alias pacdeps='pactree'          # Show package dependencies
+alias pacfiles='pkgfile'         # Find which package provides file
+
+# **[SAFER]** Remove orphan packages
+orphan() {
+  local orphans
+  orphans=$(pacman -Qtdq)
+  if [[ -n "$orphans" ]]; then
+    echo "The following orphan packages will be removed:"
+    echo "$orphans"
+    # shellcheck disable=SC2086
+    sudo pacman -Rns $orphans
+  else
+    echo "No orphan packages to remove."
+  fi
+}
+alias listorphan='pacman -Qtdq'
+
+# Reflector (Mirrorlist)
+alias mirror='sudo reflector --country Canada,US --age 6 --sort rate --save /etc/pacman.d/mirrorlist'
+
+# ----------------------------------------------------------------------------
+# Networking
+# ----------------------------------------------------------------------------
+
+alias ports='ss -tulanp' # ss is the modern replacement for netstat
+alias lsport='sudo lsof -i'
+alias myip="dig +short myip.opendns.com @resolver1.opendns.com"
+alias localip="hostname -I | awk '{print \$1}'"
+command -v vnstat &>/dev/null && alias vnstat="vnstat -i eth1"
+
+# Nmap presets
+alias nmap-open="nmap --open"
+alias nmap-fast="nmap -F -T4 --version-light --top-ports 300"
+alias nmap-full="sudo nmap -sS -A -v -T4 -p-" # Simplified full scan
+
+# Simple HTTP server for sharing
+share() {
+  [[ ! -e "$1" ]] && { echo "Error: '$1' not found." >&2; return 1; }
+  local port="${2:-8000}"
+  local ip_addr
+  ip_addr=$(hostname -I | awk '{print $1}')
+  
+  # Use a subshell to prevent directory changes and simplify cleanup
+  (
+    if [[ -d "$1" ]]; then
+      cd "$1" || return
+      echo "Sharing directory at http://$ip_addr:$port/"
+    else
+      # For files, serve from its containing directory to avoid copying
+      local dir
+      local file
+      dir=$(dirname "$1")
+      file=$(basename "$1")
+      cd "$dir" || return
+      echo "Sharing file at http://$ip_addr:$port/$file"
+    fi
+    python3 -m http.server "$port"
+  )
+}
+
+# ----------------------------------------------------------------------------
+
+# Module loaded successfully
+return 0

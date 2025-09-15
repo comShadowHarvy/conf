@@ -1,0 +1,56 @@
+# ------------------------------------------------------------------
+# Module: development
+# Loaded when: conditional ((( ${+commands[nvim]} )))
+# Depends: nvim
+# ------------------------------------------------------------------
+
+# Enhanced Development Environment
+# ----------------------------------------------------------------------------
+
+# Modern development tools
+if command -v code &>/dev/null; then
+  alias c='code .'
+  alias code-extensions='code --list-extensions'
+fi
+
+# Enhanced Git workflow
+alias git-tree='git log --graph --pretty=format:"%C(red)%h%C(reset) -%C(yellow)%d%C(reset) %s %C(green)(%cr) %C(blue)<%an>%C(reset)" --abbrev-commit --all'
+alias git-files='git diff --name-only'  # Show changed files
+alias git-stats='git shortlog -sn'       # Contributor stats
+alias git-today='git log --since="midnight" --author="$(git config user.name)"'
+alias git-week='git log --since="1 week ago" --oneline'
+
+# Project management shortcuts
+projectinit() {
+  [[ -z "$1" ]] && { echo "Usage: projectinit <project_name> [template]" >&2; return 1; }
+  local project_name="$1" template="${2:-basic}"
+  
+  mkdir -p "$project_name" && cd "$project_name"
+  git init
+  
+  case "$template" in
+    "python") 
+      echo "# $project_name\n\nA Python project.\n" > README.md
+      echo "*.pyc\n__pycache__/\n.env\nvenv/\n.venv/\n" > .gitignore
+      python3 -m venv venv
+      ;;
+    "node"|"js")
+      echo "# $project_name\n\nA Node.js project.\n" > README.md  
+      echo "node_modules/\n.env\n*.log\ndist/\nbuild/\n" > .gitignore
+      npm init -y
+      ;;
+    *)
+      echo "# $project_name\n\nA new project.\n" > README.md
+      echo ".DS_Store\n*.log\n.env\ntmp/\n" > .gitignore
+      ;;
+  esac
+  
+  git add .
+  git commit -m "Initial commit: Project setup with $template template"
+  echo "✅ Project '$project_name' initialized with $template template"
+}
+
+# ----------------------------------------------------------------------------
+
+# Module loaded successfully
+return 0

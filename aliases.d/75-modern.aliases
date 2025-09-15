@@ -1,0 +1,102 @@
+# ------------------------------------------------------------------
+# Module: modern
+# Loaded when: always
+# Depends: fd, rg, bat
+# ------------------------------------------------------------------
+
+# Modern CLI Tool Shortcuts
+# ----------------------------------------------------------------------------
+
+# Zoxide shortcuts (if available)
+command -v zoxide &>/dev/null && {
+  alias z='cd'  # Since zoxide replaces cd
+  alias zi='cdi'  # Interactive mode
+}
+
+# FZF powered functions
+if command -v fzf &>/dev/null; then
+  # Edit a file with fzf
+  fzf-edit() {
+    local file
+    file=$(fzf --preview 'bat --style=numbers --color=always {}' --preview-window=right:60%)
+    [[ -n "$file" ]] && "${EDITOR:-nvim}" "$file"
+  }
+  alias fe='fzf-edit'
+  
+  # Change directory with fzf
+  fzf-cd() {
+    local dir
+    dir=$(find . -type d 2>/dev/null | fzf --preview 'ls -la {}' --preview-window=right:60%)
+    [[ -n "$dir" ]] && cd "$dir"
+  }
+  alias fcd='fzf-cd'
+  
+  # Kill process with fzf
+  fzf-kill() {
+    local pid
+    pid=$(ps -ef | sed 1d | fzf -m --header='[KILL PROCESS]' | awk '{print $2}')
+    [[ -n "$pid" ]] && echo "$pid" | xargs kill -"${1:-9}"
+  }
+  alias fkill='fzf-kill'
+fi
+
+# Modern alternatives shortcuts
+# alias cat='bat --paging=never' 2>/dev/null || alias cat='cat'  # DISABLED: AUR builds need real cat
+# alias find='fd' 2>/dev/null || alias find='find'  # DISABLED: AUR builds need real find
+
+# ----------------------------------------------------------------------------
+# Quick utilities and one-liners
+# ----------------------------------------------------------------------------
+
+# Convert seconds to human readable
+sec2time() {
+  local T="$1"
+  local D=$((T/60/60/24))
+  local H=$((T/60/60%24))
+  local M=$((T/60%60))
+  local S=$((T%60))
+  (( D > 0 )) && printf '%d days ' $D
+  (( H > 0 )) && printf '%d hours ' $H
+  (( M > 0 )) && printf '%d minutes ' $M
+  printf '%d seconds\n' $S
+}
+
+# Get public IP with location info
+myip-full() {
+  curl -s https://ipapi.co/json/ | jq -r '
+    "🌐 Public IP Information:\n" +
+    "   IP: " + .ip + "\n" +
+    "   Location: " + .city + ", " + .region + ", " + .country_name + "\n" +
+    "   ISP: " + .org + "\n" +
+    "   Timezone: " + .timezone
+  '
+}
+
+# Local network scan
+localscan() {
+  local network
+  network=$(ip route | grep -E '^default' | awk '{print $3}' | head -1)
+  if [[ -n "$network" ]]; then
+    nmap -sn "${network%.*}.0/24"
+  else
+    echo "Could not determine network range" >&2
+  fi
+}
+
+# Port scanner
+portscan() {
+  [[ -z "$1" ]] && { echo "Usage: portscan <host> [port_range]" >&2; return 1; }
+  local host="$1" ports="${2:-1-1000}"
+  nmap -Pn "$host" -p "$ports"
+}
+
+# Generate random string
+randstr() {
+  local length="${1:-32}"
+  LC_ALL=C tr -dc 'A-Za-z0-9!@#$%^&*()_+[]{}|;:,.<>?' </dev/urandom | head -c "$length" && echo
+}
+
+# ----------------------------------------------------------------------------
+
+# Module loaded successfully
+return 0

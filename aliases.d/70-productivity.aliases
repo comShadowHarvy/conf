@@ -1,0 +1,221 @@
+# ------------------------------------------------------------------
+# Module: productivity
+# Loaded when: always
+# Depends: none
+# ------------------------------------------------------------------
+
+# Productivity Functions & Advanced Utilities
+# ----------------------------------------------------------------------------
+
+# Create a backup of a file with timestamp
+backup() {
+  [[ -z "$1" ]] && { echo "Usage: backup <file>" >&2; return 1; }
+  [[ ! -f "$1" ]] && { echo "Error: File '$1' not found." >&2; return 1; }
+  cp "$1" "$1.backup.$(date +%Y%m%d_%H%M%S)"
+  echo "Backup created: $1.backup.$(date +%Y%m%d_%H%M%S)"
+}
+
+# Quick notes function
+note() {
+  local notes_dir="$HOME/notes"
+  local notes_file="$notes_dir/$(date +%Y-%m-%d).md"
+  mkdir -p "$notes_dir"
+  
+  if [[ $# -eq 0 ]]; then
+    # Open today's notes file
+    "${EDITOR:-nvim}" "$notes_file"
+  else
+    # Append note with timestamp
+    echo "## $(date '+%H:%M:%S') - $*" >> "$notes_file"
+    echo "Note added to $(basename "$notes_file")"
+  fi
+}
+
+# Quick todo function
+todo() {
+  local todo_file="$HOME/.todo.txt"
+  if [[ $# -eq 0 ]]; then
+    [[ -f "$todo_file" ]] && cat "$todo_file" || echo "No todos yet. Add one with: todo <task>"
+  else
+    echo "[ ] $* ($(date '+%Y-%m-%d'))" >> "$todo_file"
+    echo "Todo added: $*"
+  fi
+}
+
+# Mark todo as done
+todo-done() {
+  local todo_file="$HOME/.todo.txt"
+  [[ ! -f "$todo_file" ]] && { echo "No todo file found." >&2; return 1; }
+  
+  if [[ -z "$1" ]]; then
+    echo "Current todos:"
+    nl "$todo_file"
+    echo -n "Which todo to mark as done? (number): "
+    read -r num
+  else
+    num="$1"
+  fi
+  
+  if [[ "$num" =~ ^[0-9]+$ ]]; then
+    sed -i "${num}s/\[ \]/[x]/" "$todo_file"
+    echo "Todo $num marked as done!"
+  else
+    echo "Invalid todo number." >&2
+  fi
+}
+
+# Find and replace in files
+freplace() {
+  [[ $# -lt 2 ]] && { echo "Usage: freplace <find> <replace> [file_pattern]" >&2; return 1; }
+  local find_text="$1" replace_text="$2" pattern="${3:-*}"
+  
+  if command -v rg &>/dev/null && command -v sed &>/dev/null; then
+    rg -l "$find_text" --glob="$pattern" | xargs sed -i "s/$find_text/$replace_text/g"
+    echo "Replaced '$find_text' with '$replace_text' in files matching '$pattern'"
+  else
+    find . -name "$pattern" -type f -exec sed -i "s/$find_text/$replace_text/g" {} +
+    echo "Replaced '$find_text' with '$replace_text' in files matching '$pattern'"
+  fi
+}
+
+# Process management helpers
+killport() {
+  [[ -z "$1" ]] && { echo "Usage: killport <port>" >&2; return 1; }
+  local pid
+  pid=$(lsof -ti:"$1")
+  if [[ -n "$pid" ]]; then
+    kill -9 "$pid"
+    echo "Killed process on port $1 (PID: $pid)"
+  else
+    echo "No process found on port $1"
+  fi
+}
+
+# Find and kill processes by name
+killname() {
+  [[ -z "$1" ]] && { echo "Usage: killname <process_name>" >&2; return 1; }
+  pkill -f "$1" && echo "Killed processes matching '$1'" || echo "No processes found matching '$1'"
+}
+
+# System monitoring functions
+watchdir() {
+  [[ -z "$1" ]] && { echo "Usage: watchdir <directory> [command]" >&2; return 1; }
+  local dir="$1" cmd="${2:-echo 'Directory changed'}"
+  
+  if command -v inotifywait &>/dev/null; then
+    echo "Watching $dir for changes..."
+    while inotifywait -r -e modify,create,delete "$dir" &>/dev/null; do
+      eval "$cmd"
+    done
+  else
+    echo "inotifywait not found. Install inotify-tools package." >&2
+    return 1
+  fi
+}
+
+# Enhanced directory operations
+mktemp-cd() {
+  local tmp_dir
+  tmp_dir=$(mktemp -d)
+  echo "Created and entering temporary directory: $tmp_dir"
+  cd "$tmp_dir"
+}
+
+# File comparison helpers
+diffdir() {
+  [[ $# -ne 2 ]] && { echo "Usage: diffdir <dir1> <dir2>" >&2; return 1; }
+  diff -r "$1" "$2"
+}
+
+# Quick archive creation
+archive() {
+  [[ -z "$1" ]] && { echo "Usage: archive <file_or_directory> [archive_name]" >&2; return 1; }
+  local source="$1"
+  local archive_name="${2:-$(basename "$source")_$(date +%Y%m%d_%H%M%S)}"
+  
+  if [[ -d "$source" ]]; then
+    tar -czf "${archive_name}.tar.gz" "$source"
+    echo "Directory archived to: ${archive_name}.tar.gz"
+  elif [[ -f "$source" ]]; then
+    gzip -c "$source" > "${archive_name}.gz"
+    echo "File archived to: ${archive_name}.gz"
+  else
+    echo "Error: '$source' not found." >&2
+    return 1
+  fi
+}
+
+# Network utilities
+whosonport() {
+  [[ -z "$1" ]] && { echo "Usage: whosonport <port>" >&2; return 1; }
+  lsof -i :"$1"
+}
+
+# Test internet connection
+ping-test() {
+  local hosts=("8.8.8.8" "1.1.1.1" "google.com" "github.com")
+  for host in "${hosts[@]}"; do
+    if ping -c 1 -W 2 "$host" &>/dev/null; then
+      echo "✓ Connected to $host"
+    else
+      echo "✗ Failed to connect to $host"
+    fi
+  done
+}
+
+# Generate QR code for text
+qr() {
+  [[ -z "$1" ]] && { echo "Usage: qr <text>" >&2; return 1; }
+  if command -v qrencode &>/dev/null; then
+    qrencode -t ansiutf8 "$1"
+  else
+    curl -s "https://qr-server.com/api/qr-code/?size=150x150&data=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$1'))")" | display
+  fi
+}
+
+# Disk usage helpers
+biggest() {
+  local num="${1:-10}" dir="${2:-.}"
+  echo "Top $num largest files/directories in $dir:"
+  du -ah "$dir" | sort -hr | head -"$num"
+}
+
+# Git helpers
+git-size() {
+  git rev-list --objects --all | 
+    git cat-file --batch-check='%(objecttype) %(objectname) %(objectsize) %(rest)' | 
+    sed -n 's/^blob //p' | 
+    sort --numeric-sort --key=2 | 
+    tail -20 | 
+    cut -c 1-12,41- | 
+    $(command -v gnumfmt || echo numfmt) --field=2 --to=iec-i --suffix=B --padding=7 --round=nearest
+}
+
+# Enhanced system information
+sys-full() {
+  echo "🖥️  System Information (Detailed)"
+  echo "═══════════════════════════════════════════════"
+  echo "🔹 Hostname: $(hostname)"
+  echo "🔹 Kernel: $(uname -srm)"
+  echo "🔹 Uptime: $(uptime -p)"
+  echo "🔹 Load: $(uptime | awk -F'load average:' '{print $2}')"
+  
+  if command -v free &>/dev/null; then
+    echo "🔹 Memory: $(free -h | awk '/^Mem:/ {printf "%s used / %s total (%.1f%% free)", $3, $2, ($4/$2)*100}')"
+  fi
+  
+  if command -v df &>/dev/null; then
+    echo "🔹 Root disk: $(df -h / | awk 'NR==2 {printf "%s used / %s total (%s full)", $3, $2, $5}')"
+  fi
+  
+  if command -v sensors &>/dev/null; then
+    local temp
+    temp=$(sensors 2>/dev/null | grep -i 'core 0' | awk '{print $3}' | head -1)
+    [[ -n "$temp" ]] && echo "🔹 CPU Temp: $temp"
+  fi
+}
+
+# ----------------------------------------------------------------------------
+
+# Module loaded successfully
+return 0
