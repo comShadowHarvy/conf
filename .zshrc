@@ -298,6 +298,12 @@ _run_deferred_startup_visuals() {
     zle && zle .redisplay
 }
 
+# --- Autoload Zsh Built-in Functions ---
+# Load essential Zsh functions before using them
+autoload -Uz compinit   # Completion initialization
+autoload -Uz add-zsh-hook # Hook management
+autoload -Uz vcs_info   # Version control info (if needed)
+
 # --- Completion System (Native Zsh) ---
 ZSH_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/zsh"
 mkdir -p "$ZSH_CACHE_DIR"
