@@ -512,14 +512,30 @@ mkdir -p "$_alias_cache_dir"
 
 # Load alias module with performance caching
 load_alias_module() {
-  local mod="$1" file="$HOME/git/conf/aliases.d/$mod.aliases"
+  local mod="$1"
+  local config_dir
+  
+  # Determine config directory (handle both standard home location and current directory)
+  if [[ -d "$HOME/git/conf/aliases.d" ]]; then
+    config_dir="$HOME/git/conf"
+  elif [[ -d "$PWD/aliases.d" ]]; then
+    config_dir="$PWD"
+  else
+    _log_message "WARNING" "aliases.d directory not found"
+    return 1
+  fi
+  
+  local file="$config_dir/aliases.d/$mod.aliases"
   local module_id="LOADED_ALIAS_MODULE_${mod//-/_}"
   
   # Skip if already loaded
   [[ -v $module_id ]] && return 0
   
   # Check if file exists and is readable
-  [[ -r "$file" ]] || return 1
+  if [[ ! -r "$file" ]]; then
+    _log_message "WARNING" "Alias module not found or not readable: $file"
+    return 1
+  fi
   
   # Source the module
   if source "$file" 2>/dev/null; then
@@ -601,9 +617,23 @@ _safe_source "$ZDOTDIR/.api_keys" # Be careful with sensitive data! Consider env
 _safe_source "$ZDOTDIR/.zshrc.local" # For user-specific overrides
 
 # Legacy .aliases support for backward compatibility
-if [[ -f "$ZDOTDIR/.aliases" ]] && [[ "$USE_LEGACY_ALIASES" == "true" ]]; then
-  _log_message "INFO" "Loading legacy .aliases file (consider migrating to modular system)"
-  _safe_source "$ZDOTDIR/.aliases"
+# Load legacy .aliases if modular system isn't working or explicitly requested
+if [[ "$USE_LEGACY_ALIASES" == "true" ]] || [[ ${#_alias_module_loaded[@]} -eq 0 ]]; then
+  # Try various locations for the .aliases file
+  local aliases_file=""
+  for location in "$ZDOTDIR/.aliases" "$HOME/git/conf/.aliases" "$PWD/.aliases" "$HOME/.aliases"; do
+    if [[ -f "$location" ]]; then
+      aliases_file="$location"
+      break
+    fi
+  done
+  
+  if [[ -n "$aliases_file" ]]; then
+    _log_message "INFO" "Loading legacy .aliases file from $aliases_file"
+    _safe_source "$aliases_file"
+  else
+    _log_message "WARNING" "No alias files found (neither modular nor legacy)"
+  fi
 fi
 
 # --- Oh My Posh (Prompt) ---
