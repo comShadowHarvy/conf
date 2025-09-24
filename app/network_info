@@ -1,0 +1,234 @@
+#!/bin/bash
+
+#===============================================================================
+# network_info - Network Adapter Information Display
+# Shows network adapters with their IPs and network ranges
+#===============================================================================
+
+set -euo pipefail
+
+# Colors for output
+readonly RED='\033[0;31m'
+readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[1;33m'
+readonly BLUE='\033[0;34m'
+readonly CYAN='\033[0;36m'
+readonly BOLD='\033[1m'
+readonly NC='\033[0m' # No Color
+
+# Function to print colored output
+print_header() {
+    echo -e "${BOLD}${CYAN}🌐 Network Adapter Information${NC}"
+    echo -e "${CYAN}================================${NC}"
+    echo
+}
+
+# Function to calculate network range from IP and netmask
+calculate_network_range() {
+    local ip=$1
+    local netmask=$2
+    
+    # Convert IP to decimal
+    IFS=. read -r i1 i2 i3 i4 <<< "$ip"
+    ip_dec=$((i1 * 256**3 + i2 * 256**2 + i3 * 256 + i4))
+    
+    # Convert netmask to decimal
+    IFS=. read -r m1 m2 m3 m4 <<< "$netmask"
+    mask_dec=$((m1 * 256**3 + m2 * 256**2 + m3 * 256 + m4))
+    
+    # Calculate network address
+    network_dec=$((ip_dec & mask_dec))
+    
+    # Calculate broadcast address
+    broadcast_dec=$((network_dec | (0xFFFFFFFF ^ mask_dec)))
+    
+    # Convert back to dotted decimal
+    network_ip=$((network_dec >> 24 & 255)).$((network_dec >> 16 & 255)).$((network_dec >> 8 & 255)).$((network_dec & 255))
+    broadcast_ip=$((broadcast_dec >> 24 & 255)).$((broadcast_dec >> 16 & 255)).$((broadcast_dec >> 8 & 255)).$((broadcast_dec & 255))
+    
+    # Calculate CIDR by counting bits
+    local temp_mask=$mask_dec
+    local cidr=0
+    while [[ $temp_mask -ne 0 ]]; do
+        if [[ $((temp_mask & 1)) -eq 1 ]]; then
+            ((cidr++))
+        fi
+        temp_mask=$((temp_mask >> 1))
+    done
+    
+    echo "${network_ip}/${cidr} (${network_ip} - ${broadcast_ip})"
+}
+
+# Function to get adapter info using ip command
+get_adapter_info_ip() {
+    local interface=$1
+    local info
+    
+    # Get IP address and netmask
+    info=$(ip addr show "$interface" 2>/dev/null | grep -E 'inet [0-9]' | head -1)
+    
+    if [[ -n "$info" ]]; then
+        local ip_cidr
+        ip_cidr=$(echo "$info" | awk '{print $2}')
+        local ip="${ip_cidr%/*}"
+        local cidr="${ip_cidr#*/}"
+        
+        # Convert CIDR to netmask
+        local mask_dec=$((0xFFFFFFFF << (32 - cidr) & 0xFFFFFFFF))
+        local netmask="$((mask_dec >> 24 & 255)).$((mask_dec >> 16 & 255)).$((mask_dec >> 8 & 255)).$((mask_dec & 255))"
+        
+        echo "$ip|$netmask|$ip_cidr"
+    fi
+}
+
+# Function to get adapter info using ifconfig (fallback)
+get_adapter_info_ifconfig() {
+    local interface=$1
+    local ip netmask
+    
+    if command -v ifconfig >/dev/null 2>&1; then
+        local info
+        info=$(ifconfig "$interface" 2>/dev/null | grep -E 'inet [0-9]')
+        
+        if [[ -n "$info" ]]; then
+            ip=$(echo "$info" | awk '{print $2}' | sed 's/addr://')
+            netmask=$(echo "$info" | awk '{print $4}' | sed 's/Mask://')
+            
+            if [[ -n "$ip" && -n "$netmask" ]]; then
+                echo "$ip|$netmask|"
+            fi
+        fi
+    fi
+}
+
+# Function to get MAC address
+get_mac_address() {
+    local interface=$1
+    
+    if [[ -f "/sys/class/net/$interface/address" ]]; then
+        cat "/sys/class/net/$interface/address" 2>/dev/null
+    else
+        ip link show "$interface" 2>/dev/null | grep -o -E '([[:xdigit:]]{1,2}:){5}[[:xdigit:]]{1,2}' | head -1
+    fi
+}
+
+# Function to get interface state
+get_interface_state() {
+    local interface=$1
+    
+    if [[ -f "/sys/class/net/$interface/operstate" ]]; then
+        cat "/sys/class/net/$interface/operstate" 2>/dev/null
+    else
+        echo "unknown"
+    fi
+}
+
+# Function to display adapter information
+display_adapter_info() {
+    local interface=$1
+    local mac="" state="" ip="" netmask="" ip_cidr="" network_range=""
+    
+    # Skip loopback unless it's the only interface
+    if [[ "$interface" == "lo" ]] && [[ $(ls /sys/class/net/ | wc -l) -gt 1 ]]; then
+        return
+    fi
+    
+    # Get MAC address
+    mac=$(get_mac_address "$interface")
+    
+    # Get interface state
+    state=$(get_interface_state "$interface")
+    
+    # Get IP information
+    local adapter_info
+    adapter_info=$(get_adapter_info_ip "$interface")
+    
+    if [[ -z "$adapter_info" ]]; then
+        adapter_info=$(get_adapter_info_ifconfig "$interface")
+    fi
+    
+    if [[ -n "$adapter_info" ]]; then
+        IFS='|' read -r ip netmask ip_cidr <<< "$adapter_info"
+        
+        if [[ -n "$ip_cidr" ]]; then
+            network_range="$ip_cidr"
+        else
+            network_range=$(calculate_network_range "$ip" "$netmask")
+        fi
+    fi
+    
+    # Display information
+    echo -e "${BOLD}${BLUE}Interface: ${GREEN}$interface${NC}"
+    
+    if [[ -n "$mac" && "$mac" != "00:00:00:00:00:00" ]]; then
+        echo -e "  ${YELLOW}MAC Address:${NC} $mac"
+    fi
+    
+    echo -e "  ${YELLOW}State:${NC} $state"
+    
+    if [[ -n "$ip" ]]; then
+        echo -e "  ${YELLOW}IP Address:${NC} $ip"
+        echo -e "  ${YELLOW}Network Range:${NC} $network_range"
+    else
+        echo -e "  ${RED}No IP assigned${NC}"
+    fi
+    
+    echo
+}
+
+# Main function
+main() {
+    print_header
+    
+    # Check if we have network interfaces
+    if [[ ! -d "/sys/class/net" ]]; then
+        echo -e "${RED}❌ Unable to access network interface information${NC}"
+        exit 1
+    fi
+    
+    # Get all network interfaces
+    local interfaces
+    interfaces=$(ls /sys/class/net/ 2>/dev/null | sort)
+    
+    if [[ -z "$interfaces" ]]; then
+        echo -e "${RED}❌ No network interfaces found${NC}"
+        exit 1
+    fi
+    
+    # Display information for each interface
+    for interface in $interfaces; do
+        display_adapter_info "$interface"
+    done
+    
+    echo -e "${CYAN}💡 Tip: Use 'ip addr' or 'ifconfig' for more detailed information${NC}"
+}
+
+# Help function
+show_help() {
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Display network adapter information including IPs and network ranges."
+    echo ""
+    echo "Options:"
+    echo "  -h, --help    Show this help message"
+    echo ""
+    echo "Examples:"
+    echo "  $0            Show all network adapters"
+    echo ""
+}
+
+# Parse command line arguments
+case "${1:-}" in
+    -h|--help)
+        show_help
+        exit 0
+        ;;
+    "")
+        main
+        ;;
+    *)
+        echo -e "${RED}❌ Invalid option: $1${NC}"
+        echo "Use -h for help"
+        exit 1
+        ;;
+esac

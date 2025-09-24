@@ -1,0 +1,34 @@
+#!/bin/bash
+# Quick network info - shows adapters, IPs, and ranges
+
+echo "Network Adapters:"
+echo "=================="
+
+for iface in $(ls /sys/class/net/ 2>/dev/null | sort); do
+    # Skip loopback unless it's the only interface
+    [[ "$iface" == "lo" ]] && [[ $(ls /sys/class/net/ | wc -l) -gt 1 ]] && continue
+    
+    # Get basic info
+    ip_info=$(ip addr show "$iface" 2>/dev/null | grep -E 'inet [0-9]' | head -1 | awk '{print $2}')
+    state=$(cat "/sys/class/net/$iface/operstate" 2>/dev/null || echo "unknown")
+    
+    printf "%-12s " "$iface:"
+    
+    if [[ -n "$ip_info" ]]; then
+        ip="${ip_info%/*}"
+        cidr="${ip_info#*/}"
+        
+        # Calculate network range
+        IFS=. read -r i1 i2 i3 i4 <<< "$ip"
+        ip_dec=$((i1 * 256**3 + i2 * 256**2 + i3 * 256 + i4))
+        mask_dec=$((0xFFFFFFFF << (32 - cidr) & 0xFFFFFFFF))
+        network_dec=$((ip_dec & mask_dec))
+        network_ip=$((network_dec >> 24 & 255)).$((network_dec >> 16 & 255)).$((network_dec >> 8 & 255)).$((network_dec & 255))
+        
+        printf "IP: %-15s Range: %s/%s" "$ip" "$network_ip" "$cidr"
+    else
+        printf "No IP assigned"
+    fi
+    
+    printf " (%s)\n" "$state"
+done
