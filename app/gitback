@@ -314,7 +314,6 @@ main() {
 
   setup_persona "$persona_choice"
 
-  clear
   cat <<EOF
 ====================================================================
 ${TEXT[title]}
