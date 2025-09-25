@@ -1,15 +1,47 @@
 #!/usr/bin/env bash
 # backup_docker_images.sh
 # Save a timestamped list of currently installed Docker images (tags and digests)
-# Usage: backup_docker_images.sh [--dir /path/to/backup-root]
-# Creates: $BACKUP_ROOT/images/YYYYmmdd-HHMMSS/{images.tags.txt, images.digests.txt, images.json, README.txt}
+# Usage: backup_docker_images.sh [--dir /path/to/backup-root] [--dest /path/to/centralized-backup]
+# 
+# --dir: Creates $DIR/YYYYmmdd-HHMMSS/ (original standalone mode)
+# --dest: Creates $DEST/docker-images/ (centralized mode - no timestamp subdirectory)
+#
+# Creates: images.tags.txt, images.digests.txt, images.json, README.txt
 
 set -euo pipefail
 
+# Default to standalone mode
 BACKUP_ROOT="$HOME/docker-backups/images"
-if [[ ${1-} == "--dir" && -n ${2-} ]]; then
-  BACKUP_ROOT="$2"
-  shift 2
+CENTRALIZED_MODE=0
+DEST_DIR=""
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dir)
+      BACKUP_ROOT="${2:-}"
+      shift 2
+      ;;
+    --dest)
+      DEST_DIR="${2:-}"
+      CENTRALIZED_MODE=1
+      shift 2
+      ;;
+    -h|--help)
+      sed -n '1,10p' "$0"; exit 0
+      ;;
+    *)
+      echo "Unknown option: $1" >&2; exit 1
+      ;;
+  esac
+done
+
+# Set output directory based on mode
+if [[ $CENTRALIZED_MODE -eq 1 ]]; then
+  OUT_DIR="$DEST_DIR/docker-images"
+else
+  TS=$(date +%Y%m%d-%H%M%S)
+  OUT_DIR="$BACKUP_ROOT/$TS"
 fi
 
 # Check docker availability
@@ -22,8 +54,6 @@ if ! docker info >/dev/null 2>&1; then
   exit 1
 fi
 
-TS=$(date +%Y%m%d-%H%M%S)
-OUT_DIR="$BACKUP_ROOT/$TS"
 mkdir -p "$OUT_DIR"
 
 # Save images (repository:tag), excluding dangling <none>
@@ -64,9 +94,11 @@ To restore using the companion script:
   restore_docker_images.sh -f "$OUT_DIR/images.tags.txt"
 EOF
 
-# Convenience symlink to latest snapshot
-mkdir -p "$BACKUP_ROOT"
-ln -sfn "$OUT_DIR" "$BACKUP_ROOT/latest"
+# Convenience symlink to latest snapshot (standalone mode only)
+if [[ $CENTRALIZED_MODE -eq 0 ]]; then
+  mkdir -p "$BACKUP_ROOT"
+  ln -sfn "$OUT_DIR" "$BACKUP_ROOT/latest"
+fi
 
 printf "Saved Docker images list to: %s\n" "$OUT_DIR"
 printf "Files created:\n"

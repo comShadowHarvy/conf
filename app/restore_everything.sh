@@ -306,9 +306,17 @@ TOTAL_COMPONENTS=$((RESTORE_DOCKER + RESTORE_FLATPAK + RESTORE_CREDENTIALS + RES
 if [[ $RESTORE_DOCKER -eq 1 ]]; then
   echo "🐳 [1/4] Restoring Docker images..."
   
-  DOCKER_IMAGES_FILE=$(find "$BACKUP_DIR/docker-images" -name "images.digests.txt" 2>/dev/null | head -1)
-  if [[ -z "$DOCKER_IMAGES_FILE" ]]; then
-    DOCKER_IMAGES_FILE=$(find "$BACKUP_DIR/docker-images" -name "images.tags.txt" 2>/dev/null | head -1)
+  # Try centralized layout first, then legacy layout
+  DOCKER_IMAGES_FILE="$BACKUP_DIR/docker-images/images.digests.txt"
+  if [[ ! -f "$DOCKER_IMAGES_FILE" ]]; then
+    DOCKER_IMAGES_FILE="$BACKUP_DIR/docker-images/images.tags.txt"
+  fi
+  if [[ ! -f "$DOCKER_IMAGES_FILE" ]]; then
+    # Fall back to legacy nested directory structure
+    DOCKER_IMAGES_FILE=$(find "$BACKUP_DIR/docker-images" -name "images.digests.txt" 2>/dev/null | head -1)
+    if [[ -z "$DOCKER_IMAGES_FILE" ]]; then
+      DOCKER_IMAGES_FILE=$(find "$BACKUP_DIR/docker-images" -name "images.tags.txt" 2>/dev/null | head -1)
+    fi
   fi
   
   if [[ -n "$DOCKER_IMAGES_FILE" && -f "$DOCKER_IMAGES_FILE" ]]; then
@@ -339,8 +347,14 @@ fi
 if [[ $RESTORE_FLATPAK -eq 1 ]]; then
   echo "📦 [2/4] Restoring Flatpak applications..."
   
-  FLATPAK_APPS_FILE=$(find "$BACKUP_DIR/flatpak-apps" -name "apps.tsv" 2>/dev/null | head -1)
-  FLATPAK_REMOTES_FILE=$(find "$BACKUP_DIR/flatpak-apps" -name "remotes.tsv" 2>/dev/null | head -1)
+  # Try centralized layout first, then legacy layout
+  FLATPAK_APPS_FILE="$BACKUP_DIR/flatpak-apps/apps.tsv"
+  FLATPAK_REMOTES_FILE="$BACKUP_DIR/flatpak-apps/remotes.tsv"
+  if [[ ! -f "$FLATPAK_APPS_FILE" ]]; then
+    # Fall back to legacy nested directory structure
+    FLATPAK_APPS_FILE=$(find "$BACKUP_DIR/flatpak-apps" -name "apps.tsv" 2>/dev/null | head -1)
+    FLATPAK_REMOTES_FILE=$(find "$BACKUP_DIR/flatpak-apps" -name "remotes.tsv" 2>/dev/null | head -1)
+  fi
   
   if [[ -n "$FLATPAK_APPS_FILE" && -f "$FLATPAK_APPS_FILE" ]]; then
     if command -v flatpak >/dev/null 2>&1; then
@@ -375,7 +389,15 @@ fi
 if [[ $RESTORE_CREDENTIALS -eq 1 ]]; then
   echo "🔐 [3/4] Restoring credentials..."
   
-  CREDS_ARCHIVE=$(find "$BACKUP_DIR/credentials" -name "credentials.tar.gpg" -o -name "credentials.tar" 2>/dev/null | head -1)
+  # Try centralized layout first, then legacy layout
+  CREDS_ARCHIVE="$BACKUP_DIR/credentials/credentials.tar.gpg"
+  if [[ ! -f "$CREDS_ARCHIVE" ]]; then
+    CREDS_ARCHIVE="$BACKUP_DIR/credentials/credentials.tar"
+  fi
+  if [[ ! -f "$CREDS_ARCHIVE" ]]; then
+    # Fall back to legacy nested directory structure
+    CREDS_ARCHIVE=$(find "$BACKUP_DIR/credentials" -name "credentials.tar.gpg" -o -name "credentials.tar" 2>/dev/null | head -1)
+  fi
   
   if [[ -n "$CREDS_ARCHIVE" && -f "$CREDS_ARCHIVE" ]]; then
     CREDS_CMD="~/restore_credentials.sh"
@@ -397,8 +419,12 @@ if [[ $RESTORE_CREDENTIALS -eq 1 ]]; then
       fi
     fi
   else
-    # Try to find backup directory instead
-    CREDS_DIR=$(find "$BACKUP_DIR/credentials" -maxdepth 2 -name "collected" -type d 2>/dev/null | head -1)
+    # Try to find backup directory instead - centralized layout first
+    CREDS_DIR="$BACKUP_DIR/credentials/collected"
+    if [[ ! -d "$CREDS_DIR" ]]; then
+      # Fall back to legacy nested directory structure
+      CREDS_DIR=$(find "$BACKUP_DIR/credentials" -maxdepth 2 -name "collected" -type d 2>/dev/null | head -1)
+    fi
     if [[ -n "$CREDS_DIR" ]]; then
       CREDS_BACKUP_DIR=$(dirname "$CREDS_DIR")
       CREDS_CMD="~/restore_credentials.sh"

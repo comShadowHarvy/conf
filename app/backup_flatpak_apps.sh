@@ -1,15 +1,47 @@
 #!/usr/bin/env bash
 # backup_flatpak_apps.sh
 # Save a timestamped list of installed Flatpak apps and configured remotes.
-# Usage: backup_flatpak_apps.sh [--dir /path/to/backup-root]
-# Creates: $BACKUP_ROOT/YYYYmmdd-HHMMSS/{remotes.tsv, apps.tsv, apps.details.txt, README.txt}
+# Usage: backup_flatpak_apps.sh [--dir /path/to/backup-root] [--dest /path/to/centralized-backup]
+# 
+# --dir: Creates $DIR/YYYYmmdd-HHMMSS/ (original standalone mode)
+# --dest: Creates $DEST/flatpak-apps/ (centralized mode - no timestamp subdirectory)
+#
+# Creates: remotes.tsv, apps.tsv, apps.details.txt, README.txt
 
 set -euo pipefail
 
+# Default to standalone mode
 BACKUP_ROOT="$HOME/flatpak-backups"
-if [[ ${1-} == "--dir" && -n ${2-} ]]; then
-  BACKUP_ROOT="$2"
-  shift 2
+CENTRALIZED_MODE=0
+DEST_DIR=""
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dir)
+      BACKUP_ROOT="${2:-}"
+      shift 2
+      ;;
+    --dest)
+      DEST_DIR="${2:-}"
+      CENTRALIZED_MODE=1
+      shift 2
+      ;;
+    -h|--help)
+      sed -n '1,10p' "$0"; exit 0
+      ;;
+    *)
+      echo "Unknown option: $1" >&2; exit 1
+      ;;
+  esac
+done
+
+# Set output directory based on mode
+if [[ $CENTRALIZED_MODE -eq 1 ]]; then
+  OUT_DIR="$DEST_DIR/flatpak-apps"
+else
+  TS=$(date +%Y%m%d-%H%M%S)
+  OUT_DIR="$BACKUP_ROOT/$TS"
 fi
 
 # Check flatpak availability
@@ -18,8 +50,6 @@ if ! command -v flatpak >/dev/null 2>&1; then
   exit 1
 fi
 
-TS=$(date +%Y%m%d-%H%M%S)
-OUT_DIR="$BACKUP_ROOT/$TS"
 mkdir -p "$OUT_DIR"
 
 # Save remotes (TSV with header)
@@ -57,8 +87,10 @@ Notes:
 - Specific commits are not pinned; the restore will install the current commit of the saved branch.
 EOF
 
-# Convenience symlink to latest snapshot
-ln -sfn "$OUT_DIR" "$BACKUP_ROOT/latest"
+# Convenience symlink to latest snapshot (standalone mode only)
+if [[ $CENTRALIZED_MODE -eq 0 ]]; then
+  ln -sfn "$OUT_DIR" "$BACKUP_ROOT/latest"
+fi
 
 printf "Saved Flatpak snapshot to: %s\n" "$OUT_DIR"
 printf "Files created:\n  - %s\n  - %s\n  - %s\n" \
