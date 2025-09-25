@@ -11,6 +11,7 @@
 #   --credentials         Include credentials backup (SSH, GPG, GitHub CLI, Git)
 #   --git-repos           Include Git repositories backup/sync
 #   --vscode              Include VS Code settings (with credentials)
+#   --docker-desktop-mcp  Include Docker Desktop MCP configuration
 #   --encrypt-symmetric   Encrypt credential archives with passphrase (recommended)
 #   --encrypt-recipient   Encrypt credential archives to GPG recipient
 #   --no-encrypt-creds    Don't encrypt credentials (NOT recommended)
@@ -45,6 +46,7 @@ INCLUDE_FLATPAK=0
 INCLUDE_CREDENTIALS=0
 INCLUDE_GIT_REPOS=0
 INCLUDE_VSCODE=0
+INCLUDE_DOCKER_DESKTOP_MCP=0
 ENCRYPT_MODE="symmetric"
 ENCRYPT_RECIPIENT=""
 OUT_ROOT="$HOME/complete-backups"
@@ -285,6 +287,7 @@ while [[ $# -gt 0 ]]; do
     --credentials)      INCLUDE_CREDENTIALS=1; shift ;;
     --git-repos)        INCLUDE_GIT_REPOS=1; shift ;;
     --vscode)           INCLUDE_VSCODE=1; shift ;;
+    --docker-desktop-mcp) INCLUDE_DOCKER_DESKTOP_MCP=1; shift ;;
     --encrypt-symmetric) ENCRYPT_MODE="symmetric"; shift ;;
     --encrypt-recipient) ENCRYPT_MODE="recipient"; ENCRYPT_RECIPIENT="${2:-}"; shift 2 ;;
     --no-encrypt-creds) ENCRYPT_MODE="none"; shift ;;
@@ -293,7 +296,7 @@ while [[ $# -gt 0 ]]; do
     -p|--persona)       PERSONA_CHOSEN="${2:-}"; shift 2 ;;
     --no-theatrics)     SKIP_THEATRICS=1; shift ;;
     --dry-run)          DRY_RUN=1; shift ;;
-    --all)              INCLUDE_DOCKER=1; INCLUDE_FLATPAK=1; INCLUDE_CREDENTIALS=1; INCLUDE_GIT_REPOS=1; shift ;;
+    --all)              INCLUDE_DOCKER=1; INCLUDE_FLATPAK=1; INCLUDE_CREDENTIALS=1; INCLUDE_GIT_REPOS=1; INCLUDE_DOCKER_DESKTOP_MCP=1; shift ;;
     -h|--help)
       sed -n '1,30p' "$0"; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
@@ -301,12 +304,13 @@ while [[ $# -gt 0 ]]; do
 done
 
 # If no specific components selected, backup everything
-if [[ $INCLUDE_DOCKER -eq 0 && $INCLUDE_FLATPAK -eq 0 && $INCLUDE_CREDENTIALS -eq 0 && $INCLUDE_GIT_REPOS -eq 0 ]]; then
+if [[ $INCLUDE_DOCKER -eq 0 && $INCLUDE_FLATPAK -eq 0 && $INCLUDE_CREDENTIALS -eq 0 && $INCLUDE_GIT_REPOS -eq 0 && $INCLUDE_DOCKER_DESKTOP_MCP -eq 0 ]]; then
   echo "[info] No specific components selected, backing up everything..."
   INCLUDE_DOCKER=1
   INCLUDE_FLATPAK=1  
   INCLUDE_CREDENTIALS=1
   INCLUDE_GIT_REPOS=1
+  INCLUDE_DOCKER_DESKTOP_MCP=1
 fi
 
 TS=$(date +%Y%m%d-%H%M%S)
@@ -341,6 +345,7 @@ else
     [ $INCLUDE_CREDENTIALS -eq 1 ] && echo "✓ Credentials (SSH, GPG, GitHub CLI, Git)"
     [ $INCLUDE_GIT_REPOS -eq 1 ] && echo "✓ Git repositories backup/sync"
     [ $INCLUDE_VSCODE -eq 1 ] && echo "✓ VS Code settings"
+    [ $INCLUDE_DOCKER_DESKTOP_MCP -eq 1 ] && echo "✓ Docker Desktop MCP configuration"
     echo ""
     echo "BACKUP LOCATION: $BACKUP_DIR"
   } > "$BACKUP_DIR/BACKUP_SUMMARY.txt" || echo "[warn] Failed to create summary file"
@@ -357,7 +362,7 @@ FAILED_COMPONENTS=()
 SUCCESS_COUNT=0
 
 # Calculate total steps
-TOTAL_STEPS=$((INCLUDE_DOCKER + INCLUDE_FLATPAK + INCLUDE_CREDENTIALS + INCLUDE_GIT_REPOS))
+TOTAL_STEPS=$((INCLUDE_DOCKER + INCLUDE_FLATPAK + INCLUDE_CREDENTIALS + INCLUDE_GIT_REPOS + INCLUDE_DOCKER_DESKTOP_MCP))
 CURRENT_STEP=0
 
 # 1. Docker Images Backup
@@ -448,7 +453,31 @@ if [[ $INCLUDE_CREDENTIALS -eq 1 ]]; then
   echo ""
 fi
 
-# 4. Git Repositories Backup/Sync
+# 4. Docker Desktop MCP Backup
+if [[ $INCLUDE_DOCKER_DESKTOP_MCP -eq 1 ]]; then
+  CURRENT_STEP=$((CURRENT_STEP + 1))
+  echo "🔧 [$CURRENT_STEP/$TOTAL_STEPS] Backing up Docker Desktop MCP configuration..."
+  
+  if [[ -d "$HOME/.docker/mcp" ]]; then
+    if [[ $DRY_RUN -eq 1 ]]; then
+      echo "[dry-run] Would backup Docker Desktop MCP to: $BACKUP_DIR/docker-desktop-mcp/"
+    else
+      if ~/git/conf/app/backup_docker_desktop_mcp.sh --dest "$BACKUP_DIR"; then
+        echo "✅ Docker Desktop MCP backup completed"
+        SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+      else
+        echo "❌ Docker Desktop MCP backup failed"
+        FAILED_COMPONENTS+=("Docker Desktop MCP")
+      fi
+    fi
+  else
+    echo "⚠️  Docker Desktop MCP not found (~/.docker/mcp), skipping..."
+    FAILED_COMPONENTS+=("Docker Desktop MCP (not found)")
+  fi
+  echo ""
+fi
+
+# 5. Git Repositories Backup/Sync
 if [[ $INCLUDE_GIT_REPOS -eq 1 ]]; then
   CURRENT_STEP=$((CURRENT_STEP + 1))
   echo "🔄 [$CURRENT_STEP/$TOTAL_STEPS] Backing up and syncing Git repositories..."
@@ -482,7 +511,7 @@ fi
 flatten_backup_files "$BACKUP_DIR"
 
 # Create summary report
-TOTAL_COMPONENTS=$((INCLUDE_DOCKER + INCLUDE_FLATPAK + INCLUDE_CREDENTIALS + INCLUDE_GIT_REPOS))
+TOTAL_COMPONENTS=$((INCLUDE_DOCKER + INCLUDE_FLATPAK + INCLUDE_CREDENTIALS + INCLUDE_GIT_REPOS + INCLUDE_DOCKER_DESKTOP_MCP))
 
 if [[ $DRY_RUN -eq 0 ]]; then
   {
@@ -496,6 +525,7 @@ if [[ $DRY_RUN -eq 0 ]]; then
     echo "- Docker images: ./restore_docker_images.sh -f docker-images/images.digests.txt"
     echo "- Flatpak apps: ./restore_flatpak_apps.sh -f flatpak-apps/apps.tsv -r flatpak-apps/remotes.tsv"
     echo "- Credentials: ./restore_credentials.sh -f credentials/credentials.tar.gpg"
+    echo "- Docker Desktop MCP: Manual restore from docker-desktop-mcp/ directory"
     echo "- Git repos: Use gitdow with git_repositories_backup.txt"
     echo ""
     echo "CREATED: $(date)"
