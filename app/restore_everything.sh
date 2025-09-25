@@ -194,9 +194,6 @@ type_out() {
 initial_loader() {
   [ "$SKIP_THEATRICS" -eq 1 ] && return 0
   
-  # Clear screen and move cursor up
-  printf "\033[2J\033[H"
-  
   # Stage 1: Initial startup with spinning
   spinner_dots "${TEXT[intro_start]}" 2
   printf "\r ${C_GREEN}✓ %s${C_RESET}\n" "${TEXT[intro_online]}"
