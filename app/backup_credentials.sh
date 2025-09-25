@@ -18,7 +18,10 @@
 #
 # USAGE:
 #   ./backup_credentials.sh [--encrypt-symmetric | --encrypt-recipient <id> | --no-encrypt]
-#                           [--include-vscode] [--outdir <dir>] [--dry-run]
+#                           [--include-vscode] [--outdir <dir>] [--dest <dir>] [--dry-run]
+#
+# --outdir: Creates $DIR/YYYYmmdd-HHMMSS/ (original standalone mode)
+# --dest: Creates $DEST/credentials/ (centralized mode - no timestamp subdirectory)
 #
 # SECURITY WARNINGS:
 # - Handle the resulting archive as HIGHLY SENSITIVE (contains private keys).
@@ -32,6 +35,8 @@ ENCRYPT_MODE="symmetric"   # default to symmetric encryption
 RECIPIENT=""
 INCLUDE_VSCODE=0
 OUT_ROOT="$HOME/secure-backups"
+CENTRALIZED_MODE=0
+DEST_DIR=""
 DRY_RUN=0
 
 while [[ $# -gt 0 ]]; do
@@ -41,6 +46,7 @@ while [[ $# -gt 0 ]]; do
     --no-encrypt)        ENCRYPT_MODE="none"; shift ;;
     --include-vscode)    INCLUDE_VSCODE=1; shift ;;
     --outdir)            OUT_ROOT="${2:-}"; shift 2 ;;
+    --dest)              DEST_DIR="${2:-}"; CENTRALIZED_MODE=1; shift 2 ;;
     --dry-run)           DRY_RUN=1; shift ;;
     -h|--help)
       sed -n '1,120p' "$0"; exit 0 ;;
@@ -48,8 +54,14 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-TS=$(date +%Y%m%d-%H%M%S)
-OUT_DIR="$OUT_ROOT/$TS"
+# Set output directory based on mode
+if [[ $CENTRALIZED_MODE -eq 1 ]]; then
+  OUT_DIR="$DEST_DIR/credentials"
+  TS="centralized-$(date +%Y%m%d-%H%M%S)"
+else
+  TS=$(date +%Y%m%d-%H%M%S)
+  OUT_DIR="$OUT_ROOT/$TS"
+fi
 ARCHIVE_NAME="credentials.tar"
 ARCHIVE_PATH="$OUT_DIR/$ARCHIVE_NAME"
 
@@ -188,8 +200,10 @@ SECURITY:
 - Consider removing collected/ after verifying the encrypted archive.
 EOF
 
-# Create latest symlink
-ln -sfn "$OUT_DIR" "$OUT_ROOT/latest" || true
+# Create latest symlink (standalone mode only)
+if [[ $CENTRALIZED_MODE -eq 0 ]]; then
+  ln -sfn "$OUT_DIR" "$OUT_ROOT/latest" || true
+fi
 
 echo "[done] Credentials backup complete: $OUT_DIR"
 echo "[info] Latest backup symlink: $OUT_ROOT/latest"

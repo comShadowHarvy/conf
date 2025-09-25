@@ -368,12 +368,10 @@ if [[ $INCLUDE_DOCKER -eq 1 ]]; then
   CURRENT_STEP=$((CURRENT_STEP + 1))
   echo "🐳 [$CURRENT_STEP/$TOTAL_STEPS] Backing up Docker images..."
   if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-    DOCKER_BACKUP_DIR="$BACKUP_DIR/docker-images"
-    
     if [[ $DRY_RUN -eq 1 ]]; then
-      echo "[dry-run] Would backup Docker images to: $DOCKER_BACKUP_DIR"
+      echo "[dry-run] Would backup Docker images to: $BACKUP_DIR/docker-images/"
     else
-      if ~/backup_docker_images.sh --dir "$DOCKER_BACKUP_DIR"; then
+      if ~/git/conf/app/backup_docker_images.sh --dest "$BACKUP_DIR"; then
         echo "✅ Docker images backup completed"
         SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
       else
@@ -393,13 +391,11 @@ if [[ $INCLUDE_FLATPAK -eq 1 ]]; then
   CURRENT_STEP=$((CURRENT_STEP + 1))
   echo "📦 [$CURRENT_STEP/$TOTAL_STEPS] Backing up Flatpak applications..."
   if command -v flatpak >/dev/null 2>&1; then
-    FLATPAK_BACKUP_DIR="$BACKUP_DIR/flatpak-apps"
-    
     if [[ $DRY_RUN -eq 1 ]]; then
-      echo "[dry-run] Would backup Flatpak apps to: $FLATPAK_BACKUP_DIR"
+      echo "[dry-run] Would backup Flatpak apps to: $BACKUP_DIR/flatpak-apps/"
       SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
     else
-      if ~/backup_flatpak_apps.sh --dir "$FLATPAK_BACKUP_DIR"; then
+      if ~/git/conf/app/backup_flatpak_apps.sh --dest "$BACKUP_DIR"; then
         echo "✅ Flatpak apps backup completed"
         SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
       else
@@ -418,10 +414,8 @@ fi
 if [[ $INCLUDE_CREDENTIALS -eq 1 ]]; then
   CURRENT_STEP=$((CURRENT_STEP + 1))
   echo "🔐 [$CURRENT_STEP/$TOTAL_STEPS] Backing up credentials (SSH, GPG, GitHub CLI, Git)..."
-  CREDS_BACKUP_DIR="$BACKUP_DIR/credentials"
-  
   # Build credentials backup command
-  CREDS_CMD="~/backup_credentials.sh --outdir $CREDS_BACKUP_DIR"
+  CREDS_CMD="~/git/conf/app/backup_credentials.sh --dest $BACKUP_DIR"
   
   case "$ENCRYPT_MODE" in
     symmetric) CREDS_CMD="$CREDS_CMD --encrypt-symmetric" ;;
@@ -501,9 +495,10 @@ if [[ $DRY_RUN -eq 0 ]]; then
     [ ${#FAILED_COMPONENTS[@]} -gt 0 ] && echo "❌ Failed: ${FAILED_COMPONENTS[*]}"
     echo ""
     echo "RESTORE INSTRUCTIONS:"
-    echo "- Docker images: ./restore_docker_images.sh -f docker-images/*/images.digests.txt"
-    echo "- Flatpak apps: ./restore_flatpak_apps.sh -f flatpak-apps/*/apps.tsv -r flatpak-apps/*/remotes.tsv"
-    echo "- Credentials: ./restore_credentials.sh -f credentials/*/credentials.tar.gpg"
+    echo "- All components: ./restore_everything.sh [backup_directory]"
+    echo "- Docker images: ./restore_docker_images.sh -f docker-images/images.digests.txt"
+    echo "- Flatpak apps: ./restore_flatpak_apps.sh -f flatpak-apps/apps.tsv -r flatpak-apps/remotes.tsv"
+    echo "- Credentials: ./restore_credentials.sh -f credentials/credentials.tar.gpg"
     echo "- Git repos: Use gitdow with git_repositories_backup.txt"
     echo ""
     echo "CREATED: $(date)"
