@@ -37,10 +37,10 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Set output directory based on mode
+TS=$(date +%Y%m%d-%H%M%S)
 if [[ $CENTRALIZED_MODE -eq 1 ]]; then
   OUT_DIR="$DEST_DIR/flatpak-apps"
 else
-  TS=$(date +%Y%m%d-%H%M%S)
   OUT_DIR="$BACKUP_ROOT/$TS"
 fi
 
