@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # restore_everything.sh - Master Restore System
-# Comprehensive restore of Docker images, Flatpak apps, credentials, and Git repos
+# Comprehensive restore of Docker images, Flatpak apps, credentials, Docker Desktop MCP, and Git repos
 #
 # USAGE:
 #   ./restore_everything.sh [options] [backup_directory]
@@ -10,10 +10,12 @@
 #   --docker              Restore Docker images only
 #   --flatpak             Restore Flatpak apps only  
 #   --credentials         Restore credentials only (SSH, GPG, GitHub CLI, Git)
+#   --docker-desktop-mcp  Restore Docker Desktop MCP only
 #   --git-repos           Restore Git repositories only (requires gitdow)
 #   --skip-docker         Skip Docker images restore
 #   --skip-flatpak        Skip Flatpak apps restore
 #   --skip-credentials    Skip credentials restore
+#   --skip-docker-desktop-mcp Skip Docker Desktop MCP restore
 #   --skip-git-repos      Skip Git repositories restore
 #   --add-ssh-keys        Automatically add SSH keys to agent after restore (default)
 #   --no-ssh-agent        Don't automatically add SSH keys to agent
@@ -45,6 +47,7 @@ BACKUP_DIR=""
 RESTORE_DOCKER=1
 RESTORE_FLATPAK=1
 RESTORE_CREDENTIALS=1
+RESTORE_DOCKER_DESKTOP_MCP=1
 RESTORE_GIT_REPOS=1
 ADD_SSH_KEYS=1
 NO_SSH_AGENT=0
@@ -231,20 +234,22 @@ initial_loader() {
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -d|--dir)           BACKUP_DIR="${2:-}"; shift 2 ;;
-    --docker)           SELECTIVE_MODE=1; RESTORE_DOCKER=1; RESTORE_FLATPAK=0; RESTORE_CREDENTIALS=0; RESTORE_GIT_REPOS=0; shift ;;
-    --flatpak)          SELECTIVE_MODE=1; RESTORE_DOCKER=0; RESTORE_FLATPAK=1; RESTORE_CREDENTIALS=0; RESTORE_GIT_REPOS=0; shift ;;
-    --credentials)      SELECTIVE_MODE=1; RESTORE_DOCKER=0; RESTORE_FLATPAK=0; RESTORE_CREDENTIALS=1; RESTORE_GIT_REPOS=0; shift ;;
-    --git-repos)        SELECTIVE_MODE=1; RESTORE_DOCKER=0; RESTORE_FLATPAK=0; RESTORE_CREDENTIALS=0; RESTORE_GIT_REPOS=1; shift ;;
+    --docker)           SELECTIVE_MODE=1; RESTORE_DOCKER=1; RESTORE_FLATPAK=0; RESTORE_CREDENTIALS=0; RESTORE_DOCKER_DESKTOP_MCP=0; RESTORE_GIT_REPOS=0; shift ;;
+    --flatpak)          SELECTIVE_MODE=1; RESTORE_DOCKER=0; RESTORE_FLATPAK=1; RESTORE_CREDENTIALS=0; RESTORE_DOCKER_DESKTOP_MCP=0; RESTORE_GIT_REPOS=0; shift ;;
+    --credentials)      SELECTIVE_MODE=1; RESTORE_DOCKER=0; RESTORE_FLATPAK=0; RESTORE_CREDENTIALS=1; RESTORE_DOCKER_DESKTOP_MCP=0; RESTORE_GIT_REPOS=0; shift ;;
+    --docker-desktop-mcp) SELECTIVE_MODE=1; RESTORE_DOCKER=0; RESTORE_FLATPAK=0; RESTORE_CREDENTIALS=0; RESTORE_DOCKER_DESKTOP_MCP=1; RESTORE_GIT_REPOS=0; shift ;;
+    --git-repos)        SELECTIVE_MODE=1; RESTORE_DOCKER=0; RESTORE_FLATPAK=0; RESTORE_CREDENTIALS=0; RESTORE_DOCKER_DESKTOP_MCP=0; RESTORE_GIT_REPOS=1; shift ;;
     --skip-docker)      RESTORE_DOCKER=0; shift ;;
     --skip-flatpak)     RESTORE_FLATPAK=0; shift ;;
     --skip-credentials) RESTORE_CREDENTIALS=0; shift ;;
+    --skip-docker-desktop-mcp) RESTORE_DOCKER_DESKTOP_MCP=0; shift ;;
     --skip-git-repos)   RESTORE_GIT_REPOS=0; shift ;;
     --add-ssh-keys)     ADD_SSH_KEYS=1; shift ;;
     --no-ssh-agent)     NO_SSH_AGENT=1; ADD_SSH_KEYS=0; shift ;;
     -p|--persona)       PERSONA_CHOSEN="${2:-}"; shift 2 ;;
     --no-theatrics)     SKIP_THEATRICS=1; shift ;;
     --dry-run)          DRY_RUN=1; shift ;;
-    --all)              RESTORE_DOCKER=1; RESTORE_FLATPAK=1; RESTORE_CREDENTIALS=1; RESTORE_GIT_REPOS=1; shift ;;
+    --all)              RESTORE_DOCKER=1; RESTORE_FLATPAK=1; RESTORE_CREDENTIALS=1; RESTORE_DOCKER_DESKTOP_MCP=1; RESTORE_GIT_REPOS=1; shift ;;
     -h|--help)
       sed -n '1,25p' "$0"; exit 0 ;;
     -*) echo "Unknown option: $1" >&2; exit 1 ;;
@@ -297,11 +302,11 @@ echo ""
 
 FAILED_COMPONENTS=()
 SUCCESS_COUNT=0
-TOTAL_COMPONENTS=$((RESTORE_DOCKER + RESTORE_FLATPAK + RESTORE_CREDENTIALS + RESTORE_GIT_REPOS))
+TOTAL_COMPONENTS=$((RESTORE_DOCKER + RESTORE_FLATPAK + RESTORE_CREDENTIALS + RESTORE_DOCKER_DESKTOP_MCP + RESTORE_GIT_REPOS))
 
 # 1. Docker Images Restore
 if [[ $RESTORE_DOCKER -eq 1 ]]; then
-  echo "🐳 [1/4] Restoring Docker images..."
+  echo "🐳 [1/5] Restoring Docker images..."
   
   # Try centralized layout first, then legacy layout
   DOCKER_IMAGES_FILE="$BACKUP_DIR/docker-images/images.digests.txt"
@@ -342,7 +347,7 @@ fi
 
 # 2. Flatpak Apps Restore
 if [[ $RESTORE_FLATPAK -eq 1 ]]; then
-  echo "📦 [2/4] Restoring Flatpak applications..."
+  echo "📦 [2/5] Restoring Flatpak applications..."
   
   # Try centralized layout first, then legacy layout
   FLATPAK_APPS_FILE="$BACKUP_DIR/flatpak-apps/apps.tsv"
@@ -384,7 +389,7 @@ fi
 
 # 3. Credentials Restore
 if [[ $RESTORE_CREDENTIALS -eq 1 ]]; then
-  echo "🔐 [3/4] Restoring credentials..."
+  echo "🔐 [3/5] Restoring credentials..."
   
   # Try centralized layout first, then legacy layout
   CREDS_ARCHIVE="$BACKUP_DIR/credentials/credentials.tar.gpg"
@@ -450,9 +455,35 @@ if [[ $RESTORE_CREDENTIALS -eq 1 ]]; then
   echo ""
 fi
 
-# 4. Git Repositories Restore
+# 4. Docker Desktop MCP Restore
+if [[ $RESTORE_DOCKER_DESKTOP_MCP -eq 1 ]]; then
+  echo "🔧 [4/5] Restoring Docker Desktop MCP configuration..."
+  
+  # Try centralized layout first, then legacy layout
+  DOCKER_MCP_DIR="$BACKUP_DIR/docker-desktop-mcp"
+  
+  if [[ -d "$DOCKER_MCP_DIR" ]]; then
+    if [[ $DRY_RUN -eq 1 ]]; then
+      echo "[dry-run] Would restore Docker Desktop MCP from: $DOCKER_MCP_DIR"
+    else
+      if ~/git/conf/app/restore_docker_desktop_mcp.sh -d "$DOCKER_MCP_DIR"; then
+        echo "✅ Docker Desktop MCP restore completed"
+        ((SUCCESS_COUNT++))
+      else
+        echo "❌ Docker Desktop MCP restore failed"
+        FAILED_COMPONENTS+=("Docker Desktop MCP")
+      fi
+    fi
+  else
+    echo "⚠️  No Docker Desktop MCP backup found, skipping..."
+    FAILED_COMPONENTS+=("Docker Desktop MCP (no backup found)")
+  fi
+  echo ""
+fi
+
+# 5. Git Repositories Restore
 if [[ $RESTORE_GIT_REPOS -eq 1 ]]; then
-  echo "🔄 [4/4] Restoring Git repositories..."
+  echo "🔄 [5/5] Restoring Git repositories..."
   
   GIT_BACKUP_FILE="$BACKUP_DIR/git_repositories_backup.txt"
   
@@ -515,3 +546,4 @@ echo "  • GitHub CLI: Run 'gh auth status' to verify authentication"
 echo "  • Git repos: Run '~/app/gitdow' if not automatically restored"
 echo "  • Docker: Run 'docker images' to verify restored images"
 echo "  • Flatpak: Run 'flatpak list' to verify restored apps"
+echo "  • Docker Desktop MCP: Restart Docker Desktop and verify MCP setup"
