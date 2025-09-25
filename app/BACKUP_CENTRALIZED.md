@@ -2,7 +2,7 @@
 
 ## Overview
 
-The backup system has been updated to support centralized backup storage. All backup components (Docker images, Flatpak apps, credentials, and Git repositories) now get stored in a single timestamped directory for easy restoration.
+The backup system has been updated to support centralized backup storage. All backup components (Docker images, Flatpak apps, credentials, Docker Desktop MCP configuration, and Git repositories) now get stored in a single timestamped directory for easy restoration.
 
 ## New Directory Structure
 
@@ -34,6 +34,11 @@ The backup system has been updated to support centralized backup storage. All ba
 │   ├── credentials.tar.gpg
 │   ├── collected/
 │   └── README.txt
+├── docker-desktop-mcp/
+│   ├── mcp_config/
+│   ├── config.json
+│   ├── daemon.json
+│   └── README.txt
 ├── git_repositories_backup.txt
 └── BACKUP_SUMMARY.txt
 ```
@@ -55,17 +60,28 @@ The backup system has been updated to support centralized backup storage. All ba
 ./restore_everything.sh ~/complete-backups/20250925-120000/
 ```
 
+### Selective Component Backups
+```bash
+# Backup only Docker Desktop MCP configuration
+./backup_everything.sh --docker-desktop-mcp
+
+# Backup Docker images and MCP configuration together
+./backup_everything.sh --docker --docker-desktop-mcp
+```
+
 ### Individual Component Backups (Still Supported)
 ```bash
 # Standalone mode (legacy behavior)
 ./backup_docker_images.sh --dir ~/my-docker-backup
 ./backup_flatpak_apps.sh --dir ~/my-flatpak-backup
 ./backup_credentials.sh --outdir ~/my-creds-backup
+./backup_docker_desktop_mcp.sh --dir ~/my-mcp-backup
 
 # Centralized mode (new)
 ./backup_docker_images.sh --dest ~/my-centralized-backup
 ./backup_flatpak_apps.sh --dest ~/my-centralized-backup
 ./backup_credentials.sh --dest ~/my-centralized-backup
+./backup_docker_desktop_mcp.sh --dest ~/my-centralized-backup
 ```
 
 ## Backward Compatibility
