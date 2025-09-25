@@ -58,6 +58,10 @@ The backup system has been updated to support centralized backup storage. All ba
 
 # Or specify a specific backup:
 ./restore_everything.sh ~/complete-backups/20250925-120000/
+
+# Restore only specific components:
+./restore_everything.sh --docker-desktop-mcp
+./restore_everything.sh --docker --docker-desktop-mcp
 ```
 
 ### Selective Component Backups
@@ -67,6 +71,12 @@ The backup system has been updated to support centralized backup storage. All ba
 
 # Backup Docker images and MCP configuration together
 ./backup_everything.sh --docker --docker-desktop-mcp
+
+# Restore only Docker Desktop MCP configuration
+./restore_everything.sh --docker-desktop-mcp
+
+# Restore Docker images and MCP configuration together
+./restore_everything.sh --docker --docker-desktop-mcp
 ```
 
 ### Individual Component Backups (Still Supported)
@@ -82,6 +92,12 @@ The backup system has been updated to support centralized backup storage. All ba
 ./backup_flatpak_apps.sh --dest ~/my-centralized-backup
 ./backup_credentials.sh --dest ~/my-centralized-backup
 ./backup_docker_desktop_mcp.sh --dest ~/my-centralized-backup
+
+# Individual restore scripts (standalone)
+./restore_docker_images.sh -f ~/backup/images.digests.txt
+./restore_flatpak_apps.sh -f ~/backup/apps.tsv -r ~/backup/remotes.tsv
+./restore_credentials.sh -f ~/backup/credentials.tar.gpg
+./restore_docker_desktop_mcp.sh -d ~/backup/docker-desktop-mcp/
 ```
 
 ## Backward Compatibility
