@@ -92,7 +92,6 @@ printf "Creating backup summary...\n"
   if [[ -d "$OUT_DIR/mcp_config" ]]; then
     echo "✓ MCP Configuration Directory (mcp_config/)"
     find "$OUT_DIR/mcp_config" -type f | sed 's|'"$OUT_DIR"'/mcp_config/|  - |' | head -20
-    local file_count
     file_count=$(find "$OUT_DIR/mcp_config" -type f | wc -l)
     if [[ $file_count -gt 20 ]]; then
       echo "  ... and $((file_count - 20)) more files"
