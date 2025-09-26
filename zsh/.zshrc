@@ -88,15 +88,13 @@ typeset -U path # Ensures path entries are unique
 
 # Build path array with proper precedence
 path=(
-  "$HOME/app"                   # Custom applications
+  "$HOME/bin"                   # Custom applications (via Stow scripts package)
   "$HOME/.local/bin"            # Standard user binary location
-  "$HOME/bin"                   # Legacy user binary location
   "$XDG_DATA_HOME/../bin"       # Potential location from install scripts
   $path                         # Include existing system path
 )
 
-# Add repo app directory to path if it exists and contains executables
-[[ -d "./app" && -x "./app/updateall" ]] && path=("./app" $path)
+# Note: Custom scripts are now managed via Stow scripts package -> ~/bin
 
 # Source environment variables from specific file if it exists
 [[ -f "$XDG_DATA_HOME/../bin/env" ]] && source "$XDG_DATA_HOME/../bin/env"
