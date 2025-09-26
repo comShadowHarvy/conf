@@ -5,12 +5,23 @@
 # Based on comprehensive WARP development standards
 # =====================================================
 
+# Guard against bash-specific file loading
+if [[ -n "$BASH_VERSION" ]]; then
+    echo "Error: This is a Zsh configuration file but Bash is running. Use .bashrc instead."
+    return 1
+fi
+
+# Prevent bash completion from loading (common source of errors)
+unset -f shopt 2>/dev/null  # Remove bash shopt function if it exists
+unset -f complete 2>/dev/null  # Remove bash complete function if it exists
+unset -f bind 2>/dev/null  # Remove bash bind function if it exists
+
 # --- Performance Tracking (Uncomment to Debug) ---
 # zmodload zsh/zprof
 # ZSHRC_START_TIME=${EPOCHREALTIME} # Use Zsh's high-resolution timer
 # All the default Omarchy aliases and functions
-# (don't mess with these directly, just overwrite them here!)
-source ~/.local/share/omarchy/default/bash/rc
+# Note: Omarchy bash config removed as it contains bash-specific commands
+# If you need omarchy functionality, create a zsh-specific version
 
 # Add your own exports, aliases, and functions here.
 #
@@ -120,9 +131,14 @@ elif (( $+commands[rg] )); then
   export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
 fi
 
-# FZF keybindings (if fzf is installed)
+# FZF keybindings and completion (if fzf is installed)
 if (( $+commands[fzf] )); then
-  # Load FZF keybindings if available
+  # Load FZF completion for Zsh
+  if [[ -f /usr/share/fzf/completion.zsh ]]; then
+    source /usr/share/fzf/completion.zsh
+  fi
+  
+  # Load FZF keybindings for Zsh
   if [[ -f /usr/share/fzf/key-bindings.zsh ]]; then
     source /usr/share/fzf/key-bindings.zsh
   elif [[ -f ~/.fzf.zsh ]]; then

@@ -118,7 +118,7 @@ export PROMPT_COMMAND="history -a; history -c; history -r; ${PROMPT_COMMAND}"
 # --------------------------------------------------
 # Keybindings (Emacs-style with prefix history search)
 # --------------------------------------------------
-bind -e
+set -o emacs
 bind '"\e[A": history-search-backward'
 bind '"\e[B": history-search-forward'
 
