@@ -136,6 +136,9 @@ fi
 # --------------------------------------------------
 # Local Binaries in PATH
 # --------------------------------------------------
+# Custom scripts (via Stow scripts package)
+export PATH="$HOME/bin:$PATH"
+# Standard user binaries
 export PATH="$HOME/.local/bin:$PATH"
 
 # --------------------------------------------------
