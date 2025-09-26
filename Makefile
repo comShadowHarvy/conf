@@ -8,7 +8,7 @@ TARGET_DIR := $(HOME)
 PACKAGES := bash zsh git tmux nvim hyprland waybar vscode wget secrets scripts shared
 
 # Core packages that should be stowed first
-CORE_PACKAGES := bash zsh git
+CORE_PACKAGES := bash zsh git scripts
 
 .PHONY: help stow-all stow-core unstow-all clean check status
 
