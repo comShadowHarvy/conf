@@ -178,26 +178,72 @@ _is_cache_valid() {
   [[ -f "$cache_file" ]] && (( $(date +%s) - $(stat -c %Y "$cache_file" 2>/dev/null || stat -f %m "$cache_file" 2>/dev/null || echo 0) < 86400 ))
 }
 
-# Safe download helper with progress and retries
+# Safe download helper with progress, retries, and atomic writes.
 _safe_download() {
-  local url="$1" destination="$2" message="${3:-"Downloading $url"}"
-  [[ -f "$destination" ]] && return 0
+  local url="$1"
+  local destination="$2"
+  # Optional 3rd argument for a custom log message
+  local message="${3:-"Downloading $url"}"
   
-  _log_message "INFO" "$message"
+  # Exit if the file already exists
+  if [[ -f "$destination" ]]; then
+    return 0
+  fi
+
+  # _log_message "INFO" "$message" # Assuming you have a _log_message function
+  
+  # Ensure the destination directory exists
   mkdir -p "$(dirname "$destination")"
-  
-  local cmd
-  if (( $+commands[curl] )); then
-    cmd="curl -fLs --connect-timeout 10 --max-time 30"
-  elif (( $+commands[wget] )); then
-    cmd="wget -qO-"
-  else
-    _error_exit "Cannot download: curl or wget not found."
+
+  # Create a temporary file to download to. This makes the operation atomic.
+  local tmp_file
+  tmp_file=$(mktemp "${destination}.tmp.XXXXXX")
+  if [[ -z "$tmp_file" ]]; then
+    # _error_exit "Failed to create temporary file." # Assuming _error_exit
     return 1
   fi
-  
-  $cmd "$url" > "$destination" || { _error_exit "Failed to download $url"; return 1; }
+
+  local download_cmd
+  local exit_code=1
+
+  # Use the more portable `command -v` to check for command existence
+  if command -v curl >/dev/null 2>&1; then
+    # -f: Fail on server errors (like 404)
+    # -L: Follow redirects
+    # -sS: Show errors, but otherwise be silent
+    # --retry 3: Attempt the download up to 3 times
+    # --retry-delay 2: Wait 2 seconds between retries
+    # --progress-bar: Display a progress bar instead of the default meter
+    download_cmd="curl -fL -sS --retry 3 --retry-delay 2 --progress-bar"
+    $download_cmd -o "$tmp_file" "$url"
+    exit_code=$?
+  elif command -v wget >/dev/null 2>&1; then
+    # --tries=3: Attempt the download up to 3 times
+    # --wait=2: Wait 2 seconds between retries
+    # --progress=bar:force: Display a progress bar
+    # -O: Specify the output file
+    download_cmd="wget --tries=3 --wait=2 --progress=bar:force"
+    $download_cmd -O "$tmp_file" "$url" 2>&1 # Redirect stderr to see progress
+    exit_code=$?
+  else
+    # _error_exit "Cannot download: curl or wget not found."
+    rm -f "$tmp_file" # Clean up temporary file
+    return 1
+  fi
+
+  # Check if the download command was successful
+  if [[ $exit_code -eq 0 ]]; then
+    # Move the completed download to its final destination
+    mv "$tmp_file" "$destination"
+    return 0
+  else
+    # _error_exit "Failed to download $url"
+    # Clean up the partial/failed download
+    rm -f "$tmp_file"
+    return 1
+  fi
 }
+
 
 # Package manager detection (cached)
 _detect_package_manager() {
@@ -670,25 +716,62 @@ if [[ "$USE_LEGACY_ALIASES" == "true" ]] || [[ ${#_alias_module_loaded[@]} -eq 0
 fi
 
 # --- Oh My Posh (Prompt) ---
-if [[ "$USE_OHMYPOSH" == "true" ]]; then
-  if _install_if_missing "oh-my-posh"; then
-    # Use XDG config directory for themes
-    OMP_THEME_DIR="$XDG_CONFIG_HOME/oh-my-posh/themes"
-    OMP_THEME_FILE="$OMP_THEME_DIR/devious-diamonds.omp.yaml" # Adjust theme name if needed
-    OMP_THEME_URL="https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/devious-diamonds.omp.yaml"
-
-    # Ensure theme is available (download if missing)
-    mkdir -p "$OMP_THEME_DIR"
-    if _safe_download "$OMP_THEME_URL" "$OMP_THEME_FILE" "Downloading Oh My Posh theme..."; then
-      # Initialize Oh My Posh
-      eval "$(oh-my-posh init zsh --config "$OMP_THEME_FILE")"
-    else
-      _log_message "WARNING" "Failed to download Oh My Posh theme. Using default prompt."
-    fi
-  else
+# Improved theme management with better caching, fallbacks, and async downloading
+_setup_ohmyposh() {
+  [[ "$USE_OHMYPOSH" != "true" ]] && return 1
+  
+  # Check if oh-my-posh is available
+  if ! _install_if_missing "oh-my-posh"; then
     _log_message "WARNING" "Oh My Posh not available. Using default prompt."
+    return 1
   fi
-fi
+  
+  # Configuration
+  local theme_dir="$XDG_CONFIG_HOME/oh-my-posh/themes"
+  local theme_name="devious-diamonds" # Change this to your preferred theme
+  local theme_file="$theme_dir/${theme_name}.omp.yaml"
+  local theme_url="https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/${theme_name}.omp.yaml"
+  local fallback_themes=("agnoster" "powerline" "pure" "spaceship") # Built-in themes as fallbacks
+  
+  mkdir -p "$theme_dir"
+  
+  # Try to use the custom theme if it exists
+  if [[ -f "$theme_file" ]]; then
+    eval "$(oh-my-posh init zsh --config "$theme_file")"
+    return 0
+  fi
+  
+  # Try built-in themes first (faster than downloading)
+  local builtin_theme_found=false
+  for fallback in "${fallback_themes[@]}"; do
+    if oh-my-posh print primary --config "$fallback" &>/dev/null; then
+      eval "$(oh-my-posh init zsh --config "$fallback")"
+      builtin_theme_found=true
+      
+      # Download the preferred theme in the background for next time
+      {
+        if _safe_download "$theme_url" "$theme_file" "Downloading Oh My Posh theme ($theme_name)..."; then
+          _log_message "INFO" "Theme $theme_name downloaded successfully. Restart shell to use it."
+        fi
+      } &!
+      break
+    fi
+  done
+  
+  # If no built-in theme worked, try to download synchronously as last resort
+  if ! $builtin_theme_found; then
+    _log_message "INFO" "No built-in themes available. Attempting download..."
+    if _safe_download "$theme_url" "$theme_file" "Downloading Oh My Posh theme ($theme_name)..."; then
+      eval "$(oh-my-posh init zsh --config "$theme_file")"
+    else
+      _log_message "WARNING" "Failed to download theme. Using Oh My Posh default."
+      eval "$(oh-my-posh init zsh)"
+    fi
+  fi
+}
+
+# Initialize Oh My Posh
+_setup_ohmyposh
 
 # --- Feature Functions & Aliases ---
 
