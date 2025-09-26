@@ -8,6 +8,17 @@
 # --- Performance Tracking (Uncomment to Debug) ---
 # zmodload zsh/zprof
 # ZSHRC_START_TIME=${EPOCHREALTIME} # Use Zsh's high-resolution timer
+# All the default Omarchy aliases and functions
+# (don't mess with these directly, just overwrite them here!)
+source ~/.local/share/omarchy/default/bash/rc
+
+# Add your own exports, aliases, and functions here.
+#
+# Make an alias for invoking commands you use constantly
+# alias p='python'
+
+. "$HOME/.local/share/../bin/env"
+. "$HOME/.cargo/env"
 
 # --- Core Environment Setup (Set Early) ---
 export ZDOTDIR="${ZDOTDIR:-$HOME}"
