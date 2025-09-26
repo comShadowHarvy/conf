@@ -592,8 +592,10 @@ load_alias_module() {
   local mod="$1"
   local config_dir
   
-  # Determine config directory (handle both standard home location and current directory)
-  if [[ -d "$HOME/git/conf/aliases.d" ]]; then
+  # Determine config directory (Stow-managed structure)
+  if [[ -d "$HOME/.aliases.d" ]]; then
+    config_dir="$HOME"
+  elif [[ -d "$HOME/git/conf/aliases.d" ]]; then
     config_dir="$HOME/git/conf"
   elif [[ -d "$PWD/aliases.d" ]]; then
     config_dir="$PWD"
@@ -698,7 +700,7 @@ _safe_source "$ZDOTDIR/.zshrc.local" # For user-specific overrides
 if [[ "$USE_LEGACY_ALIASES" == "true" ]] || [[ ${#_alias_module_loaded[@]} -eq 0 ]]; then
   # Try various locations for the .aliases file
   local aliases_file=""
-  for location in "$ZDOTDIR/.aliases" "$HOME/git/conf/.aliases" "$PWD/.aliases" "$HOME/.aliases"; do
+  for location in "$HOME/.aliases" "$ZDOTDIR/.aliases" "$HOME/git/conf/.aliases" "$PWD/.aliases"; do
     if [[ -f "$location" ]]; then
       aliases_file="$location"
       break
