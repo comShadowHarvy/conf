@@ -4,6 +4,17 @@
 # This file combines customizations from your old bashrc with a
 # Bash-adapted version of your Zsh/Zim setup.
 #####################################################################
+# All the default Omarchy aliases and functions
+# (don't mess with these directly, just overwrite them here!)
+source ~/.local/share/omarchy/default/bash/rc
+
+# Add your own exports, aliases, and functions here.
+#
+# Make an alias for invoking commands you use constantly
+# alias p='python'
+
+. "$HOME/.local/share/../bin/env"
+. "$HOME/.cargo/env"
 
 # Exit if not running interactively.
 [[ $- != *i* ]] && return
