@@ -1,0 +1,273 @@
+#!/bin/bash
+
+# SCRIPT: img2iso - Convert .img and .img.bz2 files to .iso format
+# DESCRIPTION: Converts disk image files to ISO format with progress feedback and size statistics
+# AUTHOR: ShadowHarvy
+# CREATED: 2025-09-28
+
+# --- Set Colors for Output ---
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# --- Global Variables ---
+PROCESSED_COUNT=0
+SUCCESS_COUNT=0
+TEMP_DIR=""
+
+# --- Cleanup Function ---
+cleanup() {
+    if [ -n "$TEMP_DIR" ] && [ -d "$TEMP_DIR" ]; then
+        echo -e "${BLUE}Cleaning up temporary files...${NC}"
+        rm -rf "$TEMP_DIR"
+    fi
+}
+
+# --- Set trap for cleanup ---
+trap cleanup EXIT
+
+# --- Usage Function ---
+usage() {
+    echo -e "${YELLOW}Usage: $0 <image_file1> [image_file2] ...${NC}"
+    echo ""
+    echo "Converts .img and .img.bz2 files to .iso format."
+    echo ""
+    echo "Supported input formats:"
+    echo "  - .img     (direct copy to .iso)"
+    echo "  - .img.bz2 (decompress then copy to .iso)"
+    echo ""
+    echo "Examples:"
+    echo "  $0 diskimage.img"
+    echo "  $0 compressed.img.bz2"
+    echo "  $0 image1.img image2.img.bz2 image3.img"
+    echo ""
+    echo "The script will create .iso files in the same directory as the source files."
+}
+
+# --- Dependency Check Function ---
+check_dependencies() {
+    local missing_deps=()
+    local required_commands=("bzip2" "bunzip2" "cp" "stat" "file")
+    
+    for cmd in "${required_commands[@]}"; do
+        if ! command -v "$cmd" >/dev/null 2>&1; then
+            missing_deps+=("$cmd")
+        fi
+    done
+    
+    if [ ${#missing_deps[@]} -ne 0 ]; then
+        echo -e "${RED}Error: Missing required dependencies:${NC}"
+        for dep in "${missing_deps[@]}"; do
+            echo -e "${RED}  - $dep${NC}"
+        done
+        echo -e "${YELLOW}Please install the missing dependencies and try again.${NC}"
+        exit 1
+    fi
+}
+
+# --- Get File Size in Human Readable Format ---
+get_file_size() {
+    local file="$1"
+    if [ -f "$file" ]; then
+        stat -c%s "$file" 2>/dev/null || echo "0"
+    else
+        echo "0"
+    fi
+}
+
+# --- Get Human Readable Size ---
+get_human_size() {
+    local size_bytes="$1"
+    if [ "$size_bytes" -eq 0 ]; then
+        echo "0 B"
+    else
+        numfmt --to=iec-i --suffix=B "$size_bytes" | sed 's/ //g'
+    fi
+}
+
+# --- Validate File Function ---
+validate_file() {
+    local file="$1"
+    
+    # Check if file exists
+    if [ ! -f "$file" ]; then
+        echo -e "${RED}Error: File '$file' does not exist.${NC}"
+        return 1
+    fi
+    
+    # Check if file has correct extension
+    case "$file" in
+        *.img|*.img.bz2)
+            return 0
+            ;;
+        *)
+            echo -e "${RED}Error: File '$file' must have .img or .img.bz2 extension.${NC}"
+            return 1
+            ;;
+    esac
+}
+
+# --- Process .img.bz2 File ---
+process_bz2_file() {
+    local input_file="$1"
+    local base_name=$(basename "$input_file" .img.bz2)
+    local temp_img="$TEMP_DIR/${base_name}.img"
+    local output_iso="${input_file%%.img.bz2}.iso"
+    
+    echo -e "${BLUE}Decompressing '$input_file'...${NC}"
+    
+    # Decompress to temporary directory
+    if ! bunzip2 -k -c "$input_file" > "$temp_img"; then
+        echo -e "${RED}Error: Failed to decompress '$input_file'${NC}"
+        return 1
+    fi
+    
+    # Check if output file already exists
+    if [ -f "$output_iso" ]; then
+        echo -e "${YELLOW}Warning: Output file '$output_iso' already exists.${NC}"
+        read -p "Overwrite? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo -e "${YELLOW}Skipping '$input_file'${NC}"
+            rm -f "$temp_img"
+            return 0
+        fi
+    fi
+    
+    # Copy decompressed img to iso
+    echo -e "${BLUE}Converting '$temp_img' to '$output_iso'...${NC}"
+    if ! cp "$temp_img" "$output_iso"; then
+        echo -e "${RED}Error: Failed to create ISO file '$output_iso'${NC}"
+        rm -f "$temp_img"
+        return 1
+    fi
+    
+    # Clean up temporary file
+    rm -f "$temp_img"
+    
+    # Display size information
+    local original_size=$(get_file_size "$input_file")
+    local iso_size=$(get_file_size "$output_iso")
+    local original_human=$(get_human_size "$original_size")
+    local iso_human=$(get_human_size "$iso_size")
+    
+    echo -e "${GREEN}Successfully converted '$input_file' to '$output_iso'${NC}"
+    echo -e "${GREEN}Original size (compressed): $original_human ($original_size bytes)${NC}"
+    echo -e "${GREEN}ISO size: $iso_human ($iso_size bytes)${NC}"
+    
+    return 0
+}
+
+# --- Process .img File ---
+process_img_file() {
+    local input_file="$1"
+    local output_iso="${input_file%%.img}.iso"
+    
+    # Check if output file already exists
+    if [ -f "$output_iso" ]; then
+        echo -e "${YELLOW}Warning: Output file '$output_iso' already exists.${NC}"
+        read -p "Overwrite? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo -e "${YELLOW}Skipping '$input_file'${NC}"
+            return 0
+        fi
+    fi
+    
+    echo -e "${BLUE}Converting '$input_file' to '$output_iso'...${NC}"
+    
+    # Copy img to iso (they're essentially the same format)
+    if ! cp "$input_file" "$output_iso"; then
+        echo -e "${RED}Error: Failed to create ISO file '$output_iso'${NC}"
+        return 1
+    fi
+    
+    # Display size information
+    local original_size=$(get_file_size "$input_file")
+    local iso_size=$(get_file_size "$output_iso")
+    local original_human=$(get_human_size "$original_size")
+    local iso_human=$(get_human_size "$iso_size")
+    
+    echo -e "${GREEN}Successfully converted '$input_file' to '$output_iso'${NC}"
+    echo -e "${GREEN}Size: $original_human ($original_size bytes)${NC}"
+    
+    return 0
+}
+
+# --- Main Function ---
+main() {
+    # Check for help flag
+    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+        usage
+        exit 0
+    fi
+    
+    # Check if arguments provided
+    if [ $# -eq 0 ]; then
+        echo -e "${RED}Error: No input files specified.${NC}"
+        usage
+        exit 1
+    fi
+    
+    # Check dependencies
+    check_dependencies
+    
+    # Create temporary directory
+    TEMP_DIR=$(mktemp -d -t img2iso.XXXXXX)
+    if [ ! -d "$TEMP_DIR" ]; then
+        echo -e "${RED}Error: Could not create temporary directory.${NC}"
+        exit 1
+    fi
+    
+    echo -e "${BLUE}=== IMG to ISO Converter ===${NC}"
+    echo -e "${BLUE}Processing $# file(s)...${NC}"
+    echo ""
+    
+    # Process each file
+    for file in "$@"; do
+        PROCESSED_COUNT=$((PROCESSED_COUNT + 1))
+        
+        echo -e "${YELLOW}[$PROCESSED_COUNT/$#] Processing: $file${NC}"
+        
+        # Validate file
+        if ! validate_file "$file"; then
+            echo ""
+            continue
+        fi
+        
+        # Process based on file extension
+        case "$file" in
+            *.img.bz2)
+                if process_bz2_file "$file"; then
+                    SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+                fi
+                ;;
+            *.img)
+                if process_img_file "$file"; then
+                    SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+                fi
+                ;;
+        esac
+        
+        echo ""
+    done
+    
+    # Final summary
+    echo -e "${BLUE}=== Conversion Summary ===${NC}"
+    echo -e "${BLUE}Files processed: $PROCESSED_COUNT${NC}"
+    echo -e "${GREEN}Successfully converted: $SUCCESS_COUNT${NC}"
+    
+    if [ $SUCCESS_COUNT -lt $PROCESSED_COUNT ]; then
+        local failed_count=$((PROCESSED_COUNT - SUCCESS_COUNT))
+        echo -e "${RED}Failed conversions: $failed_count${NC}"
+        exit 1
+    else
+        echo -e "${GREEN}All conversions completed successfully!${NC}"
+        exit 0
+    fi
+}
+
+# --- Execute Main Function ---
+main "$@"
