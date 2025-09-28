@@ -1,12 +1,12 @@
 # img2iso - Image to ISO Converter
 
-Convert .img and .img.bz2 disk image files to .iso format with progress feedback and size statistics.
+Convert .img, .img.bz2, and .img.xz disk image files to .iso format with progress feedback and size statistics.
 
 ## 🚀 Features
 
-- **Primary Function**: Converts IMG and compressed IMG.BZ2 files to ISO format
+- **Primary Function**: Converts IMG and compressed IMG.BZ2/IMG.XZ files to ISO format
 - **Batch Processing**: Handle multiple files in a single command
-- **Smart Decompression**: Automatically handles .img.bz2 files
+- **Smart Decompression**: Automatically handles .img.bz2 and .img.xz files
 - **Size Reporting**: Shows original and converted file sizes
 - **Safe Operations**: Prompts before overwriting existing files
 - **Progress Tracking**: Clear feedback during conversion process
@@ -36,6 +36,8 @@ img2iso --help    # Show help message
 ### Dependencies
 - bzip2 (for .img.bz2 decompression)
 - bunzip2 (for .img.bz2 decompression)
+- xz (for .img.xz decompression)
+- unxz (for .img.xz decompression)
 - cp (for file copying)
 - stat (for file size reporting)
 - file (for file type detection)
@@ -43,7 +45,7 @@ img2iso --help    # Show help message
 ### Installation Commands
 ```bash
 # Install dependencies (example for Arch Linux)
-sudo pacman -S bzip2 coreutils file
+sudo pacman -S bzip2 xz coreutils file
 ```
 
 ## 🛠️ Installation
@@ -76,9 +78,15 @@ Creates `diskimage.iso` in the same directory.
 ```
 Decompresses and converts to `compressed_image.iso`.
 
-### Example 3: Batch conversion
+### Example 3: Convert .img.xz file
 ```bash
-./img2iso image1.img image2.img.bz2 image3.img
+./img2iso xz_compressed.img.xz
+```
+Decompresses and converts to `xz_compressed.iso`.
+
+### Example 4: Batch conversion
+```bash
+./img2iso image1.img image2.img.bz2 image3.img.xz
 ```
 Converts multiple files at once with progress tracking.
 
@@ -92,6 +100,7 @@ Converts multiple files at once with progress tracking.
 ### Input Formats
 - **`.img`** - Raw disk image files (direct copy to .iso)
 - **`.img.bz2`** - Bzip2 compressed disk image files (decompress then copy to .iso)
+- **`.img.xz`** - XZ compressed disk image files (decompress then copy to .iso)
 
 ### Output Format
 - **`.iso`** - ISO 9660 disk image format
@@ -113,10 +122,10 @@ chmod +x img2iso
 sudo pacman -S bzip2 coreutils file
 
 # Ubuntu/Debian
-sudo apt install bzip2 coreutils file
+sudo apt install bzip2 xz-utils coreutils file
 
 # RHEL/CentOS/Fedora
-sudo yum install bzip2 coreutils file
+sudo yum install bzip2 xz coreutils file
 ```
 
 ### Issue 3: File Already Exists
@@ -140,6 +149,9 @@ file your_image_file.img
 ```bash
 # Test .img.bz2 decompression manually
 bunzip2 -t your_image.img.bz2
+
+# Test .img.xz decompression manually
+unxz -t your_image.img.xz
 ```
 
 ### Check Available Space
@@ -152,7 +164,7 @@ df -h .
 
 - IMG and ISO files are essentially the same format for disk images
 - The conversion is primarily a file copy operation with extension change
-- For .img.bz2 files, decompression occurs in a temporary directory
+- For .img.bz2 and .img.xz files, decompression occurs in a temporary directory
 - Temporary files are automatically cleaned up on script exit
 - File size statistics help verify successful conversion
 
