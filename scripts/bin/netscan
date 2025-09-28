@@ -1,0 +1,547 @@
+#!/bin/bash
+
+# SCRIPT: netscan - Network discovery and port scanning utility
+# DESCRIPTION: Advanced network scanning tool combining nmap and arp-scan
+#              capabilities for comprehensive network reconnaissance.
+#              Features interactive menus, multiple scan types, and 
+#              detailed reporting with progress indicators.
+# AUTHOR: ShadowHarvy
+# CREATED: 2025-09-28
+
+# --- Set Colors for Output ---
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# --- Global Variables ---
+TEMP_DIR=""
+OUTPUT_FILE=""
+SELECTED_INTERFACE=""
+TARGET_RANGE=""
+SCAN_TYPE=""
+SAVE_OUTPUT=false
+
+# --- Cleanup Function ---
+cleanup() {
+    # Remove temporary files
+    if [ -n "$TEMP_DIR" ] && [ -d "$TEMP_DIR" ]; then
+        echo -e "${BLUE}Cleaning up temporary files...${NC}"
+        rm -rf "$TEMP_DIR"
+    fi
+    
+    # Reset terminal formatting
+    echo -e "${NC}"
+}
+
+# --- Set trap for cleanup ---
+trap cleanup EXIT INT
+
+# --- Usage Function ---
+usage() {
+    echo -e "${YELLOW}Usage: $0 [options]${NC}"
+    echo ""
+    echo "Network discovery and port scanning utility."
+    echo ""
+    echo "Options:"
+    echo "  -h, --help    Show this help message"
+    echo "  -i, --interface IFACE  Specify network interface"
+    echo "  -r, --range RANGE      Specify target range (CIDR notation)"
+    echo "  -o, --output FILE      Save output to file"
+    echo ""
+    echo "Scan Types:"
+    echo "  1) Quick nmap scan     - Host discovery + common ports"
+    echo "  2) Full nmap scan      - Comprehensive scan with service detection"
+    echo "  3) ARP local scan      - ARP table discovery"
+    echo "  4) Custom scan         - User-defined nmap parameters"
+    echo ""
+    echo "Examples:"
+    echo "  $0                           # Interactive mode"
+    echo "  $0 -i wlan0 -r 192.168.1.0/24"
+    echo "  $0 -o scan_results.txt"
+}
+
+# --- Dependency Check Function ---
+check_dependencies() {
+    local missing_deps=()
+    local required_commands=("nmap" "arp-scan" "ip")
+    
+    for cmd in "${required_commands[@]}"; do
+        if ! command -v "$cmd" >/dev/null 2>&1; then
+            missing_deps+=("$cmd")
+        fi
+    done
+    
+    if [ ${#missing_deps[@]} -ne 0 ]; then
+        echo -e "${RED}Error: Missing required dependencies:${NC}"
+        for dep in "${missing_deps[@]}"; do
+            echo -e "${RED}  - $dep${NC}"
+        done
+        echo -e "${YELLOW}Install with: sudo pacman -S ${missing_deps[*]}${NC}"
+        exit 1
+    fi
+}
+
+# --- Check Root Privileges ---
+check_root() {
+    if [ "$EUID" -ne 0 ]; then
+        echo -e "${YELLOW}Warning: Some scan types require root privileges${NC}"
+        echo -e "${YELLOW}Consider running with sudo for full functionality${NC}"
+        return 1
+    fi
+    return 0
+}
+
+# --- Network Interface Detection ---
+detect_interfaces() {
+    echo -e "${BLUE}=== Detecting Network Interfaces ===${NC}"
+    ip -o -4 addr show | while read -r line; do
+        interface=$(echo "$line" | awk '{print $2}')
+        ip_cidr=$(echo "$line" | awk '{print $4}')
+        
+        # Skip loopback
+        if [ "$interface" != "lo" ]; then
+            echo -e "${GREEN}Interface: $interface - IP: $ip_cidr${NC}"
+        fi
+    done
+}
+
+# --- List Available Interfaces ---
+list_interfaces() {
+    ip -o -4 addr show | grep -v ' lo ' | awk '{print $2}' | sort -u
+}
+
+# --- Get Network Range for Interface ---
+get_network_range() {
+    local interface="$1"
+    local ip_cidr
+    
+    ip_cidr=$(ip -o -4 addr show "$interface" | awk '{print $4}' | head -n1)
+    
+    if [ -n "$ip_cidr" ]; then
+        # Convert IP/CIDR to network/CIDR
+        python3 -c "
+import ipaddress
+import sys
+try:
+    net = ipaddress.IPv4Network('$ip_cidr', strict=False)
+    print(f'{net.network_address}/{net.prefixlen}')
+except:
+    print('$ip_cidr')
+"
+    fi
+}
+
+# --- Progress Indicator ---
+show_progress() {
+    local duration=$1
+    local message="$2"
+    
+    echo -e "${BLUE}$message${NC}"
+    
+    # Simple spinner for long operations
+    local spin='-\|/'
+    local i=0
+    
+    (
+        sleep $duration
+    ) &
+    local pid=$!
+    
+    while kill -0 $pid 2>/dev/null; do
+        i=$(( (i+1) %4 ))
+        printf "\r${YELLOW}[${spin:$i:1}] Processing...${NC}"
+        sleep 0.1
+    done
+    printf "\r${GREEN}[✓] Complete!${NC}\n"
+}
+
+# --- Parse Scan Results ---
+parse_scan_results() {
+    local scan_output="$1"
+    local hosts_up=0
+    local ports_open=0
+    local services_found=0
+    
+    if [ -f "$scan_output" ]; then
+        hosts_up=$(grep -c "Host is up" "$scan_output" 2>/dev/null || echo "0")
+        ports_open=$(grep -c "open" "$scan_output" 2>/dev/null || echo "0")
+        services_found=$(grep -c "service" "$scan_output" 2>/dev/null || echo "0")
+    else
+        # Parse from last command output if no file
+        hosts_up=$(echo "$scan_output" | grep -c "Host is up" 2>/dev/null || echo "0")
+        ports_open=$(echo "$scan_output" | grep -c "open" 2>/dev/null || echo "0")
+        services_found=$(echo "$scan_output" | grep -c "service" 2>/dev/null || echo "0")
+    fi
+    
+    echo "$hosts_up:$ports_open:$services_found"
+}
+
+# --- Generate Summary Report ---
+generate_summary() {
+    local scan_type="$1"
+    local target="$2"
+    local results="$3"
+    local start_time="$4"
+    local end_time="$5"
+    
+    local hosts_up=$(echo "$results" | cut -d: -f1)
+    local ports_open=$(echo "$results" | cut -d: -f2)
+    local services_found=$(echo "$results" | cut -d: -f3)
+    local duration=$((end_time - start_time))
+    
+    echo ""
+    echo -e "${BLUE}=== Scan Summary ===${NC}"
+    echo -e "${BLUE}Scan Type: $scan_type${NC}"
+    echo -e "${BLUE}Target: $target${NC}"
+    echo -e "${BLUE}Duration: ${duration}s${NC}"
+    echo ""
+    echo -e "${GREEN}Results:${NC}"
+    echo -e "${GREEN}  • Hosts discovered: $hosts_up${NC}"
+    echo -e "${GREEN}  • Open ports found: $ports_open${NC}"
+    echo -e "${GREEN}  • Services identified: $services_found${NC}"
+    echo ""
+}
+
+# --- Quick Scan Function ---
+quick_scan() {
+    local target="$1"
+    local output_file="$2"
+    local temp_output="$TEMP_DIR/quick_scan.tmp"
+    local start_time=$(date +%s)
+    
+    echo -e "${BLUE}=== Quick Network Scan ===${NC}"
+    echo -e "${BLUE}Target: $target${NC}"
+    echo ""
+    
+    echo -e "${BLUE}Phase 1: Host Discovery${NC}"
+    if [ -n "$output_file" ]; then
+        nmap -sn "$target" | tee "$temp_output" "$output_file"
+    else
+        nmap -sn "$target" | tee "$temp_output"
+    fi
+    
+    echo ""
+    echo -e "${BLUE}Phase 2: Port Scanning (Common Ports)${NC}"
+    if [ -n "$output_file" ]; then
+        nmap -sS -p 1-1024 --reason "$target" | tee -a "$temp_output" "$output_file"
+    else
+        nmap -sS -p 1-1024 --reason "$target" | tee -a "$temp_output"
+    fi
+    
+    local end_time=$(date +%s)
+    local results=$(parse_scan_results "$temp_output")
+    generate_summary "Quick Scan" "$target" "$results" "$start_time" "$end_time"
+    
+    if [ -n "$output_file" ] && [ -f "$temp_output" ]; then
+        echo "" >> "$output_file"
+        generate_summary "Quick Scan" "$target" "$results" "$start_time" "$end_time" >> "$output_file"
+    fi
+}
+
+# --- Full Scan Function ---
+full_scan() {
+    local target="$1"
+    local output_file="$2"
+    local temp_output="$TEMP_DIR/full_scan.tmp"
+    local start_time=$(date +%s)
+    
+    echo -e "${BLUE}=== Full Network Scan ===${NC}"
+    echo -e "${BLUE}Target: $target${NC}"
+    echo -e "${YELLOW}Warning: This scan may take a considerable amount of time${NC}"
+    echo ""
+    
+    # Confirmation prompt for full scan
+    echo -e "${YELLOW}Continue with full scan? This will scan ALL ports (y/N):${NC}"
+    read -n 1 -r confirm
+    echo ""
+    
+    if [[ ! $confirm =~ ^[Yy]$ ]]; then
+        echo -e "${YELLOW}Full scan cancelled${NC}"
+        return 0
+    fi
+    
+    echo -e "${BLUE}Starting comprehensive scan...${NC}"
+    if [ -n "$output_file" ]; then
+        nmap -A -p- --reason -T4 "$target" | tee "$temp_output" "$output_file"
+    else
+        nmap -A -p- --reason -T4 "$target" | tee "$temp_output"
+    fi
+    
+    local end_time=$(date +%s)
+    local results=$(parse_scan_results "$temp_output")
+    generate_summary "Full Scan" "$target" "$results" "$start_time" "$end_time"
+    
+    if [ -n "$output_file" ] && [ -f "$temp_output" ]; then
+        echo "" >> "$output_file"
+        generate_summary "Full Scan" "$target" "$results" "$start_time" "$end_time" >> "$output_file"
+    fi
+}
+
+# --- ARP Scan Function ---
+arp_scan_network() {
+    local interface="$1"
+    local output_file="$2"
+    local temp_output="$TEMP_DIR/arp_scan.tmp"
+    local start_time=$(date +%s)
+    
+    echo -e "${BLUE}=== ARP Network Scan ===${NC}"
+    echo -e "${BLUE}Interface: $interface${NC}"
+    echo ""
+    
+    if [ -n "$output_file" ]; then
+        arp-scan --interface="$interface" --localnet | tee "$temp_output" "$output_file"
+    else
+        arp-scan --interface="$interface" --localnet | tee "$temp_output"
+    fi
+    
+    local end_time=$(date +%s)
+    local hosts_found=$(grep -c "^[0-9]" "$temp_output" 2>/dev/null || echo "0")
+    local duration=$((end_time - start_time))
+    
+    echo ""
+    echo -e "${BLUE}=== ARP Scan Summary ===${NC}"
+    echo -e "${BLUE}Interface: $interface${NC}"
+    echo -e "${BLUE}Duration: ${duration}s${NC}"
+    echo ""
+    echo -e "${GREEN}Results:${NC}"
+    echo -e "${GREEN}  • Hosts discovered: $hosts_found${NC}"
+    echo ""
+    
+    if [ -n "$output_file" ] && [ -f "$temp_output" ]; then
+        echo "" >> "$output_file"
+        echo "=== ARP Scan Summary ===" >> "$output_file"
+        echo "Interface: $interface" >> "$output_file"
+        echo "Duration: ${duration}s" >> "$output_file"
+        echo "Hosts discovered: $hosts_found" >> "$output_file"
+        echo "" >> "$output_file"
+    fi
+}
+
+# --- Custom Scan Function ---
+custom_scan() {
+    local target="$1"
+    local output_file="$2"
+    local temp_output="$TEMP_DIR/custom_scan.tmp"
+    local start_time=$(date +%s)
+    
+    echo -e "${BLUE}=== Custom Network Scan ===${NC}"
+    echo -e "${YELLOW}Common nmap options:${NC}"
+    echo "  -sS     TCP SYN scan (default)"
+    echo "  -sU     UDP scan"
+    echo "  -sV     Version detection"
+    echo "  -sC     Default scripts"
+    echo "  -A      Aggressive scan (OS detection, version detection, script scanning)"
+    echo "  -p-     All ports (1-65535)"
+    echo "  -p 80,443  Specific ports"
+    echo "  -T1-T5  Timing template (1=slow, 5=fast)"
+    echo ""
+    echo -e "${YELLOW}Enter custom nmap parameters (or press Enter for default):${NC}"
+    read -r custom_params
+    
+    if [ -z "$custom_params" ]; then
+        custom_params="-sS -sV -p 1-1024"
+        echo -e "${BLUE}Using default parameters: $custom_params${NC}"
+    fi
+    
+    echo -e "${BLUE}Target: $target${NC}"
+    echo -e "${BLUE}Parameters: $custom_params${NC}"
+    echo ""
+    
+    if [ -n "$output_file" ]; then
+        nmap $custom_params "$target" | tee "$temp_output" "$output_file"
+    else
+        nmap $custom_params "$target" | tee "$temp_output"
+    fi
+    
+    local end_time=$(date +%s)
+    local results=$(parse_scan_results "$temp_output")
+    generate_summary "Custom Scan" "$target" "$results" "$start_time" "$end_time"
+    
+    if [ -n "$output_file" ] && [ -f "$temp_output" ]; then
+        echo "" >> "$output_file"
+        generate_summary "Custom Scan" "$target" "$results" "$start_time" "$end_time" >> "$output_file"
+    fi
+}
+
+# --- Interactive Menu ---
+show_menu() {
+    echo -e "${BLUE}=== NetScan - Network Discovery Tool ===${NC}"
+    echo ""
+    echo "Select scan type:"
+    echo "1) Quick scan (host discovery + common ports)"
+    echo "2) Full scan (comprehensive with service detection)"
+    echo "3) ARP scan (local network discovery)"
+    echo "4) Custom scan (user-defined parameters)"
+    echo "5) List network interfaces"
+    echo "6) Exit"
+    echo ""
+}
+
+# --- Main Function ---
+main() {
+    # Parse command line arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            -i|--interface)
+                SELECTED_INTERFACE="$2"
+                shift 2
+                ;;
+            -r|--range)
+                TARGET_RANGE="$2"
+                shift 2
+                ;;
+            -o|--output)
+                OUTPUT_FILE="$2"
+                SAVE_OUTPUT=true
+                shift 2
+                ;;
+            *)
+                echo -e "${RED}Error: Unknown option $1${NC}"
+                usage
+                exit 1
+                ;;
+        esac
+    done
+    
+    # Check dependencies
+    check_dependencies
+    
+    # Check root privileges
+    check_root
+    
+    # Create temporary directory
+    TEMP_DIR=$(mktemp -d)
+    
+    # Interactive mode if no specific arguments provided
+    if [ -z "$SELECTED_INTERFACE" ] && [ -z "$TARGET_RANGE" ] && [ -z "$OUTPUT_FILE" ]; then
+        while true; do
+            show_menu
+            read -p "Choose an option (1-6): " choice
+            echo ""
+            
+            case $choice in
+                1)
+                    SCAN_TYPE="quick"
+                    break
+                    ;;
+                2)
+                    SCAN_TYPE="full"
+                    break
+                    ;;
+                3)
+                    SCAN_TYPE="arp"
+                    break
+                    ;;
+                4)
+                    SCAN_TYPE="custom"
+                    break
+                    ;;
+                5)
+                    echo -e "${BLUE}Available network interfaces:${NC}"
+                    detect_interfaces
+                    echo ""
+                    continue
+                    ;;
+                6)
+                    echo -e "${YELLOW}Goodbye!${NC}"
+                    exit 0
+                    ;;
+                *)
+                    echo -e "${RED}Invalid option. Please try again.${NC}"
+                    echo ""
+                    continue
+                    ;;
+            esac
+        done
+        
+        # Get interface selection
+        if [ -z "$SELECTED_INTERFACE" ]; then
+            echo -e "${YELLOW}Select network interface:${NC}"
+            interfaces=($(list_interfaces))
+            
+            if [ ${#interfaces[@]} -eq 0 ]; then
+                echo -e "${RED}Error: No network interfaces found${NC}"
+                exit 1
+            fi
+            
+            for i in "${!interfaces[@]}"; do
+                echo "$((i+1))) ${interfaces[i]}"
+            done
+            
+            read -p "Choose interface (1-${#interfaces[@]}): " iface_choice
+            
+            if [[ "$iface_choice" -gt 0 && "$iface_choice" -le "${#interfaces[@]}" ]]; then
+                SELECTED_INTERFACE="${interfaces[$((iface_choice-1))]}"
+            else
+                echo -e "${RED}Invalid interface selection${NC}"
+                exit 1
+            fi
+        fi
+        
+        # Get target range
+        if [ -z "$TARGET_RANGE" ] && [ "$SCAN_TYPE" != "arp" ]; then
+            default_range=$(get_network_range "$SELECTED_INTERFACE")
+            echo -e "${YELLOW}Enter target range [default: $default_range]:${NC}"
+            read -r range_input
+            
+            if [ -z "$range_input" ]; then
+                TARGET_RANGE="$default_range"
+            else
+                TARGET_RANGE="$range_input"
+            fi
+        fi
+        
+        # Get output file option
+        if [ "$SAVE_OUTPUT" = false ]; then
+            echo -e "${YELLOW}Save output to file? (y/N):${NC}"
+            read -n 1 -r save_choice
+            echo ""
+            
+            if [[ $save_choice =~ ^[Yy]$ ]]; then
+                echo -e "${YELLOW}Enter output filename:${NC}"
+                read -r OUTPUT_FILE
+                SAVE_OUTPUT=true
+            fi
+        fi
+    else
+        # Non-interactive mode - default to quick scan
+        if [ -z "$SCAN_TYPE" ]; then
+            SCAN_TYPE="quick"
+        fi
+    fi
+    
+    # Execute scan based on type
+    case $SCAN_TYPE in
+        "quick")
+            quick_scan "$TARGET_RANGE" "$OUTPUT_FILE"
+            ;;
+        "full")
+            full_scan "$TARGET_RANGE" "$OUTPUT_FILE"
+            ;;
+        "arp")
+            arp_scan_network "$SELECTED_INTERFACE" "$OUTPUT_FILE"
+            ;;
+        "custom")
+            custom_scan "$TARGET_RANGE" "$OUTPUT_FILE"
+            ;;
+        *)
+            echo -e "${RED}Error: Invalid scan type${NC}"
+            exit 1
+            ;;
+    esac
+    
+    echo -e "${GREEN}Scan completed successfully!${NC}"
+    
+    if [ "$SAVE_OUTPUT" = true ] && [ -n "$OUTPUT_FILE" ]; then
+        echo -e "${GREEN}Results saved to: $OUTPUT_FILE${NC}"
+    fi
+}
+
+# --- Execute Main Function ---
+main "$@"
