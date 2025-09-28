@@ -1,0 +1,89 @@
+#!/bin/bash
+
+# Script to install X11 components on Arch Linux
+# This installs the core X11 server, utilities, and client libraries
+
+set -e  # Exit on any error
+
+echo "=== Installing X11 on Arch Linux ==="
+echo
+
+# Function to print colored output
+print_status() {
+    echo -e "\033[1;32m[INFO]\033[0m $1"
+}
+
+print_error() {
+    echo -e "\033[1;31m[ERROR]\033[0m $1"
+}
+
+print_warning() {
+    echo -e "\033[1;33m[WARNING]\033[0m $1"
+}
+
+# Check if we're on Arch Linux
+if ! command -v pacman &> /dev/null; then
+    print_error "This script is designed for Arch Linux (pacman not found)."
+    exit 1
+fi
+
+# Check if running as root
+if [ "$EUID" -eq 0 ]; then
+    print_error "Don't run this script as root. It will use sudo when needed."
+    exit 1
+fi
+
+print_status "Installing Xorg server and applications..."
+sudo pacman -S --needed xorg-server xorg-apps xorg-xinit
+
+echo
+print_status "Installing X11 client libraries..."
+sudo pacman -S --needed libx11 libxext libxrender libxrandr libxinerama libxcursor libxi libxcomposite libxdamage libxfixes
+
+echo
+print_status "Testing X11 installation..."
+
+# Check if Xorg is installed
+if command -v Xorg &> /dev/null; then
+    print_status "Xorg server installed successfully: $(which Xorg)"
+else
+    print_error "Xorg installation failed!"
+    exit 1
+fi
+
+# Test X11 connection if we're in a graphical session
+if [ -n "$DISPLAY" ]; then
+    if command -v xdpyinfo &> /dev/null; then
+        print_status "Testing X11 connection..."
+        if xdpyinfo > /dev/null 2>&1; then
+            print_status "X11 connection test successful!"
+            # Show basic display info
+            echo
+            echo "Display Information:"
+            echo "  Display: $DISPLAY"
+            xdpyinfo | grep -E "^name of display:|^version number:|^vendor string:|dimensions:" | sed 's/^/  /'
+        else
+            print_warning "X11 is installed but connection test failed."
+            print_warning "Make sure you're running this from within a graphical session."
+        fi
+    fi
+else
+    print_warning "No DISPLAY variable set. X11 is installed but can't test connection."
+    print_warning "Start a graphical session to test X11 functionality."
+fi
+
+echo
+print_status "X11 installation completed successfully!"
+echo
+echo "Additional notes:"
+echo "  - X11 server and essential utilities are now installed"
+echo "  - Required client libraries are available for GUI applications"
+echo "  - You can test X11 with: xdpyinfo"
+echo "  - To run GUI apps with sudo: sudo -E DISPLAY=\$DISPLAY XAUTHORITY=\$XAUTHORITY <app>"
+echo
+
+# Suggest installing common GUI applications or window managers
+echo "Consider installing:"
+echo "  - A window manager: sudo pacman -S i3-wm awesome openbox"
+echo "  - Terminal emulator: sudo pacman -S xterm alacritty"
+echo "  - Display manager: sudo pacman -S lightdm lightdm-gtk-greeter"
