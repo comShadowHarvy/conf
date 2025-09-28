@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# SCRIPT: img2iso - Convert .img and .img.bz2 files to .iso format
+# SCRIPT: img2iso - Convert .img, .img.bz2, and .img.xz files to .iso format
 # DESCRIPTION: Converts disk image files to ISO format with progress feedback and size statistics
 # AUTHOR: ShadowHarvy
 # CREATED: 2025-09-28
@@ -32,16 +32,18 @@ trap cleanup EXIT
 usage() {
     echo -e "${YELLOW}Usage: $0 <image_file1> [image_file2] ...${NC}"
     echo ""
-    echo "Converts .img and .img.bz2 files to .iso format."
+    echo "Converts .img, .img.bz2, and .img.xz files to .iso format."
     echo ""
     echo "Supported input formats:"
     echo "  - .img     (direct copy to .iso)"
-    echo "  - .img.bz2 (decompress then copy to .iso)"
+    echo "  - .img.bz2 (bzip2 decompress then copy to .iso)"
+    echo "  - .img.xz  (xz decompress then copy to .iso)"
     echo ""
     echo "Examples:"
     echo "  $0 diskimage.img"
     echo "  $0 compressed.img.bz2"
-    echo "  $0 image1.img image2.img.bz2 image3.img"
+    echo "  $0 xz_compressed.img.xz"
+    echo "  $0 image1.img image2.img.bz2 image3.img.xz"
     echo ""
     echo "The script will create .iso files in the same directory as the source files."
 }
@@ -49,7 +51,7 @@ usage() {
 # --- Dependency Check Function ---
 check_dependencies() {
     local missing_deps=()
-    local required_commands=("bzip2" "bunzip2" "cp" "stat" "file")
+    local required_commands=("bzip2" "bunzip2" "xz" "unxz" "cp" "stat" "file")
     
     for cmd in "${required_commands[@]}"; do
         if ! command -v "$cmd" >/dev/null 2>&1; then
@@ -99,11 +101,11 @@ validate_file() {
     
     # Check if file has correct extension
     case "$file" in
-        *.img|*.img.bz2)
+        *.img|*.img.bz2|*.img.xz)
             return 0
             ;;
         *)
-            echo -e "${RED}Error: File '$file' must have .img or .img.bz2 extension.${NC}"
+            echo -e "${RED}Error: File '$file' must have .img, .img.bz2, or .img.xz extension.${NC}"
             return 1
             ;;
     esac
@@ -120,6 +122,57 @@ process_bz2_file() {
     
     # Decompress to temporary directory
     if ! bunzip2 -k -c "$input_file" > "$temp_img"; then
+        echo -e "${RED}Error: Failed to decompress '$input_file'${NC}"
+        return 1
+    fi
+    
+    # Check if output file already exists
+    if [ -f "$output_iso" ]; then
+        echo -e "${YELLOW}Warning: Output file '$output_iso' already exists.${NC}"
+        read -p "Overwrite? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo -e "${YELLOW}Skipping '$input_file'${NC}"
+            rm -f "$temp_img"
+            return 0
+        fi
+    fi
+    
+    # Copy decompressed img to iso
+    echo -e "${BLUE}Converting '$temp_img' to '$output_iso'...${NC}"
+    if ! cp "$temp_img" "$output_iso"; then
+        echo -e "${RED}Error: Failed to create ISO file '$output_iso'${NC}"
+        rm -f "$temp_img"
+        return 1
+    fi
+    
+    # Clean up temporary file
+    rm -f "$temp_img"
+    
+    # Display size information
+    local original_size=$(get_file_size "$input_file")
+    local iso_size=$(get_file_size "$output_iso")
+    local original_human=$(get_human_size "$original_size")
+    local iso_human=$(get_human_size "$iso_size")
+    
+    echo -e "${GREEN}Successfully converted '$input_file' to '$output_iso'${NC}"
+    echo -e "${GREEN}Original size (compressed): $original_human ($original_size bytes)${NC}"
+    echo -e "${GREEN}ISO size: $iso_human ($iso_size bytes)${NC}"
+    
+    return 0
+}
+
+# --- Process .img.xz File ---
+process_xz_file() {
+    local input_file="$1"
+    local base_name=$(basename "$input_file" .img.xz)
+    local temp_img="$TEMP_DIR/${base_name}.img"
+    local output_iso="${input_file%%.img.xz}.iso"
+    
+    echo -e "${BLUE}Decompressing '$input_file'...${NC}"
+    
+    # Decompress to temporary directory
+    if ! unxz -k -c "$input_file" > "$temp_img"; then
         echo -e "${RED}Error: Failed to decompress '$input_file'${NC}"
         return 1
     fi
@@ -241,6 +294,11 @@ main() {
         case "$file" in
             *.img.bz2)
                 if process_bz2_file "$file"; then
+                    SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+                fi
+                ;;
+            *.img.xz)
+                if process_xz_file "$file"; then
                     SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
                 fi
                 ;;
