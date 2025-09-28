@@ -1,0 +1,306 @@
+#!/bin/bash
+
+# SCRIPT: monitor - Real-time kernel message monitor
+# DESCRIPTION: Monitors kernel messages (dmesg) in real-time with clean output formatting.
+#              Displays rolling kernel log messages with automatic filtering to avoid
+#              duplicates and provides clean exit handling. Color-codes messages by severity.
+# AUTHOR: ShadowHarvy
+# CREATED: 2025-09-28
+
+# --- Set Colors for Output ---
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+WHITE='\033[0;37m'
+BRIGHT_RED='\033[1;31m'
+BRIGHT_GREEN='\033[1;32m'
+BRIGHT_YELLOW='\033[1;33m'
+BRIGHT_BLUE='\033[1;34m'
+GRAY='\033[0;90m'
+NC='\033[0m'
+
+# --- Global Variables ---
+DEFAULT_LINES=20
+LINES=${1:-$DEFAULT_LINES}
+PID=""
+TEMP_DIR=""
+
+# --- Cleanup Function ---
+cleanup() {
+    # Kill any background processes
+    if [ -n "$PID" ]; then
+        kill $PID 2>/dev/null
+    fi
+    
+    # Restore cursor
+    tput cnorm 2>/dev/null
+    
+    # Clean up temporary files if any
+    if [ -n "$TEMP_DIR" ] && [ -d "$TEMP_DIR" ]; then
+        rm -rf "$TEMP_DIR"
+    fi
+    
+    echo -e "\n${YELLOW}Monitoring stopped${NC}"
+    exit 0
+}
+
+# --- Set trap for cleanup ---
+trap cleanup INT TERM EXIT
+
+# --- Usage Function ---
+usage() {
+    echo -e "${YELLOW}Usage: $0 [number_of_lines]${NC}"
+    echo ""
+    echo "Real-time kernel message monitor with color-coded severity levels."
+    echo ""
+    echo "Arguments:"
+    echo "  number_of_lines    Number of lines to display (default: $DEFAULT_LINES)"
+    echo ""
+    echo "Options:"
+    echo "  -h, --help         Show this help message"
+    echo ""
+    echo "Color Legend:"
+    echo -e "  ${BRIGHT_RED}CRITICAL/ALERT${NC}     - System critical errors"
+    echo -e "  ${RED}ERROR${NC}              - Error conditions"  
+    echo -e "  ${BRIGHT_YELLOW}WARNING${NC}            - Warning conditions"
+    echo -e "  ${YELLOW}NOTICE${NC}             - Normal but significant"
+    echo -e "  ${GREEN}INFO${NC}               - Informational messages"
+    echo -e "  ${BLUE}DEBUG${NC}              - Debug-level messages"
+    echo -e "  ${PURPLE}USB/DEVICE${NC}         - Hardware device events"
+    echo -e "  ${CYAN}NETWORK${NC}            - Network-related events"
+    echo -e "  ${WHITE}OTHER${NC}              - General kernel messages"
+    echo ""
+    echo "Examples:"
+    echo "  $0                 # Show last $DEFAULT_LINES lines"
+    echo "  $0 50              # Show last 50 lines"
+    echo ""
+    echo "Controls:"
+    echo "  Ctrl+C             Stop monitoring and exit"
+}
+
+# --- Dependency Check Function ---
+check_dependencies() {
+    local missing_deps=()
+    local required_commands=("dmesg" "tail" "awk" "sudo")
+    
+    for cmd in "${required_commands[@]}"; do
+        if ! command -v "$cmd" >/dev/null 2>&1; then
+            missing_deps+=("$cmd")
+        fi
+    done
+    
+    if [ ${#missing_deps[@]} -ne 0 ]; then
+        echo -e "${RED}Error: Missing required dependencies:${NC}"
+        for dep in "${missing_deps[@]}"; do
+            echo -e "${RED}  - $dep${NC}"
+        done
+        echo -e "${YELLOW}Please install missing dependencies and try again.${NC}"
+        exit 1
+    fi
+}
+
+# --- Color Message Function ---
+colorize_message() {
+    local message="$1"
+    local colored_message
+    
+    # Extract timestamp if present
+    local timestamp=""
+    if [[ "$message" =~ ^\[([0-9.]+)\] ]]; then
+        timestamp="${BASH_REMATCH[1]}"
+        message="${message#*] }"
+    fi
+    
+    # Color based on severity and content
+    if [[ "$message" =~ (CRITICAL|ALERT|PANIC|Oops|BUG:|segfault) ]]; then
+        colored_message="${BRIGHT_RED}$message${NC}"
+    elif [[ "$message" =~ (ERROR|error|Error|FAILED|failed|Failed|cannot|Cannot|CANNOT) ]]; then
+        colored_message="${RED}$message${NC}"
+    elif [[ "$message" =~ (WARNING|warning|Warning|WARN|warn|Warn) ]]; then
+        colored_message="${BRIGHT_YELLOW}$message${NC}"
+    elif [[ "$message" =~ (NOTICE|notice|Notice) ]]; then
+        colored_message="${YELLOW}$message${NC}"
+    elif [[ "$message" =~ (INFO|info|Info) ]]; then
+        colored_message="${GREEN}$message${NC}"
+    elif [[ "$message" =~ (DEBUG|debug|Debug) ]]; then
+        colored_message="${BLUE}$message${NC}"
+    elif [[ "$message" =~ (USB|usb|device|Device|DEVICE|hub|Hub|HUB) ]]; then
+        colored_message="${PURPLE}$message${NC}"
+    elif [[ "$message" =~ (network|Network|NETWORK|eth[0-9]|wlan[0-9]|wifi|WiFi|WIFI|tcp|TCP|udp|UDP|ip|IP) ]]; then
+        colored_message="${CYAN}$message${NC}"
+    elif [[ "$message" =~ (started|Started|STARTED|stopped|Stopped|STOPPED|enabled|Enabled|ENABLED|disabled|Disabled|DISABLED) ]]; then
+        colored_message="${BRIGHT_GREEN}$message${NC}"
+    elif [[ "$message" =~ (temperature|Temperature|TEMPERATURE|thermal|Thermal|THERMAL|CPU|cpu) ]]; then
+        colored_message="${BRIGHT_BLUE}$message${NC}"
+    else
+        colored_message="${WHITE}$message${NC}"
+    fi
+    
+    # Add colored timestamp if present
+    if [ -n "$timestamp" ]; then
+        echo -e "${GRAY}[$timestamp]${NC} $colored_message"
+    else
+        echo -e "$colored_message"
+    fi
+}
+
+# --- Colorize dmesg Output Function ---
+colorize_dmesg_output() {
+    while IFS= read -r line; do
+        colorize_message "$line"
+    done
+}
+
+# --- Validate Input Function ---
+validate_input() {
+    local lines="$1"
+    
+    # Check if input is a positive integer
+    if [[ ! "$lines" =~ ^[1-9][0-9]*$ ]]; then
+        echo -e "${RED}Error: Number of lines must be a positive integer${NC}"
+        usage
+        return 1
+    fi
+    
+    # Check reasonable bounds
+    if [ "$lines" -gt 1000 ]; then
+        echo -e "${YELLOW}Warning: Displaying more than 1000 lines may impact performance${NC}"
+        read -p "Continue? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo -e "${YELLOW}Operation cancelled${NC}"
+            exit 0
+        fi
+    fi
+    
+    return 0
+}
+
+# --- Check dmesg Follow Support Function ---
+check_dmesg_follow() {
+    if sudo dmesg --help 2>&1 | grep -q -- "--follow"; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# --- Modern dmesg Monitor Function ---
+monitor_with_follow() {
+    echo -e "${BLUE}=== Real-time Kernel Message Monitor ===${NC}"
+    echo -e "${BLUE}Displaying last $LINES lines, then monitoring for new messages${NC}"
+    echo -e "${YELLOW}Press Ctrl+C to exit${NC}"
+    echo -e "${BLUE}========================================${NC}"
+    
+    # Hide cursor for cleaner display
+    tput civis 2>/dev/null
+    
+    # Initial display
+    echo -e "${GREEN}Last $LINES kernel messages:${NC}"
+    sudo dmesg | tail -n "$LINES" | colorize_dmesg_output
+    
+    # Get the timestamp of the last message or use 0 if none
+    local last_timestamp
+    last_timestamp=$(sudo dmesg | tail -n 1 | grep -o '\[[0-9.]*\]' | tr -d '[]' 2>/dev/null || echo "0")
+    
+    echo -e "${BLUE}========================================${NC}"
+    echo -e "${YELLOW}Monitoring for new messages...${NC}"
+    
+    # Use --follow option with filtering to avoid duplicates
+    sudo dmesg --follow | awk -v last="$last_timestamp" '
+    {
+        # If message has a timestamp in standard format
+        if ($1 ~ /^\[[0-9.]+\]/) {
+            ts = $1;
+            gsub(/[\[\]]/, "", ts);
+            
+            # Only print if timestamp is newer
+            if (ts > last) {
+                print $0;
+                fflush();
+            }
+        } 
+        # If message has no timestamp or non-standard format, print it after initial display
+        else if (last != "0") {
+            print $0;
+            fflush();
+        }
+    }' | colorize_dmesg_output &
+    
+    # Store the background process ID
+    PID=$!
+    
+    # Wait for the background process
+    wait $PID
+}
+
+# --- Fallback Monitor Function ---
+monitor_with_watch() {
+    echo -e "${YELLOW}Note: Using watch command (dmesg --follow not available)${NC}"
+    echo -e "${BLUE}=== Kernel Message Monitor (Polling Mode) ===${NC}"
+    echo -e "${YELLOW}Refreshing every 1 second - Press Ctrl+C to exit${NC}"
+    echo ""
+    
+    # Create a wrapper script for watch to include coloring
+    local watch_script="sudo dmesg | tail -n $LINES"
+    
+    # Since watch doesn't preserve colors well, we'll use a different approach
+    echo -e "${GRAY}Note: Colors may not work optimally in polling mode${NC}"
+    watch -n 1 --color "$watch_script"
+}
+
+# --- Test sudo Access Function ---
+test_sudo_access() {
+    if ! sudo -n dmesg >/dev/null 2>&1; then
+        echo -e "${YELLOW}This script requires sudo access to read kernel messages${NC}"
+        echo -e "${BLUE}You may be prompted for your password...${NC}"
+        
+        # Test sudo access
+        if ! sudo dmesg >/dev/null 2>&1; then
+            echo -e "${RED}Error: Unable to access kernel messages with sudo${NC}"
+            echo -e "${YELLOW}Make sure you have sudo privileges${NC}"
+            exit 1
+        fi
+    fi
+}
+
+# --- Main Function ---
+main() {
+    # Check for help flag
+    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+        usage
+        exit 0
+    fi
+    
+    # Check dependencies
+    check_dependencies
+    
+    # Validate input if provided
+    if [ $# -gt 0 ]; then
+        if ! validate_input "$1"; then
+            exit 1
+        fi
+        LINES="$1"
+    fi
+    
+    # Test sudo access
+    test_sudo_access
+    
+    # Clear screen for cleaner display
+    clear
+    
+    # Choose monitoring method based on dmesg capabilities
+    if check_dmesg_follow; then
+        echo -e "${GREEN}Using modern dmesg --follow method with color coding${NC}"
+        monitor_with_follow
+    else
+        echo -e "${YELLOW}Falling back to polling method${NC}"
+        monitor_with_watch
+    fi
+}
+
+# --- Execute Main Function ---
+main "$@"

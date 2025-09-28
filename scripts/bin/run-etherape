@@ -1,0 +1,30 @@
+#!/bin/bash
+
+# Script to run etherape with sudo privileges and GUI access
+# This allows etherape to capture network packets while displaying the GUI
+
+# Check if etherape is installed
+if ! command -v etherape &> /dev/null; then
+    echo "Error: etherape is not installed."
+    echo "Install it with: sudo pacman -S etherape"
+    exit 1
+fi
+
+# Check if we're in a graphical environment
+if [ -z "$DISPLAY" ]; then
+    echo "Error: No graphical display detected (DISPLAY variable not set)."
+    echo "Make sure you're running this from within a graphical session."
+    exit 1
+fi
+
+# Check if XAUTHORITY is set
+if [ -z "$XAUTHORITY" ]; then
+    echo "Warning: XAUTHORITY not set, using default ~/.Xauthority"
+    export XAUTHORITY="$HOME/.Xauthority"
+fi
+
+echo "Starting etherape with sudo privileges..."
+echo "You may be prompted for your password."
+
+# Run etherape with sudo, preserving environment variables needed for GUI
+exec sudo -E DISPLAY="$DISPLAY" XAUTHORITY="$XAUTHORITY" etherape "$@"
