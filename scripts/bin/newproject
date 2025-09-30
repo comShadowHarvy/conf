@@ -1,0 +1,2115 @@
+#!/usr/bin/env bash
+# ===----------------------------------------===
+#           Project Genesis 3000™
+# ===----------------------------------------===
+# Author: ShadowHarvy (Divine Digital Creator)
+# Version: 1.0 (Breathing life into new digital creations!)
+#
+# Purpose: Creates new development projects with the divine power of
+#          genesis and the precision of architectural blueprints.
+#          Because manually scaffolding projects is for mortals
+#          without access to divine automation.
+#
+# Usage:
+#   newproject MyApp                 # Interactive project creation
+#   newproject --type python MyAPI  # Create Python project
+#   newproject --type node MyWeb     # Create Node.js project
+#   newproject --template react      # Use specific template
+#   newproject --git --license MIT   # With Git and license
+#
+# Options:
+#   -t, --type TYPE         Project type (python, node, go, rust, static, etc.)
+#   -T, --template NAME     Use specific template (react, flask, express, etc.)
+#   -g, --git               Initialize Git repository
+#   -l, --license LICENSE   Add license file (MIT, GPL, Apache, BSD, etc.)
+#   -a, --author AUTHOR     Set project author name
+#   -d, --description DESC  Project description
+#   -D, --dir DIRECTORY     Create in specific directory
+#   -f, --framework FRAMEWORK  Use specific framework
+#   -v, --verbose           Show detailed creation process
+#   -q, --quiet             Less theatrical output
+#   -h, --help              Show this help and exit
+#   --version               Show version information
+#
+# Supported Project Types:
+#   - Python (Flask, FastAPI, Django, CLI tools)
+#   - Node.js (Express, React, Vue, vanilla)
+#   - Go (HTTP servers, CLI tools)
+#   - Rust (Cargo projects, web servers)
+#   - Static (HTML/CSS/JS websites)
+#   - Shell (Bash script projects)
+#
+# Exit Codes:
+#   0 - Project created successfully
+#   1 - Project directory already exists
+#   2 - Invalid arguments or missing dependencies
+#   3 - Template or framework not found
+
+# --- Strict Mode & Divine Safety ---
+set -euo pipefail
+
+# --- Script Configuration ---
+SCRIPT_VERSION="1.0"
+PROJECT_TYPE=""
+PROJECT_TEMPLATE=""
+PROJECT_NAME=""
+PROJECT_DIR=""
+PROJECT_AUTHOR="${USER:-$(whoami)}"
+PROJECT_DESCRIPTION=""
+PROJECT_LICENSE=""
+PROJECT_FRAMEWORK=""
+INIT_GIT=0
+VERBOSE_MODE=0
+QUIET_MODE=0
+
+# Default configurations
+DEFAULT_AUTHOR="${USER:-$(whoami)}"
+DEFAULT_EMAIL="${EMAIL:-${USER}@localhost}"
+
+# --- Colors & Divine Light ---
+if [ -t 1 ]; then
+    C_RESET='\033[0m'
+    C_BOLD='\033[1m'
+    C_DIM='\033[2m'
+    C_RED='\033[0;31m'
+    C_GREEN='\033[0;32m'
+    C_YELLOW='\033[0;33m'
+    C_BLUE='\033[0;34m'
+    C_PURPLE='\033[0;35m'
+    C_CYAN='\033[0;36m'
+    C_WHITE='\033[0;37m'
+    # Divine variants for creation announcements
+    C_BRED='\033[1;31m'
+    C_BGREEN='\033[1;32m'
+    C_BYELLOW='\033[1;33m'
+    C_BBLUE='\033[1;34m'
+    C_BPURPLE='\033[1;35m'
+    C_BCYAN='\033[1;36m'
+    C_BWHITE='\033[1;37m'
+else
+    C_RESET='' C_BOLD='' C_DIM='' C_RED='' C_GREEN='' C_YELLOW=''
+    C_BLUE='' C_PURPLE='' C_CYAN='' C_WHITE='' C_BRED='' C_BGREEN=''
+    C_BYELLOW='' C_BBLUE='' C_BPURPLE='' C_BCYAN='' C_BWHITE=''
+fi
+
+# --- Divine Functions ---
+
+print_banner() {
+    if [ "$QUIET_MODE" -eq 1 ]; then return; fi
+    
+    echo -e "${C_BPURPLE}"
+    echo "╔════════════════════════════════════════════════════╗"
+    echo "║            ${C_BYELLOW}PROJECT GENESIS 3000™${C_BPURPLE}            ║"
+    echo "║   ${C_WHITE}\"Let there be code... and there was code!\"${C_BPURPLE}    ║"
+    echo "║                                                    ║"
+    echo "║     ${C_BGREEN}by ShadowHarvy (Divine Digital Creator)${C_BPURPLE}     ║"
+    echo "╚════════════════════════════════════════════════════╝"
+    echo -e "${C_RESET}"
+}
+
+print_usage() {
+    cat <<EOF
+${C_BOLD}${C_BBLUE}Project Genesis 3000™ - Usage Guide${C_RESET}
+
+${C_BOLD}SYNOPSIS${C_RESET}
+    ${C_GREEN}newproject${C_RESET} [${C_YELLOW}options${C_RESET}] [${C_CYAN}project_name${C_RESET}]
+
+${C_BOLD}DESCRIPTION${C_RESET}
+    Creates new development projects with divine power and architectural precision.
+    Supports multiple languages, frameworks, and templates with intelligent defaults.
+
+${C_BOLD}DIVINE CREATIONS${C_RESET}
+    ${C_GREEN}newproject${C_RESET} ${C_CYAN}MyApp${C_RESET}                 ${C_DIM}# Interactive project creation${C_RESET}
+    ${C_GREEN}newproject${C_RESET} ${C_YELLOW}--type python${C_RESET} ${C_CYAN}MyAPI${C_RESET}    ${C_DIM}# Create Python project${C_RESET}
+    ${C_GREEN}newproject${C_RESET} ${C_YELLOW}--template react${C_RESET} ${C_CYAN}MyApp${C_RESET}  ${C_DIM}# Use React template${C_RESET}
+    ${C_GREEN}newproject${C_RESET} ${C_YELLOW}--git --license MIT${C_RESET} ${C_CYAN}MyProject${C_RESET} ${C_DIM}# With Git and license${C_RESET}
+
+${C_BOLD}CREATION OPTIONS${C_RESET}
+    ${C_YELLOW}-t, --type TYPE${C_RESET}         Project type (python, node, go, rust, static, shell)
+    ${C_YELLOW}-T, --template NAME${C_RESET}     Specific template (flask, express, react, vue, etc.)
+    ${C_YELLOW}-f, --framework FRAMEWORK${C_RESET} Framework to use within project type
+    ${C_YELLOW}-g, --git${C_RESET}              Initialize Git repository with first commit
+    ${C_YELLOW}-l, --license LICENSE${C_RESET}  Add license file (MIT, GPL3, Apache2, BSD3, etc.)
+    ${C_YELLOW}-a, --author AUTHOR${C_RESET}    Set project author name
+    ${C_YELLOW}-d, --description DESC${C_RESET} Project description for README and packages
+    ${C_YELLOW}-D, --dir DIRECTORY${C_RESET}    Create project in specific directory
+    ${C_YELLOW}-v, --verbose${C_RESET}          Show detailed creation process
+    ${C_YELLOW}-q, --quiet${C_RESET}            Less theatrical output for automation
+    ${C_YELLOW}-h, --help${C_RESET}             Show this comprehensive help guide
+    ${C_YELLOW}--version${C_RESET}              Display version and credentials
+
+${C_BOLD}SUPPORTED PROJECT TYPES${C_RESET}
+    ${C_CYAN}🐍 python${C_RESET}     - Flask, FastAPI, Django, CLI tools, data science
+    ${C_CYAN}🟢 node${C_RESET}       - Express, React, Vue, Next.js, vanilla Node.js
+    ${C_CYAN}🔷 go${C_RESET}         - HTTP servers, CLI tools, microservices  
+    ${C_CYAN}🦀 rust${C_RESET}       - Cargo projects, web servers, system tools
+    ${C_CYAN}📄 static${C_RESET}     - HTML/CSS/JS websites with modern tooling
+    ${C_CYAN}🐚 shell${C_RESET}      - Bash script projects with testing framework
+
+${C_BOLD}AVAILABLE TEMPLATES${C_RESET}
+    ${C_PURPLE}Python:${C_RESET} flask, fastapi, django, cli, jupyter, data
+    ${C_PURPLE}Node.js:${C_RESET} express, react, vue, nextjs, vanilla, typescript  
+    ${C_PURPLE}Go:${C_RESET} gin, fiber, cli, microservice
+    ${C_PURPLE}Rust:${C_RESET} axum, actix, cli, wasm
+    ${C_PURPLE}Static:${C_RESET} vanilla, bootstrap, tailwind, vite
+
+${C_BOLD}LICENSE OPTIONS${C_RESET}
+    ${C_WHITE}MIT${C_RESET}, ${C_WHITE}GPL3${C_RESET}, ${C_WHITE}Apache2${C_RESET}, ${C_WHITE}BSD3${C_RESET}, ${C_WHITE}ISC${C_RESET}, ${C_WHITE}Unlicense${C_RESET}
+
+${C_DIM}\"In the beginning was the Word... and the Word was Code!\" - Project Genesis 3000™${C_RESET}
+EOF
+}
+
+detect_system_info() {
+    # Try to get user's real name for author field
+    if command -v git >/dev/null 2>&1; then
+        local git_name
+        git_name=$(git config --global user.name 2>/dev/null || echo "")
+        local git_email
+        git_email=$(git config --global user.email 2>/dev/null || echo "")
+        
+        if [ -n "$git_name" ]; then
+            DEFAULT_AUTHOR="$git_name"
+        fi
+        if [ -n "$git_email" ]; then
+            DEFAULT_EMAIL="$git_email"
+        fi
+    fi
+}
+
+create_directory_structure() {
+    local project_path="$1"
+    
+    if [ -e "$project_path" ]; then
+        echo -e "${C_RED}❌ Project directory already exists: $project_path${C_RESET}"
+        return 1
+    fi
+    
+    echo -e "${C_YELLOW}📁 Creating divine directory structure...${C_RESET}"
+    mkdir -p "$project_path"
+    cd "$project_path"
+    
+    if [ "$VERBOSE_MODE" -eq 1 ]; then
+        echo -e "${C_DIM}   Created: $project_path${C_RESET}"
+    fi
+}
+
+create_gitignore() {
+    local project_type="$1"
+    
+    echo -e "${C_CYAN}🚫 Creating .gitignore for divine code protection...${C_RESET}"
+    
+    case "$project_type" in
+        "python")
+            cat > .gitignore <<'EOF'
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Testing
+.tox/
+.coverage
+.pytest_cache/
+htmlcov/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# Database
+*.db
+*.sqlite3
+EOF
+            ;;
+        "node")
+            cat > .gitignore <<'EOF'
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+.nyc_output
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+logs
+*.log
+EOF
+            ;;
+        "go")
+            cat > .gitignore <<'EOF'
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Dependency directories
+vendor/
+
+# Go workspace file
+go.work
+
+# Environment variables
+.env
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Build outputs
+dist/
+bin/
+EOF
+            ;;
+        "rust")
+            cat > .gitignore <<'EOF'
+# Generated by Cargo
+/target/
+Cargo.lock
+
+# Environment variables
+.env
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Backup files
+*~
+EOF
+            ;;
+        *)
+            cat > .gitignore <<'EOF'
+# Environment variables
+.env
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# Build outputs
+dist/
+build/
+out/
+EOF
+            ;;
+    esac
+}
+
+create_license() {
+    local license_type="$1"
+    local year
+    year=$(date +%Y)
+    
+    echo -e "${C_PURPLE}⚖️  Creating $license_type license for divine legal protection...${C_RESET}"
+    
+    case "${license_type^^}" in
+        "MIT")
+            cat > LICENSE <<EOF
+MIT License
+
+Copyright (c) $year $PROJECT_AUTHOR
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+EOF
+            ;;
+        "GPL3")
+            cat > LICENSE <<EOF
+GNU GENERAL PUBLIC LICENSE
+Version 3, 29 June 2007
+
+Copyright (c) $year $PROJECT_AUTHOR
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+EOF
+            ;;
+        "APACHE2")
+            cat > LICENSE <<EOF
+Apache License
+Version 2.0, January 2004
+
+Copyright $year $PROJECT_AUTHOR
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+EOF
+            ;;
+        "BSD3")
+            cat > LICENSE <<EOF
+BSD 3-Clause License
+
+Copyright (c) $year, $PROJECT_AUTHOR
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its
+   contributors may be used to endorse or promote products derived from
+   this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED.
+EOF
+            ;;
+        "UNLICENSE")
+            cat > LICENSE <<EOF
+This is free and unencumbered software released into the public domain.
+
+Anyone is free to copy, modify, publish, use, compile, sell, or
+distribute this software, either in source code form or as a compiled
+binary, for any purpose, commercial or non-commercial, and by any
+means.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+EOF
+            ;;
+    esac
+}
+
+create_readme() {
+    local project_name="$1"
+    local project_type="$2"
+    
+    echo -e "${C_BCYAN}📖 Creating divine README scripture...${C_RESET}"
+    
+    local description="$PROJECT_DESCRIPTION"
+    if [ -z "$description" ]; then
+        description="A $project_type project created with Project Genesis 3000™"
+    fi
+    
+    cat > README.md <<EOF
+# $project_name
+
+$description
+
+## Features
+
+- ✨ Created with Project Genesis 3000™
+- 🚀 Ready for development
+- 📦 Modern project structure
+- 🔧 Development tools included
+
+## Getting Started
+
+### Prerequisites
+
+EOF
+
+    # Add language-specific prerequisites
+    case "$project_type" in
+        "python")
+            cat >> README.md <<EOF
+- Python 3.8 or higher
+- pip or pipenv for package management
+
+### Installation
+
+\`\`\`bash
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\\Scripts\\activate
+
+# Install dependencies
+pip install -r requirements.txt
+\`\`\`
+
+### Running
+
+\`\`\`bash
+python main.py
+\`\`\`
+EOF
+            ;;
+        "node")
+            cat >> README.md <<EOF
+- Node.js 18 or higher
+- npm or yarn for package management
+
+### Installation
+
+\`\`\`bash
+# Install dependencies
+npm install
+# or
+yarn install
+\`\`\`
+
+### Running
+
+\`\`\`bash
+npm start
+# or
+yarn start
+\`\`\`
+EOF
+            ;;
+        "go")
+            cat >> README.md <<EOF
+- Go 1.19 or higher
+
+### Installation
+
+\`\`\`bash
+# Download dependencies
+go mod download
+\`\`\`
+
+### Running
+
+\`\`\`bash
+go run main.go
+\`\`\`
+
+### Building
+
+\`\`\`bash
+go build -o $project_name main.go
+\`\`\`
+EOF
+            ;;
+        "rust")
+            cat >> README.md <<EOF
+- Rust 1.70 or higher
+- Cargo (included with Rust)
+
+### Installation
+
+\`\`\`bash
+# Dependencies are managed by Cargo
+cargo build
+\`\`\`
+
+### Running
+
+\`\`\`bash
+cargo run
+\`\`\`
+EOF
+            ;;
+        "static")
+            cat >> README.md <<EOF
+- A modern web browser
+- Optional: Node.js for development server
+
+### Running
+
+Open \`index.html\` in your web browser, or use a development server:
+
+\`\`\`bash
+# Using Python
+python -m http.server 8000
+
+# Using Node.js (if you have http-server installed)
+npx http-server
+\`\`\`
+EOF
+            ;;
+    esac
+
+    cat >> README.md <<EOF
+
+## Project Structure
+
+\`\`\`
+$(find . -type f -not -path './.git/*' | head -20 | sed 's/^.//')
+\`\`\`
+
+## Development
+
+### Contributing
+
+1. Fork the repository
+2. Create your feature branch (\`git checkout -b feature/amazing-feature\`)
+3. Commit your changes (\`git commit -m 'Add some amazing feature'\`)
+4. Push to the branch (\`git push origin feature/amazing-feature\`)
+5. Open a Pull Request
+
+### License
+
+EOF
+
+    if [ -n "$PROJECT_LICENSE" ]; then
+        echo "This project is licensed under the $PROJECT_LICENSE License - see the [LICENSE](LICENSE) file for details." >> README.md
+    else
+        echo "This project is open source and available under the [MIT License](LICENSE)." >> README.md
+    fi
+
+    cat >> README.md <<EOF
+
+## Author
+
+**$PROJECT_AUTHOR**
+
+---
+
+*Created with 💜 by Project Genesis 3000™*
+EOF
+}
+
+create_python_project() {
+    local template="$1"
+    
+    echo -e "${C_BGREEN}🐍 Creating Python project with divine serpentine power...${C_RESET}"
+    
+    # Create basic structure
+    mkdir -p src tests docs
+    
+    case "$template" in
+        "flask")
+            echo -e "${C_GREEN}   Using Flask web framework template${C_RESET}"
+            cat > requirements.txt <<EOF
+Flask==2.3.3
+python-dotenv==1.0.0
+gunicorn==21.2.0
+EOF
+            
+            cat > src/app.py <<EOF
+from flask import Flask, jsonify, render_template
+
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return render_template('index.html')
+
+@app.route('/api/health')
+def health():
+    return jsonify({"status": "healthy", "message": "Divine Flask application is running!"})
+
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0', port=5000)
+EOF
+            
+            mkdir -p src/templates src/static/css src/static/js
+            cat > src/templates/index.html <<EOF
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>$PROJECT_NAME</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>🐍 $PROJECT_NAME</h1>
+        <p>Divine Flask application created with Project Genesis 3000™</p>
+        <div class="status" id="status">Checking divine health...</div>
+    </div>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
+EOF
+            
+            cat > src/static/css/style.css <<EOF
+body {
+    font-family: 'Arial', sans-serif;
+    margin: 0;
+    padding: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    text-align: center;
+    padding: 40px 20px;
+}
+
+h1 {
+    font-size: 2.5em;
+    margin-bottom: 20px;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+}
+
+.status {
+    background: rgba(255,255,255,0.2);
+    padding: 20px;
+    border-radius: 10px;
+    margin-top: 30px;
+    backdrop-filter: blur(10px);
+}
+EOF
+            
+            cat > src/static/js/main.js <<EOF
+document.addEventListener('DOMContentLoaded', function() {
+    fetch('/api/health')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('status').innerHTML = 
+                \`✨ \${data.message}\`;
+        })
+        .catch(error => {
+            document.getElementById('status').innerHTML = 
+                '⚠️ Divine connection failed';
+        });
+});
+EOF
+            ;;
+        "fastapi")
+            echo -e "${C_GREEN}   Using FastAPI framework template${C_RESET}"
+            cat > requirements.txt <<EOF
+fastapi==0.103.2
+uvicorn[standard]==0.23.2
+python-dotenv==1.0.0
+pydantic==2.4.2
+EOF
+            
+            cat > src/main.py <<EOF
+from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
+import uvicorn
+
+app = FastAPI(
+    title="$PROJECT_NAME",
+    description="A divine FastAPI application",
+    version="1.0.0"
+)
+
+# Mount static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/", response_class=HTMLResponse)
+async def read_root():
+    return """
+    <html>
+        <head><title>$PROJECT_NAME</title></head>
+        <body>
+            <h1>🚀 $PROJECT_NAME</h1>
+            <p>Divine FastAPI application created with Project Genesis 3000™</p>
+            <a href="/docs">View API Documentation</a>
+        </body>
+    </html>
+    """
+
+@app.get("/api/health")
+async def health_check():
+    return {"status": "healthy", "message": "Divine FastAPI application is soaring!"}
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+EOF
+            mkdir -p static
+            ;;
+        "cli")
+            echo -e "${C_GREEN}   Using CLI application template${C_RESET}"
+            cat > requirements.txt <<EOF
+click==8.1.7
+rich==13.6.0
+typer==0.9.0
+EOF
+            
+            cat > src/main.py <<EOF
+#!/usr/bin/env python3
+"""
+$PROJECT_NAME - A divine CLI application
+Created with Project Genesis 3000™
+"""
+
+import click
+from rich.console import Console
+from rich.panel import Panel
+
+console = Console()
+
+@click.group()
+@click.version_option("1.0.0")
+def cli():
+    """$PROJECT_NAME - Divine command line interface"""
+    pass
+
+@cli.command()
+@click.option('--name', '-n', default='Divine User', help='Your divine name')
+def greet(name):
+    """Greet with divine blessings"""
+    console.print(Panel(
+        f"🌟 Divine greetings, {name}! 🌟\\n\\n"
+        f"Welcome to $PROJECT_NAME\\n"
+        f"Created with Project Genesis 3000™",
+        title="Divine Blessing",
+        border_style="purple"
+    ))
+
+@cli.command()
+def status():
+    """Check divine application status"""
+    console.print("✨ Divine CLI is operational and blessed!")
+
+if __name__ == '__main__':
+    cli()
+EOF
+            ;;
+        *)
+            # Default Python project
+            echo -e "${C_GREEN}   Using default Python template${C_RESET}"
+            cat > requirements.txt <<EOF
+# Add your project dependencies here
+requests==2.31.0
+python-dotenv==1.0.0
+EOF
+            
+            cat > src/main.py <<EOF
+#!/usr/bin/env python3
+"""
+$PROJECT_NAME - A divine Python application
+Created with Project Genesis 3000™
+"""
+
+def main():
+    """Divine main function"""
+    print("🐍 Welcome to $PROJECT_NAME!")
+    print("✨ Divine Python application created with Project Genesis 3000™")
+    print("🚀 Ready for your divine code...")
+
+if __name__ == "__main__":
+    main()
+EOF
+            ;;
+    esac
+    
+    # Create test file
+    cat > tests/test_main.py <<EOF
+import unittest
+import sys
+import os
+
+# Add src to path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+
+class TestDivineApplication(unittest.TestCase):
+    """Divine tests for the application"""
+    
+    def test_divine_truth(self):
+        """Test that divine truth is always true"""
+        self.assertTrue(True)
+    
+    def test_application_exists(self):
+        """Test that the main application exists"""
+        import main
+        self.assertTrue(hasattr(main, 'main'))
+
+if __name__ == '__main__':
+    unittest.main()
+EOF
+    
+    # Create setup.py for installation
+    cat > setup.py <<EOF
+from setuptools import setup, find_packages
+
+setup(
+    name="$PROJECT_NAME",
+    version="1.0.0",
+    author="$PROJECT_AUTHOR",
+    description="$PROJECT_DESCRIPTION",
+    long_description=open("README.md").read(),
+    long_description_content_type="text/markdown",
+    packages=find_packages(),
+    install_requires=[
+        line.strip() 
+        for line in open("requirements.txt").readlines() 
+        if not line.startswith("#")
+    ],
+    python_requires=">=3.8",
+    entry_points={
+        "console_scripts": [
+            "$PROJECT_NAME=$(echo $PROJECT_NAME | tr '[:upper:]' '[:lower:]').main:main",
+        ],
+    },
+)
+EOF
+}
+
+create_node_project() {
+    local template="$1"
+    
+    echo -e "${C_BGREEN}🟢 Creating Node.js project with divine JavaScript power...${C_RESET}"
+    
+    case "$template" in
+        "express")
+            echo -e "${C_GREEN}   Using Express.js web framework template${C_RESET}"
+            cat > package.json <<EOF
+{
+  "name": "$(echo $PROJECT_NAME | tr '[:upper:]' '[:lower:]')",
+  "version": "1.0.0",
+  "description": "$PROJECT_DESCRIPTION",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js",
+    "test": "jest"
+  },
+  "keywords": ["express", "node", "divine"],
+  "author": "$PROJECT_AUTHOR",
+  "license": "${PROJECT_LICENSE:-MIT}",
+  "dependencies": {
+    "express": "^4.18.2",
+    "dotenv": "^16.3.1",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "jest": "^29.7.0"
+  }
+}
+EOF
+            
+            mkdir -p src public/css public/js views
+            
+            cat > src/app.js <<EOF
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
+require('dotenv').config();
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(express.static('public'));
+
+// Routes
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'views', 'index.html'));
+});
+
+app.get('/api/health', (req, res) => {
+    res.json({ 
+        status: 'healthy', 
+        message: 'Divine Express.js application is running!',
+        timestamp: new Date().toISOString()
+    });
+});
+
+app.listen(PORT, () => {
+    console.log(\`🚀 Divine server running on port \${PORT}\`);
+    console.log(\`✨ Created with Project Genesis 3000™\`);
+});
+
+module.exports = app;
+EOF
+            
+            cat > views/index.html <<EOF
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>$PROJECT_NAME</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>🟢 $PROJECT_NAME</h1>
+        <p>Divine Express.js application created with Project Genesis 3000™</p>
+        <div class="status" id="status">Checking divine connection...</div>
+        <div class="actions">
+            <a href="/api/health" class="button">Health Check</a>
+        </div>
+    </div>
+    <script src="/js/main.js"></script>
+</body>
+</html>
+EOF
+            
+            cat > public/css/style.css <<EOF
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #42a5f5 0%, #478ed1 50%, #1976d2 100%);
+    color: white;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.container {
+    text-align: center;
+    padding: 40px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+}
+
+h1 {
+    font-size: 2.5em;
+    margin-bottom: 20px;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+}
+
+.status {
+    background: rgba(255,255,255,0.2);
+    padding: 20px;
+    border-radius: 10px;
+    margin: 20px 0;
+}
+
+.actions {
+    margin-top: 30px;
+}
+
+.button {
+    display: inline-block;
+    padding: 12px 24px;
+    background: rgba(255,255,255,0.2);
+    color: white;
+    text-decoration: none;
+    border-radius: 25px;
+    transition: all 0.3s ease;
+    border: 2px solid rgba(255,255,255,0.3);
+}
+
+.button:hover {
+    background: rgba(255,255,255,0.3);
+    transform: translateY(-2px);
+}
+EOF
+            
+            cat > public/js/main.js <<EOF
+document.addEventListener('DOMContentLoaded', function() {
+    fetchHealthStatus();
+    
+    // Refresh status every 30 seconds
+    setInterval(fetchHealthStatus, 30000);
+});
+
+async function fetchHealthStatus() {
+    try {
+        const response = await fetch('/api/health');
+        const data = await response.json();
+        
+        document.getElementById('status').innerHTML = \`
+            <div>✨ \${data.message}</div>
+            <div style="font-size: 0.8em; margin-top: 10px; opacity: 0.8;">
+                Last checked: \${new Date(data.timestamp).toLocaleTimeString()}
+            </div>
+        \`;
+    } catch (error) {
+        document.getElementById('status').innerHTML = 
+            '⚠️ Divine connection interrupted';
+    }
+}
+EOF
+            ;;
+        "react")
+            echo -e "${C_GREEN}   Using React application template${C_RESET}"
+            cat > package.json <<EOF
+{
+  "name": "$(echo $PROJECT_NAME | tr '[:upper:]' '[:lower:]')",
+  "version": "1.0.0",
+  "description": "$PROJECT_DESCRIPTION",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest"
+  },
+  "keywords": ["react", "vite", "divine"],
+  "author": "$PROJECT_AUTHOR",
+  "license": "${PROJECT_LICENSE:-MIT}",
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.37",
+    "@types/react-dom": "^18.2.15",
+    "@vitejs/plugin-react": "^4.1.1",
+    "vite": "^4.5.0",
+    "vitest": "^0.34.6"
+  }
+}
+EOF
+            
+            mkdir -p src public
+            
+            cat > vite.config.js <<EOF
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    port: 3000,
+    open: true
+  }
+})
+EOF
+            
+            cat > index.html <<EOF
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>$PROJECT_NAME</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
+EOF
+            
+            cat > src/main.jsx <<EOF
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import App from './App.jsx'
+import './index.css'
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+)
+EOF
+            
+            cat > src/App.jsx <<EOF
+import { useState, useEffect } from 'react'
+import './App.css'
+
+function App() {
+  const [count, setCount] = useState(0)
+  const [blessing, setBlessing] = useState('')
+
+  useEffect(() => {
+    const blessings = [
+      "✨ Divine code flows through you",
+      "🌟 Your applications shine with celestial light",
+      "🚀 May your deployments be ever successful",
+      "💫 Code with divine inspiration"
+    ]
+    setBlessing(blessings[Math.floor(Math.random() * blessings.length)])
+  }, [])
+
+  return (
+    <div className="App">
+      <div className="container">
+        <h1>⚛️ $PROJECT_NAME</h1>
+        <p>Divine React application created with Project Genesis 3000™</p>
+        
+        <div className="card">
+          <button onClick={() => setCount((count) => count + 1)}>
+            Divine counter: {count}
+          </button>
+        </div>
+        
+        <div className="blessing">
+          {blessing}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default App
+EOF
+            
+            cat > src/App.css <<EOF
+.App {
+  text-align: center;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #61dafb 0%, #21a0c4 50%, #1976d2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.container {
+  padding: 40px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+}
+
+h1 {
+  font-size: 2.5em;
+  margin-bottom: 20px;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+}
+
+.card {
+  margin: 30px 0;
+}
+
+button {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  padding: 12px 24px;
+  border-radius: 25px;
+  cursor: pointer;
+  font-size: 1.1em;
+  transition: all 0.3s ease;
+}
+
+button:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+.blessing {
+  margin-top: 30px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  font-style: italic;
+}
+EOF
+            
+            cat > src/index.css <<EOF
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+EOF
+            ;;
+        *)
+            # Default Node.js project
+            echo -e "${C_GREEN}   Using vanilla Node.js template${C_RESET}"
+            cat > package.json <<EOF
+{
+  "name": "$(echo $PROJECT_NAME | tr '[:upper:]' '[:lower:]')",
+  "version": "1.0.0",
+  "description": "$PROJECT_DESCRIPTION",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "test": "jest"
+  },
+  "keywords": ["node", "divine"],
+  "author": "$PROJECT_AUTHOR",
+  "license": "${PROJECT_LICENSE:-MIT}",
+  "dependencies": {
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "jest": "^29.7.0"
+  }
+}
+EOF
+            
+            mkdir -p src
+            cat > src/index.js <<EOF
+#!/usr/bin/env node
+/**
+ * $PROJECT_NAME - Divine Node.js Application
+ * Created with Project Genesis 3000™
+ */
+
+require('dotenv').config();
+
+function main() {
+    console.log('🟢 Welcome to $PROJECT_NAME!');
+    console.log('✨ Divine Node.js application created with Project Genesis 3000™');
+    console.log('🚀 Ready for your divine JavaScript...');
+    
+    // Your divine code goes here
+    const blessing = getDivineBlessing();
+    console.log(\`💫 \${blessing}\`);
+}
+
+function getDivineBlessing() {
+    const blessings = [
+        "May your async functions always resolve",
+        "May your callbacks never pyramid",
+        "May your promises be kept",
+        "May your code be ever elegant"
+    ];
+    
+    return blessings[Math.floor(Math.random() * blessings.length)];
+}
+
+if (require.main === module) {
+    main();
+}
+
+module.exports = { main, getDivineBlessing };
+EOF
+            ;;
+    esac
+    
+    # Create test file
+    mkdir -p tests
+    cat > tests/app.test.js <<EOF
+const { main, getDivineBlessing } = require('../src/index');
+
+describe('Divine Application Tests', () => {
+    test('divine truth is always true', () => {
+        expect(true).toBe(true);
+    });
+    
+    test('divine blessing is provided', () => {
+        const blessing = getDivineBlessing();
+        expect(blessing).toBeDefined();
+        expect(typeof blessing).toBe('string');
+    });
+    
+    test('main function exists', () => {
+        expect(typeof main).toBe('function');
+    });
+});
+EOF
+}
+
+create_static_project() {
+    echo -e "${C_BGREEN}📄 Creating static website with divine HTML power...${C_RESET}"
+    
+    cat > index.html <<EOF
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>$PROJECT_NAME</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✨</text></svg>">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>✨ $PROJECT_NAME</h1>
+            <p class="subtitle">Divine static website created with Project Genesis 3000™</p>
+        </header>
+        
+        <main>
+            <section class="hero">
+                <div class="blessing" id="blessing">Loading divine blessing...</div>
+            </section>
+            
+            <section class="features">
+                <div class="feature">
+                    <h3>🚀 Modern</h3>
+                    <p>Built with modern web standards</p>
+                </div>
+                <div class="feature">
+                    <h3>✨ Divine</h3>
+                    <p>Created with celestial guidance</p>
+                </div>
+                <div class="feature">
+                    <h3>📱 Responsive</h3>
+                    <p>Beautiful on all devices</p>
+                </div>
+            </section>
+        </main>
+        
+        <footer>
+            <p>Created with 💜 by $PROJECT_AUTHOR</p>
+            <p>Powered by Project Genesis 3000™</p>
+        </footer>
+    </div>
+    
+    <script src="js/main.js"></script>
+</body>
+</html>
+EOF
+    
+    mkdir -p css js images
+    
+    cat > css/style.css <<EOF
+:root {
+    --primary-color: #667eea;
+    --secondary-color: #764ba2;
+    --text-color: #ffffff;
+    --accent-color: #ffd700;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
+    color: var(--text-color);
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+header {
+    text-align: center;
+    padding: 40px 0;
+}
+
+h1 {
+    font-size: 3em;
+    margin-bottom: 10px;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    animation: glow 2s ease-in-out infinite alternate;
+}
+
+@keyframes glow {
+    from { text-shadow: 2px 2px 4px rgba(0,0,0,0.3), 0 0 10px rgba(255,215,0,0.3); }
+    to { text-shadow: 2px 2px 4px rgba(0,0,0,0.3), 0 0 20px rgba(255,215,0,0.6); }
+}
+
+.subtitle {
+    font-size: 1.2em;
+    opacity: 0.9;
+}
+
+main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.hero {
+    text-align: center;
+    margin: 40px 0;
+}
+
+.blessing {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    padding: 30px;
+    border-radius: 20px;
+    font-size: 1.3em;
+    font-style: italic;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 30px;
+    margin: 40px 0;
+}
+
+.feature {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    padding: 30px;
+    border-radius: 15px;
+    text-align: center;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.feature:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+.feature h3 {
+    font-size: 1.5em;
+    margin-bottom: 15px;
+    color: var(--accent-color);
+}
+
+footer {
+    text-align: center;
+    padding: 40px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    margin-top: 40px;
+}
+
+footer p {
+    margin: 5px 0;
+    opacity: 0.8;
+}
+
+@media (max-width: 768px) {
+    h1 {
+        font-size: 2em;
+    }
+    
+    .features {
+        grid-template-columns: 1fr;
+    }
+    
+    .container {
+        padding: 10px;
+    }
+}
+EOF
+    
+    cat > js/main.js <<EOF
+document.addEventListener('DOMContentLoaded', function() {
+    // Divine blessing rotation
+    const blessings = [
+        "✨ May your code compile on the first try",
+        "🌟 May your deployments be swift and error-free", 
+        "💫 May your algorithms be elegant and efficient",
+        "🚀 May your applications scale to divine heights",
+        "⭐ May your bugs be few and easily squashed",
+        "🔮 May your user experience be magical"
+    ];
+    
+    function displayRandomBlessing() {
+        const blessingElement = document.getElementById('blessing');
+        const randomBlessing = blessings[Math.floor(Math.random() * blessings.length)];
+        
+        // Fade out
+        blessingElement.style.opacity = '0';
+        
+        setTimeout(() => {
+            blessingElement.textContent = randomBlessing;
+            // Fade in
+            blessingElement.style.opacity = '1';
+        }, 300);
+    }
+    
+    // Display initial blessing
+    displayRandomBlessing();
+    
+    // Rotate blessing every 10 seconds
+    setInterval(displayRandomBlessing, 10000);
+    
+    // Add smooth scrolling for any future links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const target = document.querySelector(this.getAttribute('href'));
+            if (target) {
+                target.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }
+        });
+    });
+    
+    // Add subtle parallax effect to features
+    if (window.innerWidth > 768) {
+        window.addEventListener('scroll', () => {
+            const scrolled = window.pageYOffset;
+            const features = document.querySelectorAll('.feature');
+            
+            features.forEach((feature, index) => {
+                const rate = scrolled * -0.1 * (index + 1);
+                feature.style.transform = \`translateY(\${rate}px)\`;
+            });
+        });
+    }
+    
+    console.log('🎭 Divine static website powered by Project Genesis 3000™');
+    console.log('✨ All systems blessed and operational!');
+});
+EOF
+    
+    # Create a simple favicon as SVG
+    cat > images/favicon.svg <<EOF
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <radialGradient id="sparkle" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#ffd700;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ffed4e;stop-opacity:0.8" />
+    </radialGradient>
+  </defs>
+  <circle cx="50" cy="50" r="45" fill="url(#sparkle)" />
+  <text x="50" y="70" text-anchor="middle" font-size="60" fill="white">✨</text>
+</svg>
+EOF
+}
+
+init_git_repo() {
+    if [ "$INIT_GIT" -eq 1 ]; then
+        echo -e "${C_BPURPLE}🔗 Initializing divine Git repository...${C_RESET}"
+        
+        git init > /dev/null 2>&1
+        
+        if [ "$VERBOSE_MODE" -eq 1 ]; then
+            echo -e "${C_DIM}   Git repository initialized${C_RESET}"
+        fi
+        
+        # Configure Git if not already configured
+        if ! git config user.name > /dev/null 2>&1; then
+            git config user.name "$PROJECT_AUTHOR"
+        fi
+        if ! git config user.email > /dev/null 2>&1; then
+            git config user.email "$DEFAULT_EMAIL"
+        fi
+        
+        git add . > /dev/null 2>&1
+        git commit -m "🎉 Initial divine commit
+
+✨ Project created with Project Genesis 3000™
+🚀 Ready for divine development!
+
+Author: $PROJECT_AUTHOR
+Type: $PROJECT_TYPE
+$([ -n "$PROJECT_TEMPLATE" ] && echo "Template: $PROJECT_TEMPLATE")
+$([ -n "$PROJECT_LICENSE" ] && echo "License: $PROJECT_LICENSE")" > /dev/null 2>&1
+        
+        echo -e "${C_GREEN}   Initial commit blessed and created${C_RESET}"
+    fi
+}
+
+interactive_project_creation() {
+    echo -e "${C_BBLUE}🎨 INTERACTIVE PROJECT CREATION${C_RESET}"
+    echo -e "${C_WHITE}Welcome to the divine creation chamber!${C_RESET}"
+    echo ""
+    
+    # Project name
+    if [ -z "$PROJECT_NAME" ]; then
+        echo -ne "${C_YELLOW}📝 Project name${C_RESET} > "
+        read -r PROJECT_NAME
+    fi
+    
+    # Project type
+    if [ -z "$PROJECT_TYPE" ]; then
+        echo ""
+        echo -e "${C_CYAN}Available project types:${C_RESET}"
+        echo "  1) 🐍 Python"
+        echo "  2) 🟢 Node.js" 
+        echo "  3) 🔷 Go"
+        echo "  4) 🦀 Rust"
+        echo "  5) 📄 Static HTML"
+        echo "  6) 🐚 Shell Script"
+        echo ""
+        echo -ne "${C_YELLOW}Choose project type (1-6)${C_RESET} > "
+        read -r type_choice
+        
+        case "$type_choice" in
+            1) PROJECT_TYPE="python" ;;
+            2) PROJECT_TYPE="node" ;;
+            3) PROJECT_TYPE="go" ;;
+            4) PROJECT_TYPE="rust" ;;
+            5) PROJECT_TYPE="static" ;;
+            6) PROJECT_TYPE="shell" ;;
+            *) PROJECT_TYPE="static" ;;
+        esac
+    fi
+    
+    # Template selection based on type
+    if [ -z "$PROJECT_TEMPLATE" ]; then
+        case "$PROJECT_TYPE" in
+            "python")
+                echo ""
+                echo -e "${C_CYAN}Python templates:${C_RESET}"
+                echo "  1) Flask web application"
+                echo "  2) FastAPI web application" 
+                echo "  3) CLI application"
+                echo "  4) Basic Python project"
+                echo -ne "${C_YELLOW}Choose template (1-4)${C_RESET} > "
+                read -r template_choice
+                case "$template_choice" in
+                    1) PROJECT_TEMPLATE="flask" ;;
+                    2) PROJECT_TEMPLATE="fastapi" ;;
+                    3) PROJECT_TEMPLATE="cli" ;;
+                    *) PROJECT_TEMPLATE="basic" ;;
+                esac
+                ;;
+            "node")
+                echo ""
+                echo -e "${C_CYAN}Node.js templates:${C_RESET}"
+                echo "  1) Express.js web application"
+                echo "  2) React application"
+                echo "  3) Basic Node.js project"
+                echo -ne "${C_YELLOW}Choose template (1-3)${C_RESET} > "
+                read -r template_choice
+                case "$template_choice" in
+                    1) PROJECT_TEMPLATE="express" ;;
+                    2) PROJECT_TEMPLATE="react" ;;
+                    *) PROJECT_TEMPLATE="basic" ;;
+                esac
+                ;;
+        esac
+    fi
+    
+    # Description
+    if [ -z "$PROJECT_DESCRIPTION" ]; then
+        echo -ne "${C_YELLOW}📖 Project description (optional)${C_RESET} > "
+        read -r PROJECT_DESCRIPTION
+    fi
+    
+    # Git initialization
+    echo -ne "${C_YELLOW}🔗 Initialize Git repository? [Y/n]${C_RESET} > "
+    read -r git_choice
+    case "$git_choice" in
+        [nN]|[nN][oO]) INIT_GIT=0 ;;
+        *) INIT_GIT=1 ;;
+    esac
+    
+    # License
+    if [ "$INIT_GIT" -eq 1 ]; then
+        echo -ne "${C_YELLOW}⚖️  Add license? (MIT/GPL3/Apache2/none)${C_RESET} > "
+        read -r license_choice
+        case "${license_choice^^}" in
+            "MIT"|"GPL3"|"APACHE2"|"BSD3") PROJECT_LICENSE="$license_choice" ;;
+            *) PROJECT_LICENSE="" ;;
+        esac
+    fi
+}
+
+create_project() {
+    local project_path
+    if [ -n "$PROJECT_DIR" ]; then
+        project_path="$PROJECT_DIR/$PROJECT_NAME"
+    else
+        project_path="$PROJECT_NAME"
+    fi
+    
+    echo -e "${C_BGREEN}🎭 Beginning divine creation of $PROJECT_NAME...${C_RESET}"
+    echo ""
+    
+    # Create directory structure
+    create_directory_structure "$project_path"
+    
+    # Create .gitignore
+    create_gitignore "$PROJECT_TYPE"
+    
+    # Create project files based on type
+    case "$PROJECT_TYPE" in
+        "python")
+            create_python_project "$PROJECT_TEMPLATE"
+            ;;
+        "node")
+            create_node_project "$PROJECT_TEMPLATE" 
+            ;;
+        "go")
+            echo -e "${C_BGREEN}🔷 Creating Go project with divine efficiency...${C_RESET}"
+            go mod init "$(echo $PROJECT_NAME | tr '[:upper:]' '[:lower:]')" > /dev/null 2>&1
+            cat > main.go <<EOF
+package main
+
+import (
+    "fmt"
+    "log"
+)
+
+func main() {
+    fmt.Println("🔷 Welcome to $PROJECT_NAME!")
+    fmt.Println("✨ Divine Go application created with Project Genesis 3000™")
+    fmt.Println("🚀 Ready for your divine Go code...")
+    
+    blessing := getDivineBlessing()
+    fmt.Printf("💫 %s\\n", blessing)
+}
+
+func getDivineBlessing() string {
+    blessings := []string{
+        "May your goroutines never deadlock",
+        "May your channels always flow",
+        "May your structs be well-defined",
+        "May your interfaces be elegant",
+    }
+    return blessings[0] // For simplicity, return first blessing
+}
+EOF
+            ;;
+        "rust")
+            echo -e "${C_BGREEN}🦀 Creating Rust project with divine memory safety...${C_RESET}"
+            cargo init --name "$PROJECT_NAME" . > /dev/null 2>&1
+            cat > src/main.rs <<EOF
+use std::collections::HashMap;
+
+fn main() {
+    println!("🦀 Welcome to $PROJECT_NAME!");
+    println!("✨ Divine Rust application created with Project Genesis 3000™");
+    println!("🚀 Ready for your divine Rust code...");
+    
+    let blessing = get_divine_blessing();
+    println!("💫 {}", blessing);
+}
+
+fn get_divine_blessing() -> &'static str {
+    let blessings = vec![
+        "May your memory be always safe",
+        "May your ownership be clear",
+        "May your lifetimes be correct",
+        "May your code be blazingly fast",
+    ];
+    
+    blessings[0] // For simplicity, return first blessing
+}
+EOF
+            ;;
+        "shell")
+            echo -e "${C_BGREEN}🐚 Creating Shell script project with divine automation...${C_RESET}"
+            mkdir -p src tests
+            cat > src/main.sh <<EOF
+#!/usr/bin/env bash
+# $PROJECT_NAME - Divine Shell Application
+# Created with Project Genesis 3000™
+
+set -euo pipefail
+
+main() {
+    echo "🐚 Welcome to $PROJECT_NAME!"
+    echo "✨ Divine shell application created with Project Genesis 3000™"
+    echo "🚀 Ready for your divine shell scripts..."
+    
+    local blessing
+    blessing=\$(get_divine_blessing)
+    echo "💫 \$blessing"
+}
+
+get_divine_blessing() {
+    local blessings=(
+        "May your pipes never break"
+        "May your variables always expand"
+        "May your exit codes be zero"
+        "May your automation be flawless"
+    )
+    
+    echo "\${blessings[0]}"
+}
+
+if [[ "\${BASH_SOURCE[0]}" == "\${0}" ]]; then
+    main "\$@"
+fi
+EOF
+            chmod +x src/main.sh
+            ;;
+        "static"|*)
+            create_static_project
+            ;;
+    esac
+    
+    # Create README
+    create_readme "$PROJECT_NAME" "$PROJECT_TYPE"
+    
+    # Create license
+    if [ -n "$PROJECT_LICENSE" ]; then
+        create_license "$PROJECT_LICENSE"
+    fi
+    
+    # Initialize Git
+    init_git_repo
+    
+    echo ""
+    echo -e "${C_BGREEN}✨ Divine creation complete!${C_RESET}"
+    echo -e "${C_WHITE}Project: ${C_CYAN}$PROJECT_NAME${C_RESET}"
+    echo -e "${C_WHITE}Type: ${C_CYAN}$PROJECT_TYPE${C_RESET}"
+    if [ -n "$PROJECT_TEMPLATE" ]; then
+        echo -e "${C_WHITE}Template: ${C_CYAN}$PROJECT_TEMPLATE${C_RESET}"
+    fi
+    echo -e "${C_WHITE}Location: ${C_CYAN}$(pwd)${C_RESET}"
+    
+    echo ""
+    echo -e "${C_YELLOW}🚀 Next steps:${C_RESET}"
+    echo -e "   ${C_GREEN}cd $PROJECT_NAME${C_RESET}"
+    
+    case "$PROJECT_TYPE" in
+        "python")
+            echo -e "   ${C_GREEN}python -m venv venv && source venv/bin/activate${C_RESET}"
+            echo -e "   ${C_GREEN}pip install -r requirements.txt${C_RESET}"
+            ;;
+        "node")
+            echo -e "   ${C_GREEN}npm install${C_RESET}"
+            echo -e "   ${C_GREEN}npm start${C_RESET}"
+            ;;
+        "rust")
+            echo -e "   ${C_GREEN}cargo run${C_RESET}"
+            ;;
+        "go")
+            echo -e "   ${C_GREEN}go run main.go${C_RESET}"
+            ;;
+        "static")
+            echo -e "   ${C_GREEN}devserver${C_RESET}  ${C_DIM}# Use your divine devserver!${C_RESET}"
+            ;;
+    esac
+    
+    echo ""
+    echo -e "${C_BCYAN}🎭 Your divine creation awaits your brilliant code!${C_RESET}"
+}
+
+main() {
+    # Parse command line arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -t|--type)
+                PROJECT_TYPE="$2"
+                shift 2
+                ;;
+            -T|--template)
+                PROJECT_TEMPLATE="$2"
+                shift 2
+                ;;
+            -g|--git)
+                INIT_GIT=1
+                shift
+                ;;
+            -l|--license)
+                PROJECT_LICENSE="$2"
+                shift 2
+                ;;
+            -a|--author)
+                PROJECT_AUTHOR="$2"
+                shift 2
+                ;;
+            -d|--description)
+                PROJECT_DESCRIPTION="$2"
+                shift 2
+                ;;
+            -D|--dir)
+                PROJECT_DIR="$2"
+                shift 2
+                ;;
+            -f|--framework)
+                PROJECT_FRAMEWORK="$2"
+                shift 2
+                ;;
+            -v|--verbose)
+                VERBOSE_MODE=1
+                shift
+                ;;
+            -q|--quiet)
+                QUIET_MODE=1
+                shift
+                ;;
+            -h|--help)
+                print_usage
+                exit 0
+                ;;
+            --version)
+                echo "Project Genesis 3000™ v$SCRIPT_VERSION"
+                echo "by ShadowHarvy (Divine Digital Creator)"
+                exit 0
+                ;;
+            -*)
+                echo -e "${C_RED}❌ Unknown option: $1${C_RESET}" >&2
+                echo -e "${C_YELLOW}💡 Try '$0 --help' for usage information${C_RESET}" >&2
+                exit 2
+                ;;
+            *)
+                PROJECT_NAME="$1"
+                shift
+                ;;
+        esac
+    done
+    
+    # Detect system information
+    detect_system_info
+    
+    # Show banner (unless quiet)
+    if [ "$QUIET_MODE" -eq 0 ]; then
+        print_banner
+        sleep 1
+    fi
+    
+    # Interactive mode if no project name provided
+    if [ -z "$PROJECT_NAME" ]; then
+        interactive_project_creation
+    fi
+    
+    # Validate project name
+    if [ -z "$PROJECT_NAME" ]; then
+        echo -e "${C_RED}❌ Project name is required${C_RESET}" >&2
+        exit 2
+    fi
+    
+    # Create the project
+    create_project
+    
+    # Final divine blessing
+    if [ "$QUIET_MODE" -eq 0 ]; then
+        echo ""
+        echo -e "${C_BPURPLE}🎭 Divine creation ritual complete!${C_RESET}"
+        echo -e "${C_DIM}\"And behold, it was very good!\" - Project Genesis 3000™${C_RESET}"
+    fi
+}
+
+# --- Script Entry Point ---
+main "$@"

@@ -1,0 +1,778 @@
+#!/usr/bin/env bash
+# ===----------------------------------------===
+#         Development Concierge 9000™
+# ===----------------------------------------===
+# Author: ShadowHarvy (Chief Digital Butler)
+# Version: 1.0 (At your service for development needs!)
+#
+# Purpose: Serves your development projects with the elegance of a
+#          5-star hotel concierge and the efficiency of a Swiss watch.
+#          Because manually starting development servers is beneath
+#          a developer of your caliber.
+#
+# Usage:
+#   devserver                        # Auto-detect and serve current dir
+#   devserver --port 8080            # Serve on specific port
+#   devserver --type python          # Force server type
+#   devserver --dir /path/to/project # Serve specific directory
+#   devserver --list                 # List available server types
+#   devserver --stop 3000            # Stop server on port 3000
+#
+# Options:
+#   -p, --port PORT         Serve on specific port (default: auto-assign)
+#   -t, --type TYPE         Force server type (python, node, static, php)
+#   -d, --dir DIRECTORY     Serve specific directory
+#   -H, --host HOST         Bind to specific host (default: localhost)
+#   -o, --open              Open browser automatically
+#   -w, --watch             Enable live reload (when supported)
+#   -l, --list              List available server types and exit
+#   -s, --stop PORT         Stop server running on specified port
+#   -k, --kill-all          Stop all development servers
+#   -q, --quiet             Less theatrical output
+#   -h, --help              Show this help and exit
+#   -v, --version           Show version information
+#
+# Supported Project Types:
+#   - Python (http.server, flask, django)
+#   - Node.js (Express, static server, npm/yarn dev)
+#   - Static HTML/CSS/JS
+#   - PHP (built-in dev server)
+#   - Ruby (WEBrick, Rails)
+#   - Go (net/http)
+#
+# Exit Codes:
+#   0 - Server started successfully or stopped gracefully
+#   1 - Project type not detected or unsupported
+#   2 - Invalid arguments or port issues
+#   3 - Server failed to start or permission denied
+
+# --- Strict Mode & Safety First ---
+set -euo pipefail
+
+# --- Script Configuration ---
+SCRIPT_VERSION="1.0"
+SERVE_PORT=""
+SERVE_TYPE=""
+SERVE_DIR="."
+SERVE_HOST="localhost"
+OPEN_BROWSER=0
+ENABLE_WATCH=0
+QUIET_MODE=0
+OPERATION=""
+
+# Default port ranges for different services
+DEFAULT_PORTS=(3000 8000 8080 3001 5000 4000 8001 9000)
+
+# --- Colors & Visual Flair ---
+if [ -t 1 ]; then
+    C_RESET='\033[0m'
+    C_BOLD='\033[1m'
+    C_DIM='\033[2m'
+    C_RED='\033[0;31m'
+    C_GREEN='\033[0;32m'
+    C_YELLOW='\033[0;33m'
+    C_BLUE='\033[0;34m'
+    C_PURPLE='\033[0;35m'
+    C_CYAN='\033[0;36m'
+    C_WHITE='\033[0;37m'
+    # Bright variants for service announcements
+    C_BRED='\033[1;31m'
+    C_BGREEN='\033[1;32m'
+    C_BYELLOW='\033[1;33m'
+    C_BBLUE='\033[1;34m'
+    C_BPURPLE='\033[1;35m'
+    C_BCYAN='\033[1;36m'
+    C_BWHITE='\033[1;37m'
+else
+    C_RESET='' C_BOLD='' C_DIM='' C_RED='' C_GREEN='' C_YELLOW=''
+    C_BLUE='' C_PURPLE='' C_CYAN='' C_WHITE='' C_BRED='' C_BGREEN=''
+    C_BYELLOW='' C_BBLUE='' C_BPURPLE='' C_BCYAN='' C_BWHITE=''
+fi
+
+# --- Concierge Functions ---
+
+print_banner() {
+    if [ "$QUIET_MODE" -eq 1 ]; then return; fi
+    
+    echo -e "${C_BPURPLE}"
+    echo "╔════════════════════════════════════════════════════╗"
+    echo "║        ${C_BWHITE}DEVELOPMENT CONCIERGE 9000™${C_BPURPLE}         ║"
+    echo "║     ${C_CYAN}\"At your service for all development needs!\"${C_BPURPLE}   ║"
+    echo "║                                                    ║"
+    echo "║      ${C_BGREEN}by ShadowHarvy (Chief Digital Butler)${C_BPURPLE}      ║"
+    echo "╚════════════════════════════════════════════════════╝"
+    echo -e "${C_RESET}"
+}
+
+print_usage() {
+    cat <<EOF
+${C_BOLD}${C_BBLUE}Development Concierge 9000™ - Usage Guide${C_RESET}
+
+${C_BOLD}SYNOPSIS${C_RESET}
+    ${C_GREEN}devserver${C_RESET} [${C_YELLOW}options${C_RESET}] [${C_CYAN}directory${C_RESET}]
+
+${C_BOLD}DESCRIPTION${C_RESET}
+    Serves your development projects with the elegance of a 5-star hotel concierge.
+    Auto-detects project types and provides the perfect development environment.
+
+${C_BOLD}QUICK SERVICE${C_RESET}
+    ${C_GREEN}devserver${C_RESET}                        ${C_DIM}# Auto-detect and serve current directory${C_RESET}
+    ${C_GREEN}devserver${C_RESET} ${C_YELLOW}--port 8080${C_RESET}            ${C_DIM}# Serve on specific port${C_RESET}
+    ${C_GREEN}devserver${C_RESET} ${C_YELLOW}--type python${C_RESET}          ${C_DIM}# Force specific server type${C_RESET}
+    ${C_GREEN}devserver${C_RESET} ${C_YELLOW}--open${C_RESET}                 ${C_DIM}# Auto-open in browser${C_RESET}
+
+${C_BOLD}CONCIERGE SERVICES${C_RESET}
+    ${C_GREEN}devserver${C_RESET} ${C_YELLOW}--list${C_RESET}                 ${C_DIM}# List available service types${C_RESET}
+    ${C_GREEN}devserver${C_RESET} ${C_YELLOW}--stop 3000${C_RESET}            ${C_DIM}# Stop server on port 3000${C_RESET}
+    ${C_GREEN}devserver${C_RESET} ${C_YELLOW}--kill-all${C_RESET}             ${C_DIM}# Stop all development servers${C_RESET}
+    ${C_GREEN}devserver${C_RESET} ${C_YELLOW}--watch${C_RESET}                ${C_DIM}# Enable live reload${C_RESET}
+
+${C_BOLD}OPTIONS${C_RESET}
+    ${C_YELLOW}-p, --port PORT${C_RESET}         Serve on specific port (auto-assigned if not specified)
+    ${C_YELLOW}-t, --type TYPE${C_RESET}         Force server type (python, node, static, php, go, ruby)
+    ${C_YELLOW}-d, --dir DIRECTORY${C_RESET}     Serve specific directory instead of current
+    ${C_YELLOW}-H, --host HOST${C_RESET}         Bind to specific host (default: localhost)
+    ${C_YELLOW}-o, --open${C_RESET}              Open browser automatically after starting
+    ${C_YELLOW}-w, --watch${C_RESET}             Enable live reload (when supported by server type)
+    ${C_YELLOW}-l, --list${C_RESET}              List all available server types and capabilities
+    ${C_YELLOW}-s, --stop PORT${C_RESET}         Stop server running on specified port
+    ${C_YELLOW}-k, --kill-all${C_RESET}          Stop all development servers managed by concierge
+    ${C_YELLOW}-q, --quiet${C_RESET}             Reduced theatrical output for automation
+    ${C_YELLOW}-h, --help${C_RESET}              Show this comprehensive help guide
+    ${C_YELLOW}-v, --version${C_RESET}           Display version and credentials
+
+${C_BOLD}SUPPORTED PROJECT TYPES${C_RESET}
+    ${C_CYAN}🐍 Python${C_RESET}     - HTTP server, Flask, Django, FastAPI
+    ${C_CYAN}🟢 Node.js${C_RESET}    - Express, static server, npm/yarn dev scripts
+    ${C_CYAN}📄 Static${C_RESET}     - HTML/CSS/JS with live reload capabilities
+    ${C_CYAN}🐘 PHP${C_RESET}        - Built-in development server
+    ${C_CYAN}💎 Ruby${C_RESET}       - WEBrick, Rails development server
+    ${C_CYAN}🔷 Go${C_RESET}         - net/http based servers
+
+${C_BOLD}AUTO-DETECTION${C_RESET}
+    The concierge automatically detects your project type by examining:
+    • ${C_WHITE}package.json${C_RESET} - Node.js projects
+    • ${C_WHITE}requirements.txt, *.py${C_RESET} - Python projects  
+    • ${C_WHITE}composer.json, *.php${C_RESET} - PHP projects
+    • ${C_WHITE}Gemfile, *.rb${C_RESET} - Ruby projects
+    • ${C_WHITE}go.mod, *.go${C_RESET} - Go projects
+    • ${C_WHITE}index.html${C_RESET} - Static HTML projects
+
+${C_DIM}Your wish is my command! - Development Concierge 9000™${C_RESET}
+EOF
+}
+
+detect_project_type() {
+    local target_dir="$1"
+    
+    cd "$target_dir" 2>/dev/null || return 1
+    
+    # Check for Node.js projects
+    if [ -f "package.json" ]; then
+        echo "node"
+        return 0
+    fi
+    
+    # Check for Python projects
+    if [ -f "requirements.txt" ] || [ -f "setup.py" ] || [ -f "pyproject.toml" ] || \
+       [ -f "manage.py" ] || [ -f "app.py" ] || [ -f "main.py" ] || \
+       find . -maxdepth 2 -name "*.py" -type f | head -1 | grep -q .; then
+        echo "python"
+        return 0
+    fi
+    
+    # Check for PHP projects
+    if [ -f "composer.json" ] || [ -f "index.php" ] || \
+       find . -maxdepth 2 -name "*.php" -type f | head -1 | grep -q .; then
+        echo "php"
+        return 0
+    fi
+    
+    # Check for Ruby projects
+    if [ -f "Gemfile" ] || [ -f "config.ru" ] || \
+       find . -maxdepth 2 -name "*.rb" -type f | head -1 | grep -q .; then
+        echo "ruby"
+        return 0
+    fi
+    
+    # Check for Go projects
+    if [ -f "go.mod" ] || [ -f "main.go" ] || \
+       find . -maxdepth 2 -name "*.go" -type f | head -1 | grep -q .; then
+        echo "go"
+        return 0
+    fi
+    
+    # Check for static HTML
+    if [ -f "index.html" ] || [ -f "index.htm" ]; then
+        echo "static"
+        return 0
+    fi
+    
+    # Default to static if we have any web files
+    if find . -maxdepth 2 \( -name "*.html" -o -name "*.css" -o -name "*.js" \) -type f | head -1 | grep -q .; then
+        echo "static"
+        return 0
+    fi
+    
+    echo "unknown"
+    return 1
+}
+
+find_available_port() {
+    local preferred_port="$1"
+    
+    # If a specific port was requested, try it first
+    if [ -n "$preferred_port" ]; then
+        if ! netstat -tln 2>/dev/null | grep -q ":$preferred_port "; then
+            echo "$preferred_port"
+            return 0
+        fi
+    fi
+    
+    # Try default ports
+    for port in "${DEFAULT_PORTS[@]}"; do
+        if ! netstat -tln 2>/dev/null | grep -q ":$port "; then
+            echo "$port"
+            return 0
+        fi
+    done
+    
+    # Generate random port in safe range
+    for _ in {1..10}; do
+        local random_port=$((8000 + RANDOM % 1000))
+        if ! netstat -tln 2>/dev/null | grep -q ":$random_port "; then
+            echo "$random_port"
+            return 0
+        fi
+    done
+    
+    echo "3000"  # Fallback
+}
+
+start_python_server() {
+    local port="$1"
+    local directory="$2"
+    
+    echo -e "${C_YELLOW}🐍 Python Development Service${C_RESET}"
+    
+    # Check for Django
+    if [ -f "$directory/manage.py" ]; then
+        echo -e "${C_GREEN}   Django application detected${C_RESET}"
+        cd "$directory"
+        echo -e "${C_DIM}   Starting Django development server...${C_RESET}"
+        python manage.py runserver "$SERVE_HOST:$port" &
+        echo $! > "/tmp/devserver_$port.pid"
+        return 0
+    fi
+    
+    # Check for Flask app
+    if [ -f "$directory/app.py" ] || grep -q "Flask" "$directory"/*.py 2>/dev/null; then
+        echo -e "${C_GREEN}   Flask application detected${C_RESET}"
+        cd "$directory"
+        export FLASK_ENV=development
+        export FLASK_RUN_HOST="$SERVE_HOST"
+        export FLASK_RUN_PORT="$port"
+        echo -e "${C_DIM}   Starting Flask development server...${C_RESET}"
+        
+        if command -v flask >/dev/null 2>&1; then
+            flask run &
+        else
+            python -m flask run &
+        fi
+        echo $! > "/tmp/devserver_$port.pid"
+        return 0
+    fi
+    
+    # Default Python HTTP server
+    echo -e "${C_GREEN}   Using Python HTTP server${C_RESET}"
+    cd "$directory"
+    echo -e "${C_DIM}   Starting HTTP server...${C_RESET}"
+    python -m http.server "$port" --bind "$SERVE_HOST" &
+    echo $! > "/tmp/devserver_$port.pid"
+}
+
+start_node_server() {
+    local port="$1"
+    local directory="$2"
+    
+    echo -e "${C_YELLOW}🟢 Node.js Development Service${C_RESET}"
+    cd "$directory"
+    
+    # Check for npm/yarn scripts
+    if [ -f "package.json" ]; then
+        local has_dev_script
+        has_dev_script=$(node -p "JSON.stringify(require('./package.json').scripts || {})" 2>/dev/null | grep -q '"dev"' && echo "yes" || echo "no")
+        local has_start_script
+        has_start_script=$(node -p "JSON.stringify(require('./package.json').scripts || {})" 2>/dev/null | grep -q '"start"' && echo "yes" || echo "no")
+        
+        if [ "$has_dev_script" = "yes" ]; then
+            echo -e "${C_GREEN}   Found 'dev' script in package.json${C_RESET}"
+            echo -e "${C_DIM}   Starting with npm run dev...${C_RESET}"
+            npm run dev &
+            echo $! > "/tmp/devserver_$port.pid"
+            return 0
+        elif [ "$has_start_script" = "yes" ]; then
+            echo -e "${C_GREEN}   Found 'start' script in package.json${C_RESET}"
+            echo -e "${C_DIM}   Starting with npm start...${C_RESET}"
+            npm start &
+            echo $! > "/tmp/devserver_$port.pid"
+            return 0
+        fi
+    fi
+    
+    # Default static server for Node.js
+    echo -e "${C_GREEN}   Using Node.js static server${C_RESET}"
+    echo -e "${C_DIM}   Starting HTTP server...${C_RESET}"
+    
+    # Create a simple Node.js server
+    cat > "/tmp/devserver_$port.js" <<EOF
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
+const url = require('url');
+
+const server = http.createServer((req, res) => {
+    const parsedUrl = url.parse(req.url);
+    let pathname = parsedUrl.pathname;
+    
+    if (pathname === '/') pathname = '/index.html';
+    
+    const filePath = path.join('$directory', pathname);
+    
+    fs.readFile(filePath, (err, data) => {
+        if (err) {
+            res.writeHead(404);
+            res.end('Not Found');
+            return;
+        }
+        
+        const ext = path.extname(filePath);
+        const mimeTypes = {
+            '.html': 'text/html',
+            '.css': 'text/css',
+            '.js': 'text/javascript',
+            '.json': 'application/json',
+            '.png': 'image/png',
+            '.jpg': 'image/jpeg',
+            '.gif': 'image/gif',
+            '.svg': 'image/svg+xml'
+        };
+        
+        res.writeHead(200, { 'Content-Type': mimeTypes[ext] || 'text/plain' });
+        res.end(data);
+    });
+});
+
+server.listen($port, '$SERVE_HOST', () => {
+    console.log(\`Server running at http://$SERVE_HOST:$port/\`);
+});
+EOF
+    
+    node "/tmp/devserver_$port.js" &
+    echo $! > "/tmp/devserver_$port.pid"
+}
+
+start_static_server() {
+    local port="$1"
+    local directory="$2"
+    
+    echo -e "${C_YELLOW}📄 Static File Service${C_RESET}"
+    echo -e "${C_GREEN}   Serving static HTML/CSS/JS files${C_RESET}"
+    
+    # Try to use Python first (most reliable)
+    if command -v python3 >/dev/null 2>&1; then
+        cd "$directory"
+        echo -e "${C_DIM}   Using Python HTTP server...${C_RESET}"
+        python3 -m http.server "$port" --bind "$SERVE_HOST" &
+        echo $! > "/tmp/devserver_$port.pid"
+    elif command -v python >/dev/null 2>&1; then
+        cd "$directory"
+        echo -e "${C_DIM}   Using Python HTTP server...${C_RESET}"
+        python -m http.server "$port" --bind "$SERVE_HOST" &
+        echo $! > "/tmp/devserver_$port.pid"
+    elif command -v node >/dev/null 2>&1; then
+        start_node_server "$port" "$directory"
+    else
+        echo -e "${C_RED}❌ No suitable server found. Install Python or Node.js.${C_RESET}"
+        return 1
+    fi
+}
+
+start_php_server() {
+    local port="$1"
+    local directory="$2"
+    
+    echo -e "${C_YELLOW}🐘 PHP Development Service${C_RESET}"
+    
+    if ! command -v php >/dev/null 2>&1; then
+        echo -e "${C_RED}❌ PHP not found. Please install PHP.${C_RESET}"
+        return 1
+    fi
+    
+    echo -e "${C_GREEN}   Using PHP built-in server${C_RESET}"
+    cd "$directory"
+    echo -e "${C_DIM}   Starting PHP development server...${C_RESET}"
+    php -S "$SERVE_HOST:$port" &
+    echo $! > "/tmp/devserver_$port.pid"
+}
+
+start_ruby_server() {
+    local port="$1"
+    local directory="$2"
+    
+    echo -e "${C_YELLOW}💎 Ruby Development Service${C_RESET}"
+    
+    if ! command -v ruby >/dev/null 2>&1; then
+        echo -e "${C_RED}❌ Ruby not found. Please install Ruby.${C_RESET}"
+        return 1
+    fi
+    
+    cd "$directory"
+    
+    # Check for Rails
+    if [ -f "config/application.rb" ]; then
+        echo -e "${C_GREEN}   Rails application detected${C_RESET}"
+        echo -e "${C_DIM}   Starting Rails server...${C_RESET}"
+        rails server -p "$port" -b "$SERVE_HOST" &
+        echo $! > "/tmp/devserver_$port.pid"
+        return 0
+    fi
+    
+    # Use WEBrick for static files
+    echo -e "${C_GREEN}   Using Ruby WEBrick server${C_RESET}"
+    echo -e "${C_DIM}   Starting WEBrick server...${C_RESET}"
+    ruby -run -e httpd . -p "$port" &
+    echo $! > "/tmp/devserver_$port.pid"
+}
+
+start_go_server() {
+    local port="$1"
+    local directory="$2"
+    
+    echo -e "${C_YELLOW}🔷 Go Development Service${C_RESET}"
+    
+    if ! command -v go >/dev/null 2>&1; then
+        echo -e "${C_RED}❌ Go not found. Please install Go.${C_RESET}"
+        return 1
+    fi
+    
+    cd "$directory"
+    
+    # Check for main.go
+    if [ -f "main.go" ]; then
+        echo -e "${C_GREEN}   Go application detected${C_RESET}"
+        echo -e "${C_DIM}   Starting Go application...${C_RESET}"
+        go run main.go &
+        echo $! > "/tmp/devserver_$port.pid"
+        return 0
+    fi
+    
+    echo -e "${C_RED}❌ No main.go found for Go project${C_RESET}"
+    return 1
+}
+
+list_server_types() {
+    echo -e "${C_BBLUE}🎭 AVAILABLE CONCIERGE SERVICES${C_RESET}"
+    echo -e "${C_DIM}Your personal development service menu...${C_RESET}"
+    echo ""
+    
+    echo -e "${C_YELLOW}Available Server Types:${C_RESET}"
+    echo -e "   ${C_CYAN}🐍 python${C_RESET}   - Python HTTP server, Flask, Django"
+    echo -e "   ${C_CYAN}🟢 node${C_RESET}     - Node.js with Express or static serving"
+    echo -e "   ${C_CYAN}📄 static${C_RESET}   - Static HTML/CSS/JS files"
+    echo -e "   ${C_CYAN}🐘 php${C_RESET}      - PHP built-in development server"
+    echo -e "   ${C_CYAN}💎 ruby${C_RESET}     - Ruby WEBrick or Rails server"
+    echo -e "   ${C_CYAN}🔷 go${C_RESET}       - Go HTTP server applications"
+    
+    echo ""
+    echo -e "${C_YELLOW}Auto-Detection Files:${C_RESET}"
+    echo -e "   ${C_WHITE}package.json${C_RESET}     → Node.js project"
+    echo -e "   ${C_WHITE}requirements.txt${C_RESET} → Python project"
+    echo -e "   ${C_WHITE}manage.py${C_RESET}        → Django project"
+    echo -e "   ${C_WHITE}composer.json${C_RESET}    → PHP project"
+    echo -e "   ${C_WHITE}Gemfile${C_RESET}          → Ruby project"
+    echo -e "   ${C_WHITE}go.mod${C_RESET}           → Go project"
+    echo -e "   ${C_WHITE}index.html${C_RESET}       → Static website"
+}
+
+stop_server() {
+    local port="$1"
+    local pid_file="/tmp/devserver_$port.pid"
+    
+    if [ -f "$pid_file" ]; then
+        local pid
+        pid=$(cat "$pid_file")
+        
+        if kill -0 "$pid" 2>/dev/null; then
+            echo -e "${C_YELLOW}🛑 Stopping server on port $port (PID: $pid)...${C_RESET}"
+            kill "$pid" 2>/dev/null
+            sleep 1
+            
+            if kill -0 "$pid" 2>/dev/null; then
+                echo -e "${C_RED}   Force stopping server...${C_RESET}"
+                kill -9 "$pid" 2>/dev/null
+            fi
+            
+            rm -f "$pid_file" "/tmp/devserver_$port.js"
+            echo -e "${C_GREEN}✅ Server stopped successfully${C_RESET}"
+        else
+            echo -e "${C_YELLOW}⚠️  Server process not running${C_RESET}"
+            rm -f "$pid_file" "/tmp/devserver_$port.js"
+        fi
+    else
+        # Try to find and kill by port
+        local pid
+        pid=$(lsof -ti ":$port" 2>/dev/null | head -1 || true)
+        
+        if [ -n "$pid" ]; then
+            echo -e "${C_YELLOW}🛑 Found server on port $port (PID: $pid), stopping...${C_RESET}"
+            kill "$pid" 2>/dev/null || true
+            echo -e "${C_GREEN}✅ Server stopped${C_RESET}"
+        else
+            echo -e "${C_RED}❌ No server found running on port $port${C_RESET}"
+            return 1
+        fi
+    fi
+}
+
+kill_all_servers() {
+    echo -e "${C_BRED}🧹 STOPPING ALL DEVELOPMENT SERVERS${C_RESET}"
+    echo -e "${C_DIM}Cleaning up all concierge services...${C_RESET}"
+    echo ""
+    
+    local stopped=0
+    
+    # Stop servers tracked by PID files
+    for pid_file in /tmp/devserver_*.pid; do
+        if [ -f "$pid_file" ]; then
+            local port
+            port=$(basename "$pid_file" .pid | sed 's/devserver_//')
+            stop_server "$port"
+            stopped=$((stopped + 1))
+        fi
+    done
+    
+    # Clean up any remaining temp files
+    rm -f /tmp/devserver_*.js
+    
+    if [ "$stopped" -eq 0 ]; then
+        echo -e "${C_GREEN}✅ No development servers were running${C_RESET}"
+    else
+        echo ""
+        echo -e "${C_BGREEN}🎉 Stopped $stopped development server(s)${C_RESET}"
+    fi
+}
+
+open_browser() {
+    local url="$1"
+    
+    if [ "$OPEN_BROWSER" -eq 1 ]; then
+        echo -e "${C_CYAN}🌐 Opening browser to $url${C_RESET}"
+        
+        if command -v xdg-open >/dev/null 2>&1; then
+            xdg-open "$url" >/dev/null 2>&1 &
+        elif command -v open >/dev/null 2>&1; then
+            open "$url" >/dev/null 2>&1 &
+        else
+            echo -e "${C_YELLOW}⚠️  Could not open browser automatically${C_RESET}"
+        fi
+    fi
+}
+
+start_development_server() {
+    local project_type="$SERVE_TYPE"
+    local directory="$SERVE_DIR"
+    local port="$SERVE_PORT"
+    
+    # Auto-detect project type if not specified
+    if [ -z "$project_type" ]; then
+        project_type=$(detect_project_type "$directory")
+        if [ "$project_type" = "unknown" ]; then
+            echo -e "${C_RED}❌ Could not detect project type in: $directory${C_RESET}"
+            echo -e "${C_YELLOW}💡 Try specifying the type with --type${C_RESET}"
+            return 1
+        fi
+    fi
+    
+    # Find available port if not specified
+    if [ -z "$port" ]; then
+        port=$(find_available_port "")
+    else
+        if netstat -tln 2>/dev/null | grep -q ":$port "; then
+            echo -e "${C_RED}❌ Port $port is already in use${C_RESET}"
+            echo -e "${C_YELLOW}💡 Try a different port or let me auto-assign one${C_RESET}"
+            return 1
+        fi
+    fi
+    
+    echo -e "${C_BGREEN}🎩 Development Concierge at Your Service!${C_RESET}"
+    echo -e "${C_WHITE}Project Type: ${C_CYAN}$project_type${C_RESET}"
+    echo -e "${C_WHITE}Directory: ${C_CYAN}$directory${C_RESET}"
+    echo -e "${C_WHITE}Host: ${C_CYAN}$SERVE_HOST${C_RESET}"
+    echo -e "${C_WHITE}Port: ${C_CYAN}$port${C_RESET}"
+    echo ""
+    
+    # Start the appropriate server
+    case "$project_type" in
+        "python")
+            start_python_server "$port" "$directory"
+            ;;
+        "node")
+            start_node_server "$port" "$directory"
+            ;;
+        "static")
+            start_static_server "$port" "$directory"
+            ;;
+        "php")
+            start_php_server "$port" "$directory"
+            ;;
+        "ruby")
+            start_ruby_server "$port" "$directory"
+            ;;
+        "go")
+            start_go_server "$port" "$directory"
+            ;;
+        *)
+            echo -e "${C_RED}❌ Unsupported server type: $project_type${C_RESET}"
+            return 1
+            ;;
+    esac
+    
+    # Wait a moment for server to start
+    sleep 2
+    
+    # Check if server is running
+    if netstat -tln 2>/dev/null | grep -q ":$port "; then
+        local url="http://$SERVE_HOST:$port"
+        echo ""
+        echo -e "${C_BGREEN}✨ Server successfully started!${C_RESET}"
+        echo -e "${C_WHITE}   URL: ${C_BBLUE}$url${C_RESET}"
+        echo -e "${C_DIM}   Press Ctrl+C to stop the server${C_RESET}"
+        
+        # Open browser if requested
+        open_browser "$url"
+        
+        echo ""
+        echo -e "${C_BCYAN}🎭 Your development server is now at your service!${C_RESET}"
+        
+        # Keep the script running to handle Ctrl+C
+        trap "stop_server $port; exit 0" INT TERM
+        
+        # Wait for server to be stopped externally
+        while kill -0 $(cat "/tmp/devserver_$port.pid" 2>/dev/null) 2>/dev/null; do
+            sleep 1
+        done
+        
+    else
+        echo ""
+        echo -e "${C_RED}❌ Server failed to start on port $port${C_RESET}"
+        # Clean up PID file if it exists
+        rm -f "/tmp/devserver_$port.pid" "/tmp/devserver_$port.js"
+        return 1
+    fi
+}
+
+main() {
+    # Parse command line arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -p|--port)
+                SERVE_PORT="$2"
+                shift 2
+                ;;
+            -t|--type)
+                SERVE_TYPE="$2"
+                shift 2
+                ;;
+            -d|--dir)
+                SERVE_DIR="$2"
+                shift 2
+                ;;
+            -H|--host)
+                SERVE_HOST="$2"
+                shift 2
+                ;;
+            -o|--open)
+                OPEN_BROWSER=1
+                shift
+                ;;
+            -w|--watch)
+                ENABLE_WATCH=1
+                shift
+                ;;
+            -l|--list)
+                OPERATION="list"
+                shift
+                ;;
+            -s|--stop)
+                OPERATION="stop"
+                SERVE_PORT="$2"
+                shift 2
+                ;;
+            -k|--kill-all)
+                OPERATION="kill-all"
+                shift
+                ;;
+            -q|--quiet)
+                QUIET_MODE=1
+                shift
+                ;;
+            -h|--help)
+                print_usage
+                exit 0
+                ;;
+            -v|--version)
+                echo "Development Concierge 9000™ v$SCRIPT_VERSION"
+                echo "by ShadowHarvy (Chief Digital Butler)"
+                exit 0
+                ;;
+            -*)
+                echo -e "${C_RED}❌ Unknown option: $1${C_RESET}" >&2
+                echo -e "${C_YELLOW}💡 Try '$0 --help' for usage information${C_RESET}" >&2
+                exit 2
+                ;;
+            *)
+                # Assume it's a directory
+                SERVE_DIR="$1"
+                shift
+                ;;
+        esac
+    done
+    
+    # Show banner (unless quiet or for non-serve operations)
+    if [ "$QUIET_MODE" -eq 0 ] && [ "$OPERATION" != "list" ] && [ "$OPERATION" != "stop" ] && [ "$OPERATION" != "kill-all" ]; then
+        print_banner
+        sleep 1
+    fi
+    
+    # Execute operation
+    case "$OPERATION" in
+        "list")
+            list_server_types
+            ;;
+        "stop")
+            if [ -z "$SERVE_PORT" ]; then
+                echo -e "${C_RED}❌ Port number required for --stop${C_RESET}" >&2
+                exit 2
+            fi
+            stop_server "$SERVE_PORT"
+            ;;
+        "kill-all")
+            kill_all_servers
+            ;;
+        *)
+            # Default: start development server
+            start_development_server
+            ;;
+    esac
+    
+    # Final flourish for non-serving operations
+    if [ "$QUIET_MODE" -eq 0 ] && [ "$OPERATION" != "" ] && [ "$OPERATION" != "serve" ]; then
+        echo ""
+        echo -e "${C_BGREEN}🎭 Concierge service completed!${C_RESET}"
+        echo -e "${C_DIM}\"Always at your service!\" - Development Concierge 9000™${C_RESET}"
+    fi
+}
+
+# --- Script Entry Point ---
+main "$@"

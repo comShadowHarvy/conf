@@ -1,0 +1,251 @@
+#!/usr/bin/env bash
+# ===------------------------------------------------===
+#           SmartGrab 1.0 — Link Downloader
+# ===------------------------------------------------===
+# Purpose: Download a URL using curl or wget with sensible defaults,
+#          auto-choosing the best available tool and supporting common
+#          needs (resume, redirects, retries, headers/cookies, etc.).
+#
+# Usage examples:
+#   grab https://example.com/file.zip
+#   grab -o downloads https://example.com/file.zip
+#   grab --header "Authorization: Bearer {{TOKEN}}" https://api.example.com/data
+#   grab --cookie "session=abc" --referer https://example.com https://example.com/file
+#   grab --use wget https://example.com/large.iso
+#
+# Exit codes:
+#   0 success
+#   1 usage or missing URL
+#   2 no supported downloader found
+#   3 download failed
+
+set -euo pipefail
+
+print_usage() {
+  cat <<EOF
+SmartGrab — Download URLs with curl or wget
+
+Usage: grab [options] <URL>
+
+Options:
+  -o, --output-dir DIR   Directory to save the file (default: .)
+  -f, --output FILE      Explicit output filename
+  -H, --header HDR       Add request header (can be repeated)
+  -b, --cookie COOKIE    Add cookie (name=value or cookie string)
+  -c, --cookie-jar FILE  Save cookies to FILE
+  -r, --referer URL      Set HTTP Referer
+  -A, --user-agent UA    Set User-Agent string
+  -t, --timeout SEC      Max transfer time in seconds (default: 0, unlimited)
+  --connect-timeout SEC  Connection timeout in seconds (default: 10)
+  --retry N              Retry count on transient errors (default: 5)
+  --retry-delay SEC      Seconds between retries (default: 2)
+  -C, --continue         Resume partial downloads if possible
+  -k, --insecure         Allow insecure TLS (skip cert validation)
+  -q, --quiet            Less output
+  -v, --verbose          More output
+  --use TOOL             Force downloader: curl or wget (default: auto)
+  -h, --help             Show this help
+
+Notes:
+- Follows redirects.
+- Uses Content-Disposition filename when possible.
+- Prefers curl if present, otherwise wget. Use --use to override.
+EOF
+}
+
+# Defaults
+OUTPUT_DIR="."
+OUTPUT_FILE=""
+HEADERS=()
+COOKIE=""
+COOKIE_JAR=""
+REFERER=""
+USER_AGENT=""
+TIMEOUT="0"
+CONNECT_TIMEOUT="10"
+RETRY="5"
+RETRY_DELAY="2"
+RESUME=0
+INSECURE=0
+QUIET=0
+VERBOSE=0
+FORCE_TOOL=""
+URL=""
+
+# Parse args
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -o|--output-dir)
+      OUTPUT_DIR="$2"; shift 2;;
+    -f|--output)
+      OUTPUT_FILE="$2"; shift 2;;
+    -H|--header)
+      HEADERS+=("$2"); shift 2;;
+    -b|--cookie)
+      COOKIE="$2"; shift 2;;
+    -c|--cookie-jar)
+      COOKIE_JAR="$2"; shift 2;;
+    -r|--referer)
+      REFERER="$2"; shift 2;;
+    -A|--user-agent)
+      USER_AGENT="$2"; shift 2;;
+    -t|--timeout)
+      TIMEOUT="$2"; shift 2;;
+    --connect-timeout)
+      CONNECT_TIMEOUT="$2"; shift 2;;
+    --retry)
+      RETRY="$2"; shift 2;;
+    --retry-delay)
+      RETRY_DELAY="$2"; shift 2;;
+    -C|--continue)
+      RESUME=1; shift;;
+    -k|--insecure)
+      INSECURE=1; shift;;
+    -q|--quiet)
+      QUIET=1; shift;;
+    -v|--verbose)
+      VERBOSE=1; shift;;
+    --use)
+      FORCE_TOOL="$2"; shift 2;;
+    -h|--help)
+      print_usage; exit 0;;
+    --)
+      shift; if [[ $# -gt 0 ]]; then URL="$1"; fi; break;;
+    -*)
+      echo "Unknown option: $1" >&2; print_usage; exit 1;;
+    *)
+      URL="$1"; shift;;
+  esac
+done
+
+if [[ -z "${URL}" ]]; then
+  echo "Error: URL is required" >&2
+  print_usage
+  exit 1
+fi
+
+mkdir -p -- "$OUTPUT_DIR"
+cd "$OUTPUT_DIR"
+
+choose_tool() {
+  local tool=""
+  if [[ -n "$FORCE_TOOL" ]]; then
+    case "$FORCE_TOOL" in
+      curl|wget) tool="$FORCE_TOOL";;
+      *) echo "Invalid --use value: $FORCE_TOOL (expected curl|wget)" >&2; exit 2;;
+    esac
+  else
+    if command -v curl >/dev/null 2>&1; then
+      tool="curl"
+    elif command -v wget >/dev/null 2>&1; then
+      tool="wget"
+    fi
+  fi
+  if [[ -z "$tool" ]]; then
+    echo "No supported downloader found. Install curl or wget." >&2
+    exit 2
+  fi
+  echo "$tool"
+}
+
+run_curl() {
+  local args=(
+    -L                    # follow redirects
+    --fail-with-body      # fail on HTTP errors but keep body for diagnostics
+    --connect-timeout "$CONNECT_TIMEOUT"
+    --retry "$RETRY"
+    --retry-delay "$RETRY_DELAY"
+    --retry-connrefused
+    --compressed
+  )
+  # Timeouts: overall max time if set
+  if [[ "$TIMEOUT" != "0" ]]; then
+    args+=(--max-time "$TIMEOUT")
+  fi
+  # Headers
+  for h in "${HEADERS[@]:-}"; do
+    [[ -n "$h" ]] && args+=( -H "$h" )
+  done
+  # Cookies
+  if [[ -n "$COOKIE" ]]; then args+=( --cookie "$COOKIE" ); fi
+  if [[ -n "$COOKIE_JAR" ]]; then args+=( --cookie-jar "$COOKIE_JAR" ); fi
+  # Referer & UA
+  if [[ -n "$REFERER" ]]; then args+=( -e "$REFERER" ); fi
+  if [[ -n "$USER_AGENT" ]]; then args+=( -A "$USER_AGENT" ); fi
+  # TLS
+  if [[ "$INSECURE" -eq 1 ]]; then args+=( -k ); fi
+  # Output & resume
+  if [[ -n "$OUTPUT_FILE" ]]; then
+    args+=( -o "$OUTPUT_FILE" )
+  else
+    # -J uses Content-Disposition filename, -O writes remote name
+    args+=( -O -J )
+  fi
+  if [[ "$RESUME" -eq 1 ]]; then args+=( -C - ); fi
+  # Quiet/verbose
+  if [[ "$QUIET" -eq 1 ]]; then args+=( -sS ); fi
+  if [[ "$VERBOSE" -eq 1 ]]; then args+=( -v ); fi
+
+  args+=( -- "$URL" )
+  curl "${args[@]}"
+}
+
+run_wget() {
+  local args=(
+    --tries="$RETRY"
+    --waitretry="$RETRY_DELAY"
+    --timeout="$CONNECT_TIMEOUT"
+    --continue              # safe even if no partial exists
+    --content-disposition   # honor server-provided filenames
+    --trust-server-names
+  )
+  # Follow redirects (on by default for HTTP, but ensure)
+  args+=( --max-redirect=20 )
+  # Overall timeout if set
+  if [[ "$TIMEOUT" != "0" ]]; then
+    args+=( --read-timeout="$TIMEOUT" )
+  fi
+  # Headers
+  for h in "${HEADERS[@]:-}"; do
+    [[ -n "$h" ]] && args+=( --header "$h" )
+  done
+  # Cookies
+  if [[ -n "$COOKIE" ]]; then args+=( --header "Cookie: $COOKIE" ); fi
+  if [[ -n "$COOKIE_JAR" ]]; then args+=( --save-cookies "$COOKIE_JAR" --keep-session-cookies ); fi
+  # Referer & UA
+  if [[ -n "$REFERER" ]]; then args+=( --referer "$REFERER" ); fi
+  if [[ -n "$USER_AGENT" ]]; then args+=( --user-agent "$USER_AGENT" ); fi
+  # TLS
+  if [[ "$INSECURE" -eq 1 ]]; then args+=( --no-check-certificate ); fi
+  # Output
+  if [[ -n "$OUTPUT_FILE" ]]; then args+=( -O "$OUTPUT_FILE" ); fi
+  # Quiet/verbose
+  if [[ "$QUIET" -eq 1 ]]; then args+=( -q ); fi
+  if [[ "$VERBOSE" -eq 1 ]]; then args+=( -d ); fi
+
+  args+=( -- "$URL" )
+  wget "${args[@]}"
+}
+
+tool=$(choose_tool)
+if [[ "$tool" == "curl" ]]; then
+  if ! run_curl; then
+    echo "curl download failed, trying wget as fallback..." >&2
+    if command -v wget >/dev/null 2>&1; then
+      run_wget || { echo "Download failed with both curl and wget" >&2; exit 3; }
+    else
+      exit 3
+    fi
+  fi
+else
+  if ! run_wget; then
+    echo "wget download failed, trying curl as fallback..." >&2
+    if command -v curl >/dev/null 2>&1; then
+      run_curl || { echo "Download failed with both wget and curl" >&2; exit 3; }
+    else
+      exit 3
+    fi
+  fi
+fi
+
+echo "✔ Download completed."
