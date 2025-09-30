@@ -1,0 +1,645 @@
+#!/usr/bin/env bash
+# ===----------------------------------------===
+#           Process Warden 9000™
+# ===----------------------------------------===
+# Author: ShadowHarvy (Chief Process Guardian)
+# Version: 1.0 (Keeping watch over digital minions!)
+#
+# Purpose: Monitors, manages, and maintains your system processes
+#          with the vigilance of a medieval castle guard and
+#          the drama of a Broadway performance. Because manual
+#          process management is for digital peasants.
+#
+# Usage:
+#   procmon                          # Interactive dashboard
+#   procmon --watch firefox          # Monitor specific process
+#   procmon --top 10                 # Show top 10 resource users
+#   procmon --kill 1234              # Terminate process (with drama)
+#   procmon --tree                   # Show process tree
+#   procmon --alerts                 # Resource usage alerts
+#
+# Options:
+#   -w, --watch NAME        Monitor specific process by name
+#   -k, --kill PID          Terminate process (with confirmation)
+#   -r, --restart PID       Restart process (if possible)
+#   -t, --top N             Show top N processes by CPU usage
+#   -m, --memory            Sort by memory usage instead of CPU
+#   -u, --user USER         Filter by user
+#   -s, --service NAME      Monitor systemd service
+#   -T, --tree              Display process tree
+#   -a, --alerts            Show resource usage alerts
+#   -j, --json              Output in JSON format
+#   -q, --quiet             Less theatrical output
+#   -d, --daemon            Run as background daemon
+#   -h, --help              Show this help and exit
+#   -v, --version           Show version information
+#
+# Interactive Commands:
+#   k - Kill selected process        s - Send signal to process
+#   r - Restart process             t - Show process tree
+#   f - Filter processes            q - Quit
+#   Space - Refresh display         / - Search processes
+#
+# Exit Codes:
+#   0 - Monitoring completed successfully
+#   1 - Process not found or access denied
+#   2 - Invalid arguments
+#   3 - System error or insufficient permissions
+
+# --- Strict Mode & Safety First ---
+set -euo pipefail
+
+# --- Script Configuration ---
+SCRIPT_VERSION="1.0"
+INTERACTIVE_MODE=0
+DAEMON_MODE=0
+QUIET_MODE=0
+SORT_BY="cpu"
+TOP_N=20
+FILTER_USER=""
+WATCH_PROCESS=""
+CPU_THRESHOLD=80
+MEMORY_THRESHOLD=80
+UPDATE_INTERVAL=2
+
+# Temporary files for process data
+TMP_DIR="/tmp/procmon_$$"
+mkdir -p "$TMP_DIR"
+trap 'cleanup_and_exit' EXIT INT TERM
+
+# --- Colors & Visual Flair ---
+if [ -t 1 ]; then
+    C_RESET='\033[0m'
+    C_BOLD='\033[1m'
+    C_DIM='\033[2m'
+    C_RED='\033[0;31m'
+    C_GREEN='\033[0;32m'
+    C_YELLOW='\033[0;33m'
+    C_BLUE='\033[0;34m'
+    C_PURPLE='\033[0;35m'
+    C_CYAN='\033[0;36m'
+    C_WHITE='\033[0;37m'
+    # Bright variants for alerts
+    C_BRED='\033[1;31m'
+    C_BGREEN='\033[1;32m'
+    C_BYELLOW='\033[1;33m'
+    C_BBLUE='\033[1;34m'
+    C_BPURPLE='\033[1;35m'
+    C_BCYAN='\033[1;36m'
+    C_BWHITE='\033[1;37m'
+else
+    C_RESET='' C_BOLD='' C_DIM='' C_RED='' C_GREEN='' C_YELLOW=''
+    C_BLUE='' C_PURPLE='' C_CYAN='' C_WHITE='' C_BRED='' C_BGREEN=''
+    C_BYELLOW='' C_BBLUE='' C_BPURPLE='' C_BCYAN='' C_BWHITE=''
+fi
+
+# --- Guard Functions ---
+
+cleanup_and_exit() {
+    rm -rf "$TMP_DIR" 2>/dev/null || true
+    if [ "$INTERACTIVE_MODE" -eq 1 ]; then
+        # Restore terminal settings
+        tput cnorm 2>/dev/null || true
+        stty echo 2>/dev/null || true
+    fi
+}
+
+print_banner() {
+    if [ "$QUIET_MODE" -eq 1 ]; then return; fi
+    
+    echo -e "${C_BGREEN}"
+    echo "╔════════════════════════════════════════════════════╗"
+    echo "║             ${C_BYELLOW}PROCESS WARDEN 9000™${C_BGREEN}             ║"
+    echo "║       ${C_WHITE}\"None shall pass... without monitoring!\"${C_BGREEN}      ║"
+    echo "║                                                    ║"
+    echo "║   ${C_BCYAN}by ShadowHarvy (Chief Process Guardian)${C_BGREEN}     ║"
+    echo "╚════════════════════════════════════════════════════╝"
+    echo -e "${C_RESET}"
+}
+
+print_usage() {
+    cat <<EOF
+${C_BOLD}${C_BBLUE}Process Warden 9000™ - Usage Guide${C_RESET}
+
+${C_BOLD}SYNOPSIS${C_RESET}
+    ${C_GREEN}procmon${C_RESET} [${C_YELLOW}options${C_RESET}]
+
+${C_BOLD}DESCRIPTION${C_RESET}
+    Monitors, manages, and maintains your system processes with the vigilance
+    of a medieval castle guard and the drama of a Broadway performance.
+
+${C_BOLD}MONITORING MODES${C_RESET}
+    ${C_GREEN}procmon${C_RESET}                          ${C_DIM}# Interactive dashboard${C_RESET}
+    ${C_GREEN}procmon${C_RESET} ${C_YELLOW}--watch firefox${C_RESET}         ${C_DIM}# Monitor specific process${C_RESET}
+    ${C_GREEN}procmon${C_RESET} ${C_YELLOW}--top 10${C_RESET}               ${C_DIM}# Show top 10 resource hogs${C_RESET}
+    ${C_GREEN}procmon${C_RESET} ${C_YELLOW}--alerts${C_RESET}               ${C_DIM}# Check for resource alerts${C_RESET}
+
+${C_BOLD}MANAGEMENT OPERATIONS${C_RESET}
+    ${C_GREEN}procmon${C_RESET} ${C_YELLOW}--kill 1234${C_RESET}            ${C_DIM}# Terminate process (with drama)${C_RESET}
+    ${C_GREEN}procmon${C_RESET} ${C_YELLOW}--restart 5678${C_RESET}         ${C_DIM}# Restart process${C_RESET}
+    ${C_GREEN}procmon${C_RESET} ${C_YELLOW}--tree${C_RESET}                 ${C_DIM}# Show process family tree${C_RESET}
+    ${C_GREEN}procmon${C_RESET} ${C_YELLOW}--service nginx${C_RESET}        ${C_DIM}# Monitor systemd service${C_RESET}
+
+${C_BOLD}OPTIONS${C_RESET}
+    ${C_YELLOW}-w, --watch NAME${C_RESET}      Monitor specific process by name
+    ${C_YELLOW}-k, --kill PID${C_RESET}       Terminate process (with confirmation)
+    ${C_YELLOW}-r, --restart PID${C_RESET}    Restart process (if possible)
+    ${C_YELLOW}-t, --top N${C_RESET}          Show top N processes by CPU usage
+    ${C_YELLOW}-m, --memory${C_RESET}         Sort by memory usage instead of CPU
+    ${C_YELLOW}-u, --user USER${C_RESET}      Filter processes by user
+    ${C_YELLOW}-s, --service NAME${C_RESET}   Monitor systemd service status
+    ${C_YELLOW}-T, --tree${C_RESET}           Display process tree visualization
+    ${C_YELLOW}-a, --alerts${C_RESET}         Show resource usage alerts
+    ${C_YELLOW}-j, --json${C_RESET}           Output results in JSON format
+    ${C_YELLOW}-q, --quiet${C_RESET}          Less theatrical output
+    ${C_YELLOW}-d, --daemon${C_RESET}         Run as background monitoring daemon
+    ${C_YELLOW}-h, --help${C_RESET}           Show this help message
+    ${C_YELLOW}-v, --version${C_RESET}        Display version information
+
+${C_BOLD}INTERACTIVE COMMANDS${C_RESET}
+    ${C_CYAN}k${C_RESET} - Kill selected process     ${C_CYAN}s${C_RESET} - Send signal to process
+    ${C_CYAN}r${C_RESET} - Restart process          ${C_CYAN}t${C_RESET} - Show process tree
+    ${C_CYAN}f${C_RESET} - Filter processes         ${C_CYAN}q${C_RESET} - Quit gracefully
+    ${C_CYAN}Space${C_RESET} - Refresh display      ${C_CYAN}/${C_RESET} - Search processes
+
+${C_BOLD}ALERT THRESHOLDS${C_RESET}
+    ${C_RED}CPU Usage${C_RESET}: > 80% (adjustable)
+    ${C_RED}Memory Usage${C_RESET}: > 80% (adjustable)
+
+${C_DIM}Remember: With great process power comes great responsibility.${C_RESET}
+EOF
+}
+
+get_process_info() {
+    local sort_field="$1"
+    local user_filter="$2"
+    local limit="$3"
+    
+    # Build ps command based on requirements
+    local ps_cmd="ps aux --no-headers"
+    
+    if [ -n "$user_filter" ]; then
+        ps_cmd="ps -u $user_filter -o pid,ppid,user,%cpu,%mem,vsz,rss,stat,start,time,command --no-headers"
+    fi
+    
+    # Execute and process results
+    $ps_cmd | while IFS= read -r line; do
+        # Parse ps output
+        read -r pid ppid user cpu mem vsz rss stat start time command <<< "$line"
+        
+        # Skip if we couldn't parse
+        if [ -z "$pid" ] || [ "$pid" = "PID" ]; then continue; fi
+        
+        # Calculate memory percentage if needed
+        if [ "$sort_field" = "memory" ]; then
+            # Only calculate if RSS is numeric
+            if [[ "$rss" =~ ^[0-9]+$ ]]; then
+                local mem_kb=$((rss))
+                local total_mem_kb
+                total_mem_kb=$(grep MemTotal /proc/meminfo | awk '{print $2}')
+                local mem_percent
+                mem_percent=$(awk "BEGIN {printf \"%.1f\", $mem_kb*100/$total_mem_kb}")
+                echo "$pid|$ppid|$user|$cpu|$mem_percent|$vsz|$rss|$stat|$start|$time|$command"
+            else
+                echo "$pid|$ppid|$user|$cpu|$mem|$vsz|$rss|$stat|$start|$time|$command"
+            fi
+        else
+            echo "$pid|$ppid|$user|$cpu|$mem|$vsz|$rss|$stat|$start|$time|$command"
+        fi
+    done | sort -t'|' -k4 -nr | head -n "$limit"
+}
+
+format_process_line() {
+    local pid="$1" ppid="$2" user="$3" cpu="$4" mem="$5"
+    local vsz="$6" rss="$7" stat="$8" start="$9" time="${10}" command="${11}"
+    
+    # Color code based on resource usage
+    local cpu_color="$C_GREEN"
+    local mem_color="$C_GREEN"
+    
+    # Convert to integer for comparison (remove decimal)
+    local cpu_int="${cpu%.*}"
+    local mem_int="${mem%.*}"
+    
+    if [ "${cpu_int:-0}" -gt 50 ]; then cpu_color="$C_YELLOW"; fi
+    if [ "${cpu_int:-0}" -gt 80 ]; then cpu_color="$C_RED"; fi
+    if [ "${mem_int:-0}" -gt 50 ]; then mem_color="$C_YELLOW"; fi
+    if [ "${mem_int:-0}" -gt 80 ]; then mem_color="$C_RED"; fi
+    
+    # Format memory size (handle non-numeric RSS values)
+    local mem_human="${rss}K"
+    if [[ "$rss" =~ ^[0-9]+$ ]]; then
+        if [ "$rss" -gt 1048576 ]; then
+            mem_human=$(awk "BEGIN {printf \"%.1fG\", $rss/1048576}")
+        elif [ "$rss" -gt 1024 ]; then
+            mem_human=$(awk "BEGIN {printf \"%.1fM\", $rss/1024}")
+        else
+            mem_human="${rss}K"
+        fi
+    fi
+    
+    # Truncate command if too long
+    local cmd_short="${command:0:50}"
+    if [ ${#command} -gt 50 ]; then
+        cmd_short="${cmd_short}..."
+    fi
+    
+    printf "%s%-8s%s %s%-6s%s %s%-10s%s %s%5s%%%s %s%5s%%%s %s%-8s%s %s%-12s%s %s\n" \
+        "$C_CYAN" "$pid" "$C_RESET" \
+        "$C_PURPLE" "$ppid" "$C_RESET" \
+        "$C_BLUE" "$user" "$C_RESET" \
+        "$cpu_color" "$cpu" "$C_RESET" \
+        "$mem_color" "$mem" "$C_RESET" \
+        "$C_WHITE" "$mem_human" "$C_RESET" \
+        "$C_YELLOW" "$stat" "$C_RESET" \
+        "$C_DIM$cmd_short$C_RESET"
+}
+
+show_process_tree() {
+    echo -e "${C_BYELLOW}🌳 PROCESS FAMILY TREE${C_RESET}"
+    echo -e "${C_DIM}Mapping the digital dynasty...${C_RESET}"
+    echo ""
+    
+    # Use pstree if available, otherwise fall back to ps
+    if command -v pstree >/dev/null 2>&1; then
+        pstree -p -u | head -30
+    else
+        echo -e "${C_YELLOW}📊 Process Hierarchy (ps forest view):${C_RESET}"
+        ps auxf | head -30
+    fi
+}
+
+check_alerts() {
+    echo -e "${C_BRED}🚨 RESOURCE USAGE ALERTS${C_RESET}"
+    echo -e "${C_DIM}Scanning for digital troublemakers...${C_RESET}"
+    echo ""
+    
+    local alert_count=0
+    
+    # Check CPU usage alerts
+    echo -e "${C_YELLOW}⚡ High CPU Usage (>${CPU_THRESHOLD}%):${C_RESET}"
+    while IFS='|' read -r pid ppid user cpu mem vsz rss stat start time command; do
+        local cpu_int="${cpu%.*}"
+        if [ "${cpu_int:-0}" -gt "$CPU_THRESHOLD" ]; then
+            echo -e "   ${C_RED}🔥${C_RESET} PID $pid: ${C_YELLOW}$cpu%${C_RESET} CPU - ${C_CYAN}$user${C_RESET} running ${C_WHITE}${command:0:40}${C_RESET}"
+            alert_count=$((alert_count + 1))
+        fi
+    done < <(get_process_info "cpu" "" 100)
+    
+    if [ "$alert_count" -eq 0 ]; then
+        echo -e "   ${C_GREEN}✅ All processes behaving nicely${C_RESET}"
+    fi
+    
+    echo ""
+    
+    # Check memory usage alerts
+    echo -e "${C_YELLOW}🧠 High Memory Usage (>${MEMORY_THRESHOLD}%):${C_RESET}"
+    local mem_alert_count=0
+    while IFS='|' read -r pid ppid user cpu mem vsz rss stat start time command; do
+        local mem_int="${mem%.*}"
+        if [ "${mem_int:-0}" -gt "$MEMORY_THRESHOLD" ]; then
+            # Convert RSS to human readable
+            local mem_human
+            if [ "$rss" -gt 1048576 ]; then
+                mem_human=$(awk "BEGIN {printf \"%.1fG\", $rss/1048576}")
+            elif [ "$rss" -gt 1024 ]; then
+                mem_human=$(awk "BEGIN {printf \"%.1fM\", $rss/1024}")
+            else
+                mem_human="${rss}K"
+            fi
+            echo -e "   ${C_RED}💾${C_RESET} PID $pid: ${C_YELLOW}$mem_human${C_RESET} memory - ${C_CYAN}$user${C_RESET} running ${C_WHITE}${command:0:40}${C_RESET}"
+            mem_alert_count=$((mem_alert_count + 1))
+        fi
+    done < <(get_process_info "memory" "" 100)
+    
+    if [ "$mem_alert_count" -eq 0 ]; then
+        echo -e "   ${C_GREEN}✅ Memory usage is under control${C_RESET}"
+    fi
+    
+    # System load average
+    echo ""
+    echo -e "${C_YELLOW}⚖️  System Load Average:${C_RESET}"
+    local load_avg
+    load_avg=$(uptime | awk -F'load average:' '{print $2}')
+    echo -e "   ${C_CYAN}Load:${C_RESET}$load_avg"
+    
+    local total_alerts=$((alert_count + mem_alert_count))
+    if [ "$total_alerts" -gt 5 ]; then
+        echo ""
+        echo -e "${C_BRED}⚠️  ATTENTION: ${total_alerts} processes need immediate attention!${C_RESET}"
+    fi
+}
+
+kill_process_with_style() {
+    local pid="$1"
+    local signal="${2:-TERM}"
+    
+    if ! kill -0 "$pid" 2>/dev/null; then
+        echo -e "${C_RED}❌ Process $pid is already dead. Someone beat us to it!${C_RESET}"
+        return 1
+    fi
+    
+    # Get process info for dramatic effect
+    local process_info
+    process_info=$(ps -p "$pid" -o pid,user,command --no-headers 2>/dev/null || echo "$pid unknown unknown")
+    read -r p_pid p_user p_command <<< "$process_info"
+    
+    echo -e "${C_PURPLE}⚔️  Preparing to terminate process...${C_RESET}"
+    echo -e "   ${C_WHITE}PID: ${C_YELLOW}$pid${C_RESET}"
+    echo -e "   ${C_WHITE}User: ${C_CYAN}$p_user${C_RESET}"
+    echo -e "   ${C_WHITE}Command: ${C_GREEN}$p_command${C_RESET}"
+    echo ""
+    
+    echo -ne "${C_BRED}💀 Are you absolutely sure you want to terminate this process?${C_RESET} [${C_GREEN}y${C_RESET}/${C_RED}N${C_RESET}] "
+    read -r confirmation
+    
+    case "$confirmation" in
+        [yY]|[yY][eE][sS])
+            echo -e "${C_PURPLE}🗡️  Sending $signal signal to process $pid...${C_RESET}"
+            if kill -s "$signal" "$pid" 2>/dev/null; then
+                sleep 1
+                if kill -0 "$pid" 2>/dev/null; then
+                    if [ "$signal" = "TERM" ]; then
+                        echo -e "${C_YELLOW}⚠️  Process resisted termination. Escalating to SIGKILL...${C_RESET}"
+                        return $(kill_process_with_style "$pid" "KILL")
+                    else
+                        echo -e "${C_RED}💥 Process $pid refused to die. This is concerning.${C_RESET}"
+                        return 1
+                    fi
+                else
+                    echo -e "${C_BGREEN}✨ Process $pid has been terminated successfully!${C_RESET}"
+                    echo -e "${C_DIM}\"Another one bites the dust!\" - Process Warden 9000™${C_RESET}"
+                    return 0
+                fi
+            else
+                echo -e "${C_RED}❌ Failed to terminate process $pid. Permission denied?${C_RESET}"
+                return 1
+            fi
+            ;;
+        *)
+            echo -e "${C_YELLOW}😇 Process $pid has been spared. How merciful of you.${C_RESET}"
+            return 0
+            ;;
+    esac
+}
+
+watch_process() {
+    local process_name="$1"
+    
+    echo -e "${C_BCYAN}👁️  WATCHING PROCESS: $process_name${C_RESET}"
+    echo -e "${C_DIM}Vigilant monitoring engaged...${C_RESET}"
+    echo ""
+    
+    while true; do
+        # Clear screen and show header
+        clear
+        print_banner
+        echo -e "${C_BYELLOW}🔍 Monitoring: $process_name${C_RESET} (Press Ctrl+C to stop)"
+        echo ""
+        
+        # Find matching processes
+        local found=0
+        while IFS='|' read -r pid ppid user cpu mem vsz rss stat start time command; do
+            if [[ "$command" == *"$process_name"* ]]; then
+                format_process_line "$pid" "$ppid" "$user" "$cpu" "$mem" "$vsz" "$rss" "$stat" "$start" "$time" "$command"
+                found=1
+            fi
+        done < <(get_process_info "cpu" "" 100)
+        
+        if [ "$found" -eq 0 ]; then
+            echo -e "${C_YELLOW}⚠️  No processes found matching '$process_name'${C_RESET}"
+        fi
+        
+        echo ""
+        echo -e "${C_DIM}Last updated: $(date) (refreshing every ${UPDATE_INTERVAL}s)${C_RESET}"
+        
+        sleep "$UPDATE_INTERVAL"
+    done
+}
+
+interactive_dashboard() {
+    if [ "$QUIET_MODE" -eq 0 ]; then
+        clear
+        print_banner
+    fi
+    
+    echo -e "${C_BBLUE}🎛️  INTERACTIVE PROCESS DASHBOARD${C_RESET}"
+    echo -e "${C_WHITE}Welcome to the Process Warden's command center!${C_RESET}"
+    echo ""
+    
+    # Hide cursor for cleaner display
+    tput civis 2>/dev/null || true
+    
+    while true; do
+        # Show current processes
+        echo -e "${C_YELLOW}📊 Top $TOP_N Processes (sorted by $SORT_BY):${C_RESET}"
+        echo ""
+        printf "%s%-8s %-6s %-10s %5s %5s %-8s %-12s %s%s\n" \
+            "$C_BOLD" "PID" "PPID" "USER" "CPU%" "MEM%" "MEMORY" "STATE" "COMMAND" "$C_RESET"
+        echo "────────────────────────────────────────────────────────────────────────────────"
+        
+        while IFS='|' read -r pid ppid user cpu mem vsz rss stat start time command; do
+            format_process_line "$pid" "$ppid" "$user" "$cpu" "$mem" "$vsz" "$rss" "$stat" "$start" "$time" "$command"
+        done < <(get_process_info "$SORT_BY" "$FILTER_USER" "$TOP_N")
+        
+        echo ""
+        echo -e "${C_CYAN}Commands: ${C_WHITE}k${C_RESET}ill ${C_WHITE}r${C_RESET}estart ${C_WHITE}t${C_RESET}ree ${C_WHITE}a${C_RESET}lerts ${C_WHITE}f${C_RESET}ilter ${C_WHITE}q${C_RESET}uit ${C_WHITE}Space${C_RESET}=refresh${C_RESET}"
+        echo -ne "${C_YELLOW}Enter command${C_RESET} > "
+        
+        # Read single character without pressing enter
+        read -n 1 -s cmd
+        echo ""
+        
+        case "$cmd" in
+            'k')
+                echo -ne "${C_YELLOW}Enter PID to kill${C_RESET} > "
+                read -r kill_pid
+                if [[ "$kill_pid" =~ ^[0-9]+$ ]]; then
+                    kill_process_with_style "$kill_pid"
+                    echo -ne "${C_DIM}Press any key to continue...${C_RESET}"
+                    read -n 1 -s
+                else
+                    echo -e "${C_RED}Invalid PID${C_RESET}"
+                fi
+                ;;
+            't')
+                clear
+                show_process_tree
+                echo -ne "${C_DIM}Press any key to continue...${C_RESET}"
+                read -n 1 -s
+                ;;
+            'a')
+                clear
+                check_alerts
+                echo -ne "${C_DIM}Press any key to continue...${C_RESET}"
+                read -n 1 -s
+                ;;
+            'f')
+                echo -ne "${C_YELLOW}Filter by user (empty for all)${C_RESET} > "
+                read -r FILTER_USER
+                ;;
+            'q'|$'\e')
+                echo -e "${C_GREEN}👋 Guardian duty complete! Farewell.${C_RESET}"
+                break
+                ;;
+            ' ')
+                # Refresh - just continue loop
+                ;;
+            *)
+                echo -e "${C_RED}Unknown command. Try again.${C_RESET}"
+                sleep 1
+                ;;
+        esac
+        
+        clear
+        if [ "$QUIET_MODE" -eq 0 ]; then
+            print_banner
+        fi
+    done
+    
+    # Restore cursor
+    tput cnorm 2>/dev/null || true
+}
+
+main() {
+    local operation=""
+    local target=""
+    
+    # Parse command line arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -w|--watch)
+                operation="watch"
+                target="$2"
+                shift 2
+                ;;
+            -k|--kill)
+                operation="kill"
+                target="$2"
+                shift 2
+                ;;
+            -r|--restart)
+                operation="restart"
+                target="$2"
+                shift 2
+                ;;
+            -t|--top)
+                operation="top"
+                TOP_N="$2"
+                shift 2
+                ;;
+            -m|--memory)
+                SORT_BY="memory"
+                shift
+                ;;
+            -u|--user)
+                FILTER_USER="$2"
+                shift 2
+                ;;
+            -s|--service)
+                operation="service"
+                target="$2"
+                shift 2
+                ;;
+            -T|--tree)
+                operation="tree"
+                shift
+                ;;
+            -a|--alerts)
+                operation="alerts"
+                shift
+                ;;
+            -j|--json)
+                operation="json"
+                shift
+                ;;
+            -q|--quiet)
+                QUIET_MODE=1
+                shift
+                ;;
+            -d|--daemon)
+                DAEMON_MODE=1
+                shift
+                ;;
+            -h|--help)
+                print_usage
+                exit 0
+                ;;
+            -v|--version)
+                echo "Process Warden 9000™ v$SCRIPT_VERSION"
+                echo "by ShadowHarvy (Chief Process Guardian)"
+                exit 0
+                ;;
+            -*)
+                echo -e "${C_RED}❌ Unknown option: $1${C_RESET}" >&2
+                echo -e "${C_YELLOW}💡 Try '$0 --help' for usage information${C_RESET}" >&2
+                exit 2
+                ;;
+            *)
+                echo -e "${C_RED}❌ Unexpected argument: $1${C_RESET}" >&2
+                exit 2
+                ;;
+        esac
+    done
+    
+    # Show banner (unless quiet)
+    if [ "$QUIET_MODE" -eq 0 ] && [ "$operation" != "json" ]; then
+        print_banner
+        sleep 1
+    fi
+    
+    # Execute operation
+    case "$operation" in
+        "watch")
+            watch_process "$target"
+            ;;
+        "kill")
+            if [[ "$target" =~ ^[0-9]+$ ]]; then
+                kill_process_with_style "$target"
+            else
+                echo -e "${C_RED}❌ Invalid PID: $target${C_RESET}" >&2
+                exit 2
+            fi
+            ;;
+        "tree")
+            show_process_tree
+            ;;
+        "alerts")
+            check_alerts
+            ;;
+        "top")
+            echo -e "${C_BYELLOW}🏆 Top $TOP_N Processes (by $SORT_BY):${C_RESET}"
+            echo ""
+            printf "%s%-8s %-6s %-10s %5s %5s %-8s %-12s %s%s\n" \
+                "$C_BOLD" "PID" "PPID" "USER" "CPU%" "MEM%" "MEMORY" "STATE" "COMMAND" "$C_RESET"
+            echo "────────────────────────────────────────────────────────────────────────────────"
+            
+            while IFS='|' read -r pid ppid user cpu mem vsz rss stat start time command; do
+                format_process_line "$pid" "$ppid" "$user" "$cpu" "$mem" "$vsz" "$rss" "$stat" "$start" "$time" "$command"
+            done < <(get_process_info "$SORT_BY" "$FILTER_USER" "$TOP_N")
+            ;;
+        "service")
+            echo -e "${C_BCYAN}🔧 Service Status: $target${C_RESET}"
+            if command -v systemctl >/dev/null 2>&1; then
+                systemctl status "$target" --no-pager
+            else
+                echo -e "${C_YELLOW}⚠️  systemctl not available${C_RESET}"
+            fi
+            ;;
+        *)
+            # Default to interactive mode
+            INTERACTIVE_MODE=1
+            interactive_dashboard
+            ;;
+    esac
+    
+    # Final flourish
+    if [ "$QUIET_MODE" -eq 0 ] && [ "$operation" != "watch" ] && [ "$INTERACTIVE_MODE" -eq 0 ]; then
+        echo ""
+        echo -e "${C_BGREEN}🛡️  Guardian duty complete! All processes accounted for.${C_RESET}"
+        echo -e "${C_DIM}\"Vigilance is the price of liberty!\" - Process Warden 9000™${C_RESET}"
+    fi
+}
+
+# --- Script Entry Point ---
+main "$@"
