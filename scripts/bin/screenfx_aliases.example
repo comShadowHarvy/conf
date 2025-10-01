@@ -1,0 +1,12 @@
+# ScreenFX Control Aliases - Add to your shell config if desired
+alias screen-off="export SCREENFX=0"
+alias screen-on="export SCREENFX=1" 
+alias screen-glitch="export SCREENFX_STYLE=glitch"
+alias screen-typewriter="export SCREENFX_STYLE=typewriter"
+alias screen-loader="export SCREENFX_STYLE=loader"
+alias screen-static="export SCREENFX_STYLE=static"
+alias screen-random="export SCREENFX_STYLE=random"
+alias screen-fast="export SCREENFX_SPEED=fast"
+alias screen-slow="export SCREENFX_SPEED=slow"
+alias screen-test="~/bin/screenfx.sh --self-test"
+alias screen-show="source ~/bin/screenfx.sh && screenfx::show"
