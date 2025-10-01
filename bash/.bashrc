@@ -164,6 +164,12 @@ fi
 # Initialize Oh My Posh for Bash.
 eval "$(oh-my-posh init bash --config "$THEME_FILE")"
 
+# ── Shadow-Harvey intro ──────────────────────────────
+if [[ $- == *i* ]]; then               # only interactive shells
+  source ~/bin/screenfx.sh
+  screenfx::show "$HOME/screen.txt"
+fi
+
 # --------------------------------------------------
 # Fabric Bootstrap (Optional)
 # --------------------------------------------------
