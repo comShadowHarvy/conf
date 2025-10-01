@@ -66,7 +66,7 @@ sudo pacman -S stow  # Arch Linux
 
 ```bash
 # Clone the repository
-git clone <your-repo-url> ~/conf
+git clone https://github.com/comShadowHarvy/conf ~/conf
 cd ~/conf
 
 # Stow core packages
@@ -288,6 +288,6 @@ This repository contains personal configuration files. Feel free to use any conf
 ---
 
 **Repository**: Personal Dotfiles  
-**Maintainer**: [Your Name]  
+**Maintainer**: ShadowHarvy  
 **Last Updated**: 2025-09-26  
 **Stow Version**: GNU Stow (latest)
