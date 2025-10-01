@@ -773,6 +773,12 @@ _setup_ohmyposh() {
 # Initialize Oh My Posh
 _setup_ohmyposh
 
+# ── Shadow-Harvey intro ──────────────────────────────
+[[ -o interactive ]] && {
+  source ~/bin/screenfx.sh
+  screenfx::show "$HOME/screen.txt"
+}
+
 # --- Feature Functions & Aliases ---
 
 # Font installation function (run once)
