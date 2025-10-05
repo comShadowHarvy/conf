@@ -1,0 +1,204 @@
+# Stow Configuration
+# =================
+# This file defines how packages should be managed with GNU Stow
+#
+# Schema:
+# - package_name:
+#     priority: 1-10 (1=highest, 10=lowest)
+#     category: core|desktop|development|optional
+#     description: Human readable description
+#     dependencies: [list of other packages]
+#     conflicts: files that might conflict
+#     backup_policy: skip|backup|force|ask
+#     enabled: true/false (default: true)
+#     hooks:
+#       pre_stow: command to run before stowing
+#       post_stow: command to run after stowing
+#       pre_unstow: command to run before unstowing
+#       post_unstow: command to run after unstowing
+
+global:
+  backup_dir: ".stow-backups"
+  log_dir: "logs"
+  max_backups: 10  # Keep last 10 backup snapshots
+  conflict_policy: "ask"  # Global default: ask|skip|backup|force
+
+packages:
+  # === CORE PACKAGES (Essential system configuration) ===
+  bash:
+    priority: 1
+    category: core
+    description: "Enhanced bash configuration with custom prompt and aliases"
+    conflicts:
+      - ".bashrc"
+      - ".bash_profile"
+      - ".bash_logout"
+    backup_policy: backup
+    hooks:
+      post_stow: "echo 'Bash configuration updated. Run: source ~/.bashrc'"
+
+  zsh:
+    priority: 1
+    category: core
+    description: "Advanced zsh configuration with modern features"
+    dependencies: ["shared"]
+    conflicts:
+      - ".zshrc"
+      - ".antigenrc"
+    backup_policy: backup
+    hooks:
+      post_stow: "echo 'Zsh configuration updated. Run: source ~/.zshrc'"
+
+  git:
+    priority: 2
+    category: core
+    description: "Git configuration with aliases and optimized settings"
+    conflicts:
+      - ".gitconfig"
+    backup_policy: backup
+
+  shared:
+    priority: 3
+    category: core
+    description: "Shared configurations (aliases, functions) used by multiple shells"
+    conflicts:
+      - ".aliases"
+
+  scripts:
+    priority: 4
+    category: core
+    description: "Custom utility scripts and tools"
+    hooks:
+      post_stow: "chmod +x ~/bin/* 2>/dev/null || true"
+
+  # === DEVELOPMENT PACKAGES ===
+  nvim:
+    priority: 5
+    category: development
+    description: "Neovim configuration with LazyVim and custom plugins"
+    conflicts:
+      - ".config/nvim"
+    backup_policy: backup
+    hooks:
+      post_stow: "echo 'Neovim config updated. First run may take time for plugin installation.'"
+
+  tmux:
+    priority: 6
+    category: development
+    description: "Terminal multiplexer configuration"
+    conflicts:
+      - ".config/tmux"
+      - ".tmux.conf"
+    backup_policy: backup
+
+  vscode:
+    priority: 7
+    category: development
+    description: "Visual Studio Code settings and keybindings"
+    conflicts:
+      - ".vscode/settings.json"
+      - ".vscode/keybindings.json"
+    backup_policy: backup
+
+  # === DESKTOP PACKAGES (GUI/Wayland) ===
+  hyprland:
+    priority: 8
+    category: desktop
+    description: "Hyprland window manager configuration"
+    conflicts:
+      - ".config/hypr"
+    backup_policy: backup
+
+  waybar:
+    priority: 8
+    category: desktop
+    description: "Waybar status bar configuration for Wayland"
+    conflicts:
+      - ".config/waybar"
+    backup_policy: backup
+
+  # === OPTIONAL/UTILITY PACKAGES ===
+  wget:
+    priority: 9
+    category: optional
+    description: "Wget download utility configuration"
+    conflicts:
+      - ".wgetrc"
+    backup_policy: skip
+
+  secrets:
+    priority: 10
+    category: optional
+    description: "API keys and sensitive configuration (handle with care)"
+    conflicts:
+      - ".api_keys"
+    backup_policy: backup
+    enabled: false  # Disabled by default for security
+
+# Package groups for batch operations
+groups:
+  essential:
+    - bash
+    - zsh  
+    - git
+    - shared
+    - scripts
+
+  development:
+    - nvim
+    - tmux
+    - vscode
+
+  desktop:
+    - hyprland
+    - waybar
+
+  minimal:
+    - bash
+    - git
+    - shared
+
+  full:
+    - bash
+    - zsh
+    - git
+    - shared
+    - scripts
+    - nvim
+    - tmux
+    - vscode
+    - hyprland
+    - waybar
+    - wget
+
+# System-specific configurations
+systems:
+  server:
+    exclude:
+      - hyprland
+      - waybar
+      - vscode
+  
+  desktop:
+    include_all: true
+  
+  minimal:
+    include:
+      - bash
+      - git
+      - shared
+
+# User preferences (can be customized locally)
+user:
+  # Preferred shell for new installations
+  default_shell: zsh
+  
+  # Auto-update behavior
+  auto_stow_on_pull: true
+  
+  # Confirmation requirements
+  require_confirmation: true
+  
+  # Interactive mode preferences
+  use_fzf: true
+  use_colors: true
