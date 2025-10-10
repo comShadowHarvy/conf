@@ -93,6 +93,273 @@ log_debug() {
     printf "${C_GRAY}[DEBUG]${C_RESET} %s\n" "$*" >&2
 }
 
+# Interactive conflict resolution
+ask_user_choice() {
+    local prompt="$1"
+    local default="${2:-}"
+    local options="${3:-y/n}"
+    
+    [[ $QUIET -eq 1 ]] && return 0
+    [[ $DRY_RUN -eq 1 ]] && return 0
+    
+    local choice
+    while true; do
+        if [[ -n "$default" ]]; then
+            read -p "${C_YELLOW}$prompt${C_RESET} [$options] [${C_CYAN}$default${C_RESET}]: " choice
+            choice="${choice:-$default}"
+        else
+            read -p "${C_YELLOW}$prompt${C_RESET} [$options]: " choice
+        fi
+        
+        case "${choice,,}" in
+            y|yes|true) return 0 ;;
+            n|no|false) return 1 ;;
+            s|skip) return 2 ;;
+            b|backup) return 3 ;;
+            r|replace) return 4 ;;
+            *)
+                case "$options" in
+                    *skip*|*backup*|*replace*)
+                        log_error "Please enter: y(es)/n(o)/s(kip)/b(ackup)/r(eplace)"
+                        ;;
+                    *)
+                        log_error "Please enter: y(es) or n(o)"
+                        ;;
+                esac
+                ;;
+        esac
+    done
+}
+
+detect_conflicts() {
+    local component="$1"
+    local backup_dir="$2"
+    local conflicts=()
+    
+    case "$component" in
+        docker)
+            # Check if Docker is running with different images
+            if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+                local current_images
+                current_images=$(docker images --format "{{.Repository}}:{{.Tag}}" --filter "dangling=false" | wc -l)
+                if [[ $current_images -gt 0 ]]; then
+                    conflicts+=("$current_images existing Docker images")
+                fi
+            fi
+            ;;
+        flatpak)
+            # Check if Flatpak apps are installed
+            if command -v flatpak >/dev/null 2>&1; then
+                local current_apps
+                current_apps=$(flatpak list --app 2>/dev/null | wc -l)
+                if [[ $current_apps -gt 0 ]]; then
+                    conflicts+=("$current_apps existing Flatpak applications")
+                fi
+            fi
+            ;;
+        credentials)
+            # Check for existing credential files
+            local cred_files=()
+            [[ -d "$HOME/.ssh" ]] && cred_files+=("SSH keys and config")
+            [[ -d "$HOME/.gnupg" ]] && cred_files+=("GPG keys")
+            [[ -f "$HOME/.gitconfig" ]] && cred_files+=("Git configuration")
+            [[ -d "$HOME/.config/gh" ]] && cred_files+=("GitHub CLI config")
+            [[ -d "$HOME/.config/Code/User" ]] && cred_files+=("VS Code settings")
+            
+            if [[ ${#cred_files[@]} -gt 0 ]]; then
+                conflicts+=("${cred_files[@]}")
+            fi
+            ;;
+        omarchy)
+            # Check for existing Omarchy installation
+            if [[ -d "$HOME/.local/share/omarchy" ]]; then
+                local theme_count
+                theme_count=$(find "$HOME/.local/share/omarchy/themes" -maxdepth 1 -type d 2>/dev/null | wc -l)
+                if [[ $theme_count -gt 1 ]]; then  # Subtract 1 for the themes directory itself
+                    conflicts+=("Existing Omarchy installation with $((theme_count - 1)) themes")
+                fi
+            fi
+            ;;
+        git-repos)
+            # Check for existing git repositories in common locations
+            local repo_count=0
+            local search_dirs=("$HOME/git" "$HOME/projects" "$HOME/src" "$HOME/code" "$HOME/development")
+            for search_dir in "${search_dirs[@]}"; do
+                [[ ! -d "$search_dir" ]] && continue
+                local dir_repos
+                dir_repos=$(find "$search_dir" -name ".git" -type d 2>/dev/null | wc -l)
+                repo_count=$((repo_count + dir_repos))
+            done
+            
+            if [[ $repo_count -gt 0 ]]; then
+                conflicts+=("$repo_count existing Git repositories")
+            fi
+            ;;
+    esac
+    
+    printf '%s\n' "${conflicts[@]}"
+}
+
+handle_restore_conflicts() {
+    local component="$1"
+    local backup_dir="$2"
+    
+    # Skip interactive prompts during dry-run
+    if [[ $DRY_RUN -eq 1 ]]; then
+        return 0  # Always proceed during dry-run
+    fi
+    
+    local conflicts
+    readarray -t conflicts < <(detect_conflicts "$component" "$backup_dir")
+    
+    if [[ ${#conflicts[@]} -eq 0 ]]; then
+        log_info "No conflicts detected for $component"
+        return 0  # Proceed with restore
+    fi
+    
+    echo ""
+    log_warning "Existing $component configuration detected:"
+    printf "  ${C_YELLOW}•${C_RESET} %s\n" "${conflicts[@]}"
+    echo ""
+    
+    log_info "What would you like to do?"
+    echo -e "  ${C_GREEN}r${C_RESET}) ${C_BOLD}Replace${C_RESET} - Remove existing and restore from backup"
+    echo -e "  ${C_BLUE}b${C_RESET}) ${C_BOLD}Backup${C_RESET} - Backup existing, then restore"
+    echo -e "  ${C_YELLOW}s${C_RESET}) ${C_BOLD}Skip${C_RESET} - Keep existing, skip restore"
+    echo -e "  ${C_RED}n${C_RESET}) ${C_BOLD}Cancel${C_RESET} - Cancel this component restore"
+    echo ""
+    
+    local choice_input
+    while true; do
+        read -p "${C_YELLOW}How do you want to handle the existing $component configuration?${C_RESET} [r/b/s/n] [${C_CYAN}b${C_RESET}]: " choice_input
+        choice_input="${choice_input:-b}"
+        
+        case "${choice_input,,}" in
+            r|replace) return 4 ;;  # Replace
+            b|backup) return 3 ;;   # Backup
+            s|skip) return 2 ;;     # Skip
+            n|cancel|no) return 1 ;; # Cancel
+            *) log_error "Please enter: r(eplace)/b(ackup)/s(kip)/n(o)" ;;
+        esac
+    done
+}
+
+create_component_backup() {
+    local component="$1"
+    local backup_suffix="pre_restore_$(date +%Y%m%d_%H%M%S)"
+    local backup_base="$HOME/.${component}_backup_${backup_suffix}"
+    
+    log_info "Creating backup of existing $component configuration..."
+    
+    case "$component" in
+        docker)
+            if command -v docker >/dev/null 2>&1; then
+                mkdir -p "$backup_base"
+                docker images --format "{{.Repository}}:{{.Tag}}" --filter "dangling=false" > "$backup_base/current_images.txt" 2>/dev/null || true
+                docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}\t{{.CreatedSince}}" > "$backup_base/images_detailed.txt" 2>/dev/null || true
+                log_success "Docker images list backed up to: $backup_base"
+            fi
+            ;;
+        flatpak)
+            if command -v flatpak >/dev/null 2>&1; then
+                mkdir -p "$backup_base"
+                flatpak list --app > "$backup_base/current_apps.txt" 2>/dev/null || true
+                flatpak remotes > "$backup_base/current_remotes.txt" 2>/dev/null || true
+                log_success "Flatpak configuration backed up to: $backup_base"
+            fi
+            ;;
+        credentials)
+            if [[ -d "$HOME/.ssh" || -d "$HOME/.gnupg" || -f "$HOME/.gitconfig" ]]; then
+                mkdir -p "$backup_base"
+                [[ -d "$HOME/.ssh" ]] && cp -r "$HOME/.ssh" "$backup_base/" 2>/dev/null || true
+                [[ -d "$HOME/.gnupg" ]] && cp -r "$HOME/.gnupg" "$backup_base/" 2>/dev/null || true
+                [[ -f "$HOME/.gitconfig" ]] && cp "$HOME/.gitconfig" "$backup_base/" 2>/dev/null || true
+                [[ -d "$HOME/.config/gh" ]] && cp -r "$HOME/.config/gh" "$backup_base/" 2>/dev/null || true
+                [[ -d "$HOME/.config/Code/User" ]] && cp -r "$HOME/.config/Code/User" "$backup_base/" 2>/dev/null || true
+                log_success "Credentials backed up to: $backup_base"
+            fi
+            ;;
+        omarchy)
+            if [[ -d "$HOME/.local/share/omarchy" ]]; then
+                mkdir -p "$(dirname "$backup_base")"
+                cp -r "$HOME/.local/share/omarchy" "$backup_base" 2>/dev/null || true
+                log_success "Omarchy configuration backed up to: $backup_base"
+            fi
+            ;;
+        git-repos)
+            # For git repos, we just create a list of existing repos
+            mkdir -p "$backup_base"
+            local search_dirs=("$HOME" "$HOME/git" "$HOME/projects" "$HOME/src" "$HOME/code" "$HOME/development")
+            {
+                echo "# Existing Git Repositories - $(date)"
+                echo "# Created before restore operation"
+                echo ""
+                for search_dir in "${search_dirs[@]}"; do
+                    [[ ! -d "$search_dir" ]] && continue
+                    find "$search_dir" -type d -name ".git" 2>/dev/null | while IFS= read -r git_dir; do
+                        local repo_dir
+                        repo_dir=$(dirname "$git_dir")
+                        echo "$repo_dir"
+                    done
+                done
+            } > "$backup_base/existing_repos.txt" 2>/dev/null
+            log_success "Existing repositories list saved to: $backup_base"
+            ;;
+    esac
+    
+    echo "$backup_base"
+}
+
+remove_existing_component() {
+    local component="$1"
+    
+    log_warning "Removing existing $component configuration..."
+    
+    case "$component" in
+        docker)
+            if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+                log_info "Removing all Docker images (containers will be stopped)"
+                docker stop $(docker ps -aq) 2>/dev/null || true
+                docker system prune -af 2>/dev/null || true
+                log_success "Docker images removed"
+            fi
+            ;;
+        flatpak)
+            if command -v flatpak >/dev/null 2>&1; then
+                log_info "Removing all Flatpak applications"
+                local apps
+                apps=$(flatpak list --app --columns=application 2>/dev/null | tail -n +1)
+                if [[ -n "$apps" ]]; then
+                    echo "$apps" | while read -r app; do
+                        [[ -n "$app" ]] && flatpak uninstall -y "$app" 2>/dev/null || true
+                    done
+                fi
+                log_success "Flatpak applications removed"
+            fi
+            ;;
+        credentials)
+            log_info "Removing existing credentials"
+            [[ -d "$HOME/.ssh" ]] && rm -rf "$HOME/.ssh"
+            [[ -d "$HOME/.gnupg" ]] && rm -rf "$HOME/.gnupg"
+            [[ -f "$HOME/.gitconfig" ]] && rm -f "$HOME/.gitconfig"
+            [[ -d "$HOME/.config/gh" ]] && rm -rf "$HOME/.config/gh"
+            [[ -d "$HOME/.config/Code/User" ]] && rm -rf "$HOME/.config/Code/User"
+            log_success "Existing credentials removed"
+            ;;
+        omarchy)
+            if [[ -d "$HOME/.local/share/omarchy" ]]; then
+                log_info "Removing existing Omarchy installation"
+                rm -rf "$HOME/.local/share/omarchy"
+                log_success "Existing Omarchy removed"
+            fi
+            ;;
+        git-repos)
+            log_warning "Git repositories are not automatically removed for safety"
+            log_info "You may want to manually review and clean up existing repositories"
+            ;;
+    esac
+}
+
 # Progress indicators
 show_progress() {
     local msg="$1"
@@ -262,6 +529,22 @@ restore_docker_images() {
         return 1
     fi
     
+    # Handle conflicts with existing Docker configuration
+    local conflict_action=0
+    case $(handle_restore_conflicts "docker" "$backup_dir"; echo $?) in
+        0) conflict_action=0 ;;  # Proceed
+        1) log_info "Docker restore cancelled by user"; return 1 ;;
+        2) log_info "Skipping Docker restore (keeping existing)"; return 0 ;;
+        3) # Backup existing
+            create_component_backup "docker"
+            conflict_action=0
+            ;;
+        4) # Replace existing
+            remove_existing_component "docker"
+            conflict_action=0
+            ;;
+    esac
+    
     local restore_script="$docker_dir/restore_images.sh"
     local digests_file="$docker_dir/digests.txt"
     
@@ -388,6 +671,19 @@ restore_flatpak_apps() {
         log_warning "No Flatpak backup found in $backup_dir"
         return 1
     fi
+    
+    # Handle conflicts with existing Flatpak configuration
+    case $(handle_restore_conflicts "flatpak" "$backup_dir"; echo $?) in
+        0) ;;  # Proceed
+        1) log_info "Flatpak restore cancelled by user"; return 1 ;;
+        2) log_info "Skipping Flatpak restore (keeping existing)"; return 0 ;;
+        3) # Backup existing
+            create_component_backup "flatpak"
+            ;;
+        4) # Replace existing
+            remove_existing_component "flatpak"
+            ;;
+    esac
     
     local restore_script="$flatpak_dir/restore_apps.sh"
     
@@ -574,6 +870,19 @@ restore_credentials() {
         return 1
     fi
     
+    # Handle conflicts with existing credentials
+    case $(handle_restore_conflicts "credentials" "$backup_dir"; echo $?) in
+        0) ;;  # Proceed
+        1) log_info "Credentials restore cancelled by user"; return 1 ;;
+        2) log_info "Skipping credentials restore (keeping existing)"; return 0 ;;
+        3) # Backup existing
+            create_component_backup "credentials"
+            ;;
+        4) # Replace existing
+            remove_existing_component "credentials"
+            ;;
+    esac
+    
     local restore_script="$creds_dir/restore_credentials.sh"
     
     if [[ -x "$restore_script" ]]; then
@@ -721,6 +1030,20 @@ restore_git_repos() {
         return 1
     fi
     
+    # Handle conflicts with existing Git repositories
+    case $(handle_restore_conflicts "git-repos" "$backup_dir"; echo $?) in
+        0) ;;  # Proceed
+        1) log_info "Git repositories restore cancelled by user"; return 1 ;;
+        2) log_info "Skipping Git repositories restore (keeping existing)"; return 0 ;;
+        3) # Backup existing
+            create_component_backup "git-repos"
+            ;;
+        4) # Replace existing (note: Git repos are not auto-removed for safety)
+            create_component_backup "git-repos"
+            log_warning "Git repositories are preserved for safety. Backup created."
+            ;;
+    esac
+    
     local clone_script="$git_dir/clone_repos.sh"
     
     if [[ -x "$clone_script" ]]; then
@@ -731,7 +1054,7 @@ restore_git_repos() {
         
         # Ask user where to restore repos
         local restore_dir="$HOME/restored_repos"
-        if [[ $QUIET -eq 0 ]]; then
+        if [[ $QUIET -eq 0 && $DRY_RUN -eq 0 ]]; then
             read -p "Restore repositories to [$restore_dir]: " user_dir
             [[ -n "$user_dir" ]] && restore_dir="$user_dir"
         fi
@@ -883,6 +1206,19 @@ restore_omarchy() {
         log_warning "No Omarchy backup found in $backup_dir"
         return 1
     fi
+    
+    # Handle conflicts with existing Omarchy installation
+    case $(handle_restore_conflicts "omarchy" "$backup_dir"; echo $?) in
+        0) ;;  # Proceed
+        1) log_info "Omarchy restore cancelled by user"; return 1 ;;
+        2) log_info "Skipping Omarchy restore (keeping existing)"; return 0 ;;
+        3) # Backup existing
+            create_component_backup "omarchy"
+            ;;
+        4) # Replace existing
+            remove_existing_component "omarchy"
+            ;;
+    esac
     
     local restore_script="$omarchy_dir/restore_omarchy.sh"
     
@@ -1214,11 +1550,23 @@ SECURITY FEATURES:
   • Automatic cleanup of temporary files
   • Backup verification and integrity checks
   • Safe restoration with existing file backup
+  • Interactive conflict resolution for existing configurations
+  • Automatic backups before overwriting existing data
 
 FILES:
   Default backup location: ~/backups/
   Latest backup symlink: ~/backups/latest
   Backup summary: [backup_dir]/BACKUP_SUMMARY.txt
+  
+RESTORE CONFLICT RESOLUTION:
+  When restoring, if existing configurations are detected, you'll be prompted:
+  • Replace - Remove existing and restore from backup
+  • Backup - Backup existing first, then restore
+  • Skip - Keep existing, skip this component
+  • Cancel - Cancel restore for this component
+  
+  Automatic safety backups are created at:
+  ~/.{component}_backup_pre_restore_{timestamp}/
 
 For more information and updates, visit: https://github.com/comShadowHarvy
 EOF
