@@ -1721,6 +1721,18 @@ fi
 
 # EOF marker for enhanced aliases
 
+# ----------------------------------------------------------------------------
+# OpenAI Codex Helper
+# ----------------------------------------------------------------------------
+
+# Auto-install and run codex if not already installed
+codex() {
+  if ! command -v codex >/dev/null 2>&1; then
+    echo "🚀 Installing @openai/codex globally..."
+    npm install -g @openai/codex
+  fi
+  command codex "$@"
+}
 
 
 
