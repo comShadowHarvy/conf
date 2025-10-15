@@ -1,0 +1,4 @@
+{"timestamp":"2025-10-10 09:32:41","level":"DEBUG","message":"Initialized directories and logging","transaction":"20251010_093241_3171738"}
+{"timestamp":"2025-10-10 09:32:41","level":"DEBUG","message":"Log file: /home/me/conf/logs/stow-20251010_093241_3171738.log","transaction":"20251010_093241_3171738"}
+{"timestamp":"2025-10-10 09:32:41","level":"SUCCESS","message":"No conflicts detected","transaction":"20251010_093241_3171738"}
+{"timestamp":"2025-10-10 09:32:41","level":"SUCCESS","message":"Operation completed successfully","transaction":"20251010_093241_3171738"}

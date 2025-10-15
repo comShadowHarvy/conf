@@ -1,0 +1,28 @@
+{"timestamp":"2025-10-10 09:26:52","level":"DEBUG","message":"Initialized directories and logging","transaction":"20251010_092652_3166810"}
+{"timestamp":"2025-10-10 09:26:52","level":"DEBUG","message":"Log file: /home/me/conf/logs/stow-20251010_092652_3166810.log","transaction":"20251010_092652_3166810"}
+{"timestamp":"2025-10-10 09:26:52","level":"INFO","message":"Validating configuration...","transaction":"20251010_092652_3166810"}
+{"timestamp":"2025-10-10 09:26:52","level":"WARNING","message":"Package 'analysis' exists but not defined in config","transaction":"20251010_092652_3166810"}
+{"timestamp":"2025-10-10 09:26:52","level":"WARNING","message":"Package 'archive' exists but not defined in config","transaction":"20251010_092652_3166810"}
+{"timestamp":"2025-10-10 09:26:52","level":"WARNING","message":"Package 'backup' exists but not defined in config","transaction":"20251010_092652_3166810"}
+{"timestamp":"2025-10-10 09:26:52","level":"WARNING","message":"Package 'backups' exists but not defined in config","transaction":"20251010_092652_3166810"}
+{"timestamp":"2025-10-10 09:26:52","level":"WARNING","message":"Package 'bash' exists but not defined in config","transaction":"20251010_092652_3166810"}
+{"timestamp":"2025-10-10 09:26:52","level":"WARNING","message":"Package 'bin' exists but not defined in config","transaction":"20251010_092652_3166810"}
+{"timestamp":"2025-10-10 09:26:52","level":"WARNING","message":"Package 'conf' exists but not defined in config","transaction":"20251010_092652_3166810"}
+{"timestamp":"2025-10-10 09:26:52","level":"WARNING","message":"Package '.config' exists but not defined in config","transaction":"20251010_092652_3166810"}
+{"timestamp":"2025-10-10 09:26:52","level":"WARNING","message":"Package 'git' exists but not defined in config","transaction":"20251010_092652_3166810"}
+{"timestamp":"2025-10-10 09:26:52","level":"WARNING","message":"Package '.github' exists but not defined in config","transaction":"20251010_092652_3166810"}
+{"timestamp":"2025-10-10 09:26:52","level":"WARNING","message":"Package 'hyprland' exists but not defined in config","transaction":"20251010_092652_3166810"}
+{"timestamp":"2025-10-10 09:26:52","level":"WARNING","message":"Package 'nvim' exists but not defined in config","transaction":"20251010_092652_3166810"}
+{"timestamp":"2025-10-10 09:26:52","level":"WARNING","message":"Package 'Pictures' exists but not defined in config","transaction":"20251010_092652_3166810"}
+{"timestamp":"2025-10-10 09:26:52","level":"WARNING","message":"Package 'reports' exists but not defined in config","transaction":"20251010_092652_3166810"}
+{"timestamp":"2025-10-10 09:26:52","level":"WARNING","message":"Package 'scripts' exists but not defined in config","transaction":"20251010_092652_3166810"}
+{"timestamp":"2025-10-10 09:26:52","level":"WARNING","message":"Package 'secrets' exists but not defined in config","transaction":"20251010_092652_3166810"}
+{"timestamp":"2025-10-10 09:26:52","level":"WARNING","message":"Package 'shared' exists but not defined in config","transaction":"20251010_092652_3166810"}
+{"timestamp":"2025-10-10 09:26:52","level":"WARNING","message":"Package 'tmux' exists but not defined in config","transaction":"20251010_092652_3166810"}
+{"timestamp":"2025-10-10 09:26:52","level":"WARNING","message":"Package 'vscode' exists but not defined in config","transaction":"20251010_092652_3166810"}
+{"timestamp":"2025-10-10 09:26:52","level":"WARNING","message":"Package 'waybar' exists but not defined in config","transaction":"20251010_092652_3166810"}
+{"timestamp":"2025-10-10 09:26:52","level":"WARNING","message":"Package 'web' exists but not defined in config","transaction":"20251010_092652_3166810"}
+{"timestamp":"2025-10-10 09:26:52","level":"WARNING","message":"Package 'wget' exists but not defined in config","transaction":"20251010_092652_3166810"}
+{"timestamp":"2025-10-10 09:26:52","level":"WARNING","message":"Package 'zsh' exists but not defined in config","transaction":"20251010_092652_3166810"}
+{"timestamp":"2025-10-10 09:26:52","level":"SUCCESS","message":"Configuration validation complete","transaction":"20251010_092652_3166810"}
+{"timestamp":"2025-10-10 09:26:52","level":"SUCCESS","message":"Operation completed successfully","transaction":"20251010_092652_3166810"}

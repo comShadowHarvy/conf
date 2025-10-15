@@ -1,0 +1,4 @@
+{"timestamp":"2025-10-10 08:35:48","level":"DEBUG","message":"Initialized directories and logging","transaction":"20251010_083548_3135799"}
+{"timestamp":"2025-10-10 08:35:48","level":"DEBUG","message":"Log file: /home/me/conf/logs/stow-20251010_083548_3135799.log","transaction":"20251010_083548_3135799"}
+{"timestamp":"2025-10-10 08:35:48","level":"INFO","message":"Validating configuration...","transaction":"20251010_083548_3135799"}
+{"timestamp":"2025-10-10 08:35:48","level":"ERROR","message":"Invalid YAML syntax in config file","transaction":"20251010_083548_3135799"}

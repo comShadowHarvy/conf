@@ -1,0 +1,11 @@
+{"timestamp":"2025-10-10 09:37:16","level":"DEBUG","message":"Initialized directories and logging","transaction":"20251010_093716_3180683"}
+{"timestamp":"2025-10-10 09:37:16","level":"DEBUG","message":"Log file: /home/me/conf/logs/stow-20251010_093716_3180683.log","transaction":"20251010_093716_3180683"}
+{"timestamp":"2025-10-10 09:37:16","level":"STEP","message":"Stowing package: test-package","transaction":"20251010_093716_3180683"}
+{"timestamp":"2025-10-10 09:37:17","level":"WARNING","message":"1 conflict(s) detected for package 'test-package'","transaction":"20251010_093716_3180683"}
+{"timestamp":"2025-10-10 09:37:17","level":"WARNING","message":"[1mStow Conflicts Detected for Package: test-package(B[m","transaction":"20251010_093716_3180683"}
+{"timestamp":"2025-10-10 09:37:17","level":"ERROR","message":"No conflicts detected, but stow failed. Check permissions or stow configuration.","transaction":"20251010_093716_3180683"}
+{"timestamp":"2025-10-10 09:37:17","level":"INFO","message":"[1mWhat would you like to do?(B[m","transaction":"20251010_093716_3180683"}
+{"timestamp":"2025-10-10 09:37:17","level":"ERROR","message":"Invalid choice. Please enter b, s, r, d, v, or q","transaction":"20251010_093716_3180683"}
+{"timestamp":"2025-10-10 09:37:17","level":"INFO","message":"Creating backup and stowing package...","transaction":"20251010_093716_3180683"}
+{"timestamp":"2025-10-10 09:37:17","level":"ERROR","message":"Backup failed","transaction":"20251010_093716_3180683"}
+{"timestamp":"2025-10-10 09:37:17","level":"ERROR","message":"Failed to resolve conflicts for 'test-package'","transaction":"20251010_093716_3180683"}

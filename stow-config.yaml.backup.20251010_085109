@@ -126,11 +126,6 @@ packages:
       - ".wgetrc"
     backup_policy: skip
 
-  analysis:
-    priority: 9
-    category: optional
-    description: "analysis configuration"
-
   secrets:
     priority: 10
     category: optional
@@ -206,3 +201,4 @@ user:
   
   # Interactive mode preferences
   use_fzf: true
+  use_colors: true

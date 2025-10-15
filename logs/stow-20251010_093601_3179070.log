@@ -1,0 +1,5 @@
+{"timestamp":"2025-10-10 09:36:01","level":"DEBUG","message":"Initialized directories and logging","transaction":"20251010_093601_3179070"}
+{"timestamp":"2025-10-10 09:36:01","level":"DEBUG","message":"Log file: /home/me/conf/logs/stow-20251010_093601_3179070.log","transaction":"20251010_093601_3179070"}
+{"timestamp":"2025-10-10 09:36:01","level":"STEP","message":"Stowing package: test-package","transaction":"20251010_093601_3179070"}
+{"timestamp":"2025-10-10 09:36:02","level":"INFO","message":"Stowing 'test-package'...","transaction":"20251010_093601_3179070"}
+{"timestamp":"2025-10-10 09:36:02","level":"ERROR","message":"Failed to stow 'test-package'","transaction":"20251010_093601_3179070"}

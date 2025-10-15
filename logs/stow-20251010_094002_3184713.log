@@ -1,0 +1,17 @@
+{"timestamp":"2025-10-10 09:40:02","level":"DEBUG","message":"Initialized directories and logging","transaction":"20251010_094002_3184713"}
+{"timestamp":"2025-10-10 09:40:02","level":"DEBUG","message":"Log file: /home/me/conf/logs/stow-20251010_094002_3184713.log","transaction":"20251010_094002_3184713"}
+{"timestamp":"2025-10-10 09:40:03","level":"STEP","message":"Stowing package: test-package","transaction":"20251010_094002_3184713"}
+{"timestamp":"2025-10-10 09:40:03","level":"WARNING","message":"1 conflict(s) detected for package 'test-package'","transaction":"20251010_094002_3184713"}
+{"timestamp":"2025-10-10 09:40:03","level":"WARNING","message":"[1mStow Conflicts Detected for Package: test-package(B[m","transaction":"20251010_094002_3184713"}
+{"timestamp":"2025-10-10 09:40:04","level":"INFO","message":"[1mWhat would you like to do?(B[m","transaction":"20251010_094002_3184713"}
+{"timestamp":"2025-10-10 09:40:04","level":"INFO","message":"[1mFile Differences:(B[m","transaction":"20251010_094002_3184713"}
+{"timestamp":"2025-10-10 09:40:04","level":"INFO","message":"Creating backup and stowing package...","transaction":"20251010_094002_3184713"}
+{"timestamp":"2025-10-10 09:40:04","level":"INFO","message":"Backing up: /home/me/.bashrc","transaction":"20251010_094002_3184713"}
+{"timestamp":"2025-10-10 09:40:04","level":"SUCCESS","message":"Backup created: /home/me/.stow-backups/20251010_094004/test-package","transaction":"20251010_094002_3184713"}
+{"timestamp":"2025-10-10 09:40:04","level":"SUCCESS","message":"Backup created at: [36m[INFO](B[m Backing up: /home/me/.bashrc
+[32m[SUCCESS](B[m Backup created: /home/me/.stow-backups/20251010_094004/test-package
+/home/me/.stow-backups/20251010_094004/test-package","transaction":"20251010_094002_3184713"}
+{"timestamp":"2025-10-10 09:40:04","level":"DEBUG","message":"Removing conflicting file: /home/me/.bashrc","transaction":"20251010_094002_3184713"}
+{"timestamp":"2025-10-10 09:40:04","level":"INFO","message":"Stowing 'test-package'...","transaction":"20251010_094002_3184713"}
+{"timestamp":"2025-10-10 09:40:04","level":"SUCCESS","message":"Successfully stowed 'test-package'","transaction":"20251010_094002_3184713"}
+{"timestamp":"2025-10-10 09:40:04","level":"SUCCESS","message":"Operation completed successfully","transaction":"20251010_094002_3184713"}
