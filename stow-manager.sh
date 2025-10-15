@@ -30,10 +30,11 @@ if [[ -t 1 ]] && command -v tput >/dev/null 2>&1; then
     PURPLE=$(tput setaf 5)
     CYAN=$(tput setaf 6)
     WHITE=$(tput setaf 7)
+    GRAY=$(tput setaf 8)
     BOLD=$(tput bold)
     RESET=$(tput sgr0)
 else
-    RED="" GREEN="" YELLOW="" BLUE="" PURPLE="" CYAN="" WHITE="" BOLD="" RESET=""
+    RED="" GREEN="" YELLOW="" BLUE="" PURPLE="" CYAN="" WHITE="" GRAY="" BOLD="" RESET=""
 fi
 
 # Global variables
@@ -213,19 +214,21 @@ is_stowed() {
     
     # Check for stow-managed symlinks
     local stow_path="${STOW_DIR}/${package}"
-    find "$stow_path" -type f -print0 2>/dev/null | while IFS= read -r -d '' file; do
+    
+    # Use process substitution to avoid subshell issues
+    while IFS= read -r -d '' file; do
         local relative_path="${file#$stow_path/}"
         local target_file="${TARGET_DIR}/${relative_path}"
         
         if [[ -L "$target_file" ]]; then
             local link_target=$(readlink "$target_file")
             if [[ "$link_target" == *"$package/$relative_path" ]]; then
-                exit 0  # Found at least one valid stow symlink
+                return 0  # Found at least one valid stow symlink
             fi
         fi
-    done
+    done < <(find "$stow_path" -type f -print0 2>/dev/null)
     
-    return $?
+    return 1
 }
 
 # Detect conflicts before stowing
@@ -238,22 +241,20 @@ detect_conflicts() {
         return 1
     fi
     
-    # Use stow's dry-run to detect conflicts
-    if ! stow -t "$TARGET_DIR" -d "$STOW_DIR" -n "$package" 2>/dev/null; then
-        # Get detailed conflict information
-        while IFS= read -r line; do
-            if [[ "$line" == *"already exists"* ]]; then
-                local file=$(echo "$line" | sed -n 's/.*: \(.*\) already exists.*/\1/p')
-                [[ -n "$file" ]] && conflicts+=("$file")
-            fi
-        done < <(stow -t "$TARGET_DIR" -d "$STOW_DIR" -n "$package" 2>&1 || true)
-    fi
+    # Use stow's dry-run to detect conflicts and parse output for details
+    while IFS= read -r line; do
+        if [[ "$line" == *"already exists"* ]]; then
+            local file=$(echo "$line" | sed -n 's/.*: \(.*\) already exists.*/\1/p')
+            [[ -n "$file" ]] && conflicts+=("$file")
+        elif [[ "$line" == *"cannot stow"* ]]; then
+            # Handle different conflict message format
+            local file=$(echo "$line" | sed -n 's/.*cannot stow .* over existing target \([^ ]*\).*/\1/p')
+            [[ -n "$file" ]] && conflicts+=("${TARGET_DIR}/${file}")
+        fi
+    done < <(stow -t "$TARGET_DIR" -d "$STOW_DIR" -n "$package" 2>&1 || true)
     
     if [[ ${#conflicts[@]} -gt 0 ]]; then
-        log WARNING "Conflicts detected for package '$package':"
-        for conflict in "${conflicts[@]}"; do
-            log WARNING "  - $conflict"
-        done
+        log WARNING "${#conflicts[@]} conflict(s) detected for package '$package'"
         return 1
     fi
     
@@ -271,10 +272,15 @@ backup_conflicts() {
     # Get conflict list from stow dry-run
     local conflicts=()
     while IFS= read -r line; do
+        local file=""
         if [[ "$line" == *"already exists"* ]]; then
-            local file=$(echo "$line" | sed -n 's/.*: \(.*\) already exists.*/\1/p')
-            [[ -n "$file" ]] && conflicts+=("$file")
+            file=$(echo "$line" | sed -n 's/.*: \(.*\) already exists.*/\1/p')
+        elif [[ "$line" == *"cannot stow"* ]]; then
+            # Handle different conflict message format
+            file=$(echo "$line" | sed -n 's/.*cannot stow .* over existing target \([^ ]*\).*/\1/p')
+            [[ -n "$file" ]] && file="${TARGET_DIR}/${file}"
         fi
+        [[ -n "$file" ]] && conflicts+=("$file")
     done < <(stow -t "$TARGET_DIR" -d "$STOW_DIR" -n "$package" 2>&1 || true)
     
     local backed_up=false
@@ -306,52 +312,21 @@ resolve_conflicts() {
                 ;;
             force)
                 log WARNING "Forcing installation of '$package' (policy: force)"
-                # Remove conflicting files
-                while IFS= read -r line; do
-                    if [[ "$line" == *"already exists"* ]]; then
-                        local file=$(echo "$line" | sed -n 's/.*: \(.*\) already exists.*/\1/p')
-                        if [[ -n "$file" && -e "$file" && ! -L "$file" ]]; then
-                            log WARNING "Removing conflicting file: $file"
-                            [[ "$DRY_RUN" == "false" ]] && rm -rf "$file"
-                        fi
-                    fi
-                done < <(stow -t "$TARGET_DIR" -d "$STOW_DIR" -n "$package" 2>&1 || true)
+                [[ "$DRY_RUN" == "false" ]] && remove_conflicting_files "$package"
                 ;;
             backup)
                 log INFO "Backing up conflicting files for '$package'"
                 if [[ "$DRY_RUN" == "false" ]]; then
                     local backup_path=$(backup_conflicts "$package")
                     [[ -n "$backup_path" ]] && log INFO "Backup created at: $backup_path"
+                    remove_conflicting_files "$package"
                 fi
-                
-                # Remove original files after backup
-                while IFS= read -r line; do
-                    if [[ "$line" == *"already exists"* ]]; then
-                        local file=$(echo "$line" | sed -n 's/.*: \(.*\) already exists.*/\1/p')
-                        if [[ -n "$file" && -e "$file" && ! -L "$file" ]]; then
-                            [[ "$DRY_RUN" == "false" ]] && rm -rf "$file"
-                        fi
-                    fi
-                done < <(stow -t "$TARGET_DIR" -d "$STOW_DIR" -n "$package" 2>&1 || true)
                 ;;
             ask)
                 if [[ "$INTERACTIVE" == "true" && "$DRY_RUN" == "false" ]]; then
-                    echo
-                    log WARNING "Conflicts found for '$package'. What would you like to do?"
-                    echo "  1) Skip this package"
-                    echo "  2) Backup conflicting files and continue"
-                    echo "  3) Force overwrite (dangerous)"
-                    echo "  4) Quit"
-                    read -p "Choice [1-4]: " -n 1 -r choice
-                    echo
-                    
-                    case "$choice" in
-                        1) log INFO "Skipping '$package'"; return 1 ;;
-                        2) resolve_conflicts "$package" "backup"; return $? ;;
-                        3) resolve_conflicts "$package" "force"; return $? ;;
-                        4) log INFO "Aborted by user"; exit 1 ;;
-                        *) log ERROR "Invalid choice"; return 1 ;;
-                    esac
+                    show_conflict_details "$package"
+                    ask_conflict_resolution "$package"
+                    return $?
                 else
                     log ERROR "Conflicts found and running non-interactively. Use --force or configure backup_policy."
                     return 1
@@ -365,6 +340,279 @@ resolve_conflicts() {
     fi
     
     return 0
+}
+
+# Show detailed conflict information
+show_conflict_details() {
+    local package="$1"
+    local conflicts=()
+    local conflict_details=()
+    
+    echo
+    log WARNING "${BOLD}Stow Conflicts Detected for Package: $package${RESET}"
+    echo "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+    
+    # Get detailed conflict information
+    while IFS= read -r line; do
+        local file=""
+        if [[ "$line" == *"already exists"* ]]; then
+            file=$(echo "$line" | sed -n 's/.*: \(.*\) already exists.*/\1/p')
+        elif [[ "$line" == *"cannot stow"* ]]; then
+            # Handle different conflict message format
+            file=$(echo "$line" | sed -n 's/.*cannot stow .* over existing target \([^ ]*\).*/\1/p')
+            [[ -n "$file" ]] && file="${TARGET_DIR}/${file}"
+        fi
+        
+        if [[ -n "$file" ]]; then
+            conflicts+=("$file")
+            
+            # Get file details
+            if [[ -f "$file" ]]; then
+                local size=$(du -h "$file" 2>/dev/null | cut -f1)
+                local mod_date=$(stat -c '%y' "$file" 2>/dev/null | cut -d' ' -f1,2 | cut -d'.' -f1)
+                local file_type=$(file -b "$file" 2>/dev/null | cut -d',' -f1)
+                
+                if [[ -L "$file" ]]; then
+                    local link_target=$(readlink "$file")
+                    conflict_details+=("${CYAN}$file${RESET} ${RED}[SYMLINK → $link_target]${RESET} ($mod_date)")
+                else
+                    conflict_details+=("${CYAN}$file${RESET} ${YELLOW}[$size, $file_type]${RESET} ($mod_date)")
+                fi
+            elif [[ -d "$file" ]]; then
+                local dir_size=$(du -sh "$file" 2>/dev/null | cut -f1)
+                local item_count=$(find "$file" -type f 2>/dev/null | wc -l)
+                conflict_details+=("${CYAN}$file/${RESET} ${BLUE}[Directory: $dir_size, $item_count files]${RESET}")
+            else
+                conflict_details+=("${CYAN}$file${RESET} ${RED}[Unknown file type]${RESET}")
+            fi
+        fi
+    done < <(stow -t "$TARGET_DIR" -d "$STOW_DIR" -n "$package" 2>&1 || true)
+    
+    if [[ ${#conflicts[@]} -eq 0 ]]; then
+        log ERROR "No conflicts detected, but stow failed. Check permissions or stow configuration."
+        return 1
+    fi
+    
+    echo
+    echo "${BOLD}Files that would be overwritten:${RESET}"
+    for detail in "${conflict_details[@]}"; do
+        echo "  • $detail"
+    done
+    
+    echo
+    echo "${BOLD}Package '$package' wants to create:${RESET}"
+    find "${STOW_DIR}/${package}" -type f 2>/dev/null | while read -r pkg_file; do
+        local rel_path="${pkg_file#${STOW_DIR}/${package}/}"
+        local target_path="${TARGET_DIR}/${rel_path}"
+        echo "  ➜ ${GREEN}$target_path${RESET}"
+    done
+    
+    echo
+    echo "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+}
+
+# Interactive conflict resolution
+ask_conflict_resolution() {
+    local package="$1"
+    
+    echo
+    log INFO "${BOLD}What would you like to do?${RESET}"
+    echo
+    echo "  ${GREEN}b${RESET}) ${BOLD}Backup${RESET} - Safely backup existing files, then stow package ${CYAN}(recommended)${RESET}"
+    echo "  ${YELLOW}s${RESET}) ${BOLD}Skip${RESET} - Skip this package, keep existing files"
+    echo "  ${RED}r${RESET}) ${BOLD}Replace${RESET} - Force overwrite existing files ${RED}(dangerous!)${RESET}"
+    echo "  ${BLUE}d${RESET}) ${BOLD}Diff${RESET} - Compare files before deciding"
+    echo "  ${PURPLE}v${RESET}) ${BOLD}View${RESET} - Show existing file contents"
+    echo "  ${WHITE}q${RESET}) ${BOLD}Quit${RESET} - Abort stow operation"
+    echo
+    
+    local choice
+    while true; do
+        read -p "${CYAN}Your choice${RESET} [${GREEN}b${RESET}/s/r/d/v/q] [${CYAN}b${RESET}]: " -n 1 -r choice
+        echo
+        choice="${choice:-b}"
+        
+        case "${choice,,}" in
+            b|backup)
+                log INFO "Creating backup and stowing package..."
+                local policy_backup=$(backup_conflicts "$package")
+                if [[ -n "$policy_backup" ]]; then
+                    log SUCCESS "Backup created at: $policy_backup"
+                    # Remove original files after backup
+                    remove_conflicting_files "$package"
+                    return 0
+                else
+                    log ERROR "Backup failed"
+                    return 1
+                fi
+                ;;
+            s|skip)
+                log INFO "Skipping package '$package'"
+                return 1
+                ;;
+            r|replace)
+                echo
+                log WARNING "${RED}${BOLD}WARNING: This will permanently delete existing files!${RESET}"
+                read -p "Are you sure you want to replace existing files? [y/N]: " -n 1 -r confirm
+                echo
+                if [[ "${confirm,,}" == "y" ]]; then
+                    log INFO "Removing existing files and stowing package..."
+                    remove_conflicting_files "$package"
+                    return 0
+                else
+                    log INFO "Operation cancelled"
+                    continue
+                fi
+                ;;
+            d|diff)
+                show_file_diffs "$package"
+                echo
+                continue
+                ;;
+            v|view)
+                view_conflicting_files "$package"
+                echo
+                continue
+                ;;
+            q|quit)
+                log INFO "Stow operation aborted by user"
+                exit 1
+                ;;
+            *)
+                log ERROR "Invalid choice. Please enter b, s, r, d, v, or q"
+                continue
+                ;;
+        esac
+    done
+}
+
+# Remove conflicting files
+remove_conflicting_files() {
+    local package="$1"
+    
+    while IFS= read -r line; do
+        local file=""
+        if [[ "$line" == *"already exists"* ]]; then
+            file=$(echo "$line" | sed -n 's/.*: \(.*\) already exists.*/\1/p')
+        elif [[ "$line" == *"cannot stow"* ]]; then
+            # Handle different conflict message format
+            file=$(echo "$line" | sed -n 's/.*cannot stow .* over existing target \([^ ]*\).*/\1/p')
+            [[ -n "$file" ]] && file="${TARGET_DIR}/${file}"
+        fi
+        
+        if [[ -n "$file" && -e "$file" && ! -L "$file" ]]; then
+            log DEBUG "Removing conflicting file: $file"
+            rm -rf "$file"
+        fi
+    done < <(stow -t "$TARGET_DIR" -d "$STOW_DIR" -n "$package" 2>&1 || true)
+}
+
+# Show differences between existing and new files
+show_file_diffs() {
+    local package="$1"
+    local shown_any=false
+    
+    echo
+    log INFO "${BOLD}File Differences:${RESET}"
+    echo "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+    
+    find "${STOW_DIR}/${package}" -type f 2>/dev/null | while read -r pkg_file; do
+        local rel_path="${pkg_file#${STOW_DIR}/${package}/}"
+        local target_path="${TARGET_DIR}/${rel_path}"
+        
+        if [[ -f "$target_path" && ! -L "$target_path" ]]; then
+            echo
+            echo "${CYAN}${BOLD}Comparing:${RESET} $rel_path"
+            echo "  ${YELLOW}Existing:${RESET} $target_path"
+            echo "  ${GREEN}Package:${RESET}  $pkg_file"
+            echo
+            
+            if command -v diff >/dev/null 2>&1; then
+                if diff -u "$target_path" "$pkg_file" 2>/dev/null | head -20; then
+                    echo "${GREEN}Files are identical${RESET}"
+                fi
+            else
+                echo "${YELLOW}diff command not available for comparison${RESET}"
+            fi
+            
+            shown_any=true
+            echo "${GRAY}────────────────────────────────────────────────────────────────────────────────────${RESET}"
+        fi
+    done
+    
+    if [[ "$shown_any" != "true" ]]; then
+        echo "${YELLOW}No text files to compare${RESET}"
+    fi
+    
+    echo "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+}
+
+# View contents of conflicting files
+view_conflicting_files() {
+    local package="$1"
+    local conflicts=()
+    
+    # Get conflicts
+    while IFS= read -r line; do
+        local file=""
+        if [[ "$line" == *"already exists"* ]]; then
+            file=$(echo "$line" | sed -n 's/.*: \(.*\) already exists.*/\1/p')
+        elif [[ "$line" == *"cannot stow"* ]]; then
+            # Handle different conflict message format
+            file=$(echo "$line" | sed -n 's/.*cannot stow .* over existing target \([^ ]*\).*/\1/p')
+            [[ -n "$file" ]] && file="${TARGET_DIR}/${file}"
+        fi
+        [[ -n "$file" ]] && conflicts+=("$file")
+    done < <(stow -t "$TARGET_DIR" -d "$STOW_DIR" -n "$package" 2>&1 || true)
+    
+    if [[ ${#conflicts[@]} -eq 0 ]]; then
+        log WARNING "No conflicts found to view"
+        return
+    fi
+    
+    echo
+    log INFO "${BOLD}Select file to view:${RESET}"
+    
+    local i=1
+    for conflict in "${conflicts[@]}"; do
+        echo "  $i) $(basename "$conflict")"
+        ((i++))
+    done
+    
+    read -p "Enter file number [1-${#conflicts[@]}] or 'q' to go back: " choice
+    
+    if [[ "$choice" == "q" ]]; then
+        return
+    fi
+    
+    if [[ "$choice" =~ ^[0-9]+$ ]] && [[ $choice -ge 1 ]] && [[ $choice -le ${#conflicts[@]} ]]; then
+        local selected_file="${conflicts[$((choice-1))]}"
+        
+        echo
+        echo "${CYAN}${BOLD}Contents of:${RESET} $selected_file"
+        echo "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+        
+        if [[ -f "$selected_file" ]]; then
+            if command -v bat >/dev/null 2>&1; then
+                bat --style=numbers --line-range=:50 "$selected_file" 2>/dev/null || cat "$selected_file" | head -50
+            else
+                head -50 "$selected_file"
+            fi
+            
+            local line_count=$(wc -l < "$selected_file" 2>/dev/null)
+            if [[ $line_count -gt 50 ]]; then
+                echo "${GRAY}... ($((line_count - 50)) more lines)${RESET}"
+            fi
+        else
+            echo "${RED}File is not readable or is a directory${RESET}"
+        fi
+        
+        echo "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+        
+        read -p "Press Enter to continue..." -r
+    else
+        log ERROR "Invalid choice"
+    fi
 }
 
 # Execute package hooks
