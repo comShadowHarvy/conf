@@ -1,4 +1,0 @@
-{"timestamp":"2025-10-19 13:49:59","level":"DEBUG","message":"Initialized directories and logging","transaction":"20251019_134959_26204"}
-{"timestamp":"2025-10-19 13:49:59","level":"DEBUG","message":"Log file: /home/me/git/conf/logs/stow-20251019_134959_26204.log","transaction":"20251019_134959_26204"}
-{"timestamp":"2025-10-19 13:49:59","level":"STEP","message":"Package Status Report","transaction":"20251019_134959_26204"}
-{"timestamp":"2025-10-19 13:50:02","level":"SUCCESS","message":"Operation completed successfully","transaction":"20251019_134959_26204"}

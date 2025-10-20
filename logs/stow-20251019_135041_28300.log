@@ -1,3 +1,0 @@
-{"timestamp":"2025-10-19 13:50:41","level":"DEBUG","message":"Initialized directories and logging","transaction":"20251019_135041_28300"}
-{"timestamp":"2025-10-19 13:50:41","level":"DEBUG","message":"Log file: /home/me/git/conf/logs/stow-20251019_135041_28300.log","transaction":"20251019_135041_28300"}
-{"timestamp":"2025-10-19 13:50:41","level":"WARNING","message":"Package 'bash' is disabled, skipping","transaction":"20251019_135041_28300"}

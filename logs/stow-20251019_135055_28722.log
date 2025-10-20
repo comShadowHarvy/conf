@@ -1,4 +1,0 @@
-{"timestamp":"2025-10-19 13:50:55","level":"DEBUG","message":"Initialized directories and logging","transaction":"20251019_135055_28722"}
-{"timestamp":"2025-10-19 13:50:55","level":"DEBUG","message":"Log file: /home/me/git/conf/logs/stow-20251019_135055_28722.log","transaction":"20251019_135055_28722"}
-{"timestamp":"2025-10-19 13:50:55","level":"INFO","message":"Validating configuration...","transaction":"20251019_135055_28722"}
-{"timestamp":"2025-10-19 13:50:55","level":"ERROR","message":"Invalid YAML syntax in config file","transaction":"20251019_135055_28722"}

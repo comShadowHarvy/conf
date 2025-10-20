@@ -1,3 +1,0 @@
-{"timestamp":"2025-10-10 09:39:06","level":"DEBUG","message":"Initialized directories and logging","transaction":"20251010_093906_3182866"}
-{"timestamp":"2025-10-10 09:39:06","level":"DEBUG","message":"Log file: /home/me/conf/logs/stow-20251010_093906_3182866.log","transaction":"20251010_093906_3182866"}
-{"timestamp":"2025-10-10 09:39:06","level":"SUCCESS","message":"Operation completed successfully","transaction":"20251010_093906_3182866"}

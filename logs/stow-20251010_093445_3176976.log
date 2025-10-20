@@ -1,4 +1,0 @@
-{"timestamp":"2025-10-10 09:34:45","level":"DEBUG","message":"Initialized directories and logging","transaction":"20251010_093445_3176976"}
-{"timestamp":"2025-10-10 09:34:45","level":"DEBUG","message":"Log file: /home/me/conf/logs/stow-20251010_093445_3176976.log","transaction":"20251010_093445_3176976"}
-{"timestamp":"2025-10-10 09:34:45","level":"INFO","message":"Package 'test-package' is already stowed","transaction":"20251010_093445_3176976"}
-{"timestamp":"2025-10-10 09:34:45","level":"SUCCESS","message":"Operation completed successfully","transaction":"20251010_093445_3176976"}
