@@ -10,7 +10,7 @@ SCREENFX_STYLE=${SCREENFX_STYLE:-"random"}        # random, static, typewriter, 
 SCREENFX_SPEED=${SCREENFX_SPEED:-"normal"}        # fast, normal, slow
 SCREENFX_FORCE=${SCREENFX_FORCE:-0}               # Force in SSH sessions
 SCREENFX_MODE=${SCREENFX_MODE:-"startup"}         # startup, prompt
-SCREENFX_STYLES=(static typewriter loader glitch matrix waves bounce scan fade reveal cascade hologram neon terminal hack decrypt spiral plasma lightning explode radar binary_rain quantum virus neural blackhole) # Available styles
+SCREENFX_STYLES=(static typewriter loader glitch matrix waves bounce scan fade reveal cascade hologram neon terminal hack decrypt spiral plasma lightning explode radar binary_rain quantum virus neural blackhole dna firewall wormhole cryptocurrency alien) # Available styles
 
 # Color definitions (cyberpunk theme)
 declare -A COLORS
@@ -2041,6 +2041,448 @@ screenfx::blackhole() {
     screenfx::show_cursor
 }
 
+screenfx::dna() {
+    local file="$1"
+    local sleep_time
+    sleep_time=$(screenfx::get_sleep_time)
+    local -a lines
+    local total_lines=0
+    
+    # Read all lines into array
+    while IFS= read -r line; do
+        lines[total_lines]="$line"
+        ((total_lines++))
+    done < "$file"
+    
+    screenfx::hide_cursor
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_green]}[DNA SEQUENCER ACTIVATED]${COLORS[reset]}"
+    echo -e "${COLORS[green]}[ANALYZING GENETIC CODE...]${COLORS[reset]}"
+    echo
+    
+    # Show DNA double helix unwinding
+    local term_size
+    term_size=$(screenfx::get_terminal_size)
+    local cols=${term_size%% *}
+    local center_col=$((cols / 2))
+    local bases=("A" "T" "G" "C")
+    
+    for ((helix=0; helix<8; helix++)); do
+        for ((row=0; row<6; row++)); do
+            local dna_line=""
+            for ((col=0; col<cols-1; col++)); do
+                local distance=$((col - center_col))
+                if [[ $distance -lt 0 ]]; then distance=$((-distance)); fi
+                
+                local helix_pos=$(((col + helix * 2 + row) % 8))
+                if [[ $distance -eq $((helix_pos % 4 + 1)) ]]; then
+                    local base_idx=$((RANDOM % ${#bases[@]}))
+                    local base="${bases[$base_idx]}"
+                    case $base in
+                        "A") dna_line+="${COLORS[bright_red]}A${COLORS[reset]}" ;;
+                        "T") dna_line+="${COLORS[bright_blue]}T${COLORS[reset]}" ;;
+                        "G") dna_line+="${COLORS[bright_green]}G${COLORS[reset]}" ;;
+                        "C") dna_line+="${COLORS[bright_yellow]}C${COLORS[reset]}" ;;
+                    esac
+                elif [[ $distance -eq $((helix_pos % 4 + 2)) ]] && [[ $((col % 3)) -eq 0 ]]; then
+                    dna_line+="${COLORS[gray]}-${COLORS[reset]}"
+                else
+                    dna_line+=" "
+                fi
+            done
+            echo -e "$dna_line"
+        done
+        sleep 0.15
+        if [[ $helix -lt 7 ]]; then
+            printf "\033[6A"  # Move cursor up
+        fi
+    done
+    
+    sleep 0.5
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_green]}[DNA SEQUENCE DECODED]${COLORS[reset]}"
+    echo -e "${COLORS[green]}[REPLICATING GENETIC INFORMATION...]${COLORS[reset]}"
+    echo
+    
+    # Show content with DNA base coloring
+    for ((i=0; i<total_lines; i++)); do
+        local line="${lines[i]}"
+        local dna_line=""
+        
+        for ((j=0; j<${#line}; j++)); do
+            local char="${line:$j:1}"
+            if [[ "$char" != " " ]]; then
+                local base_color=$((RANDOM % 4))
+                case $base_color in
+                    0) dna_line+="${COLORS[bright_red]}${char}${COLORS[reset]}" ;;  # Adenine
+                    1) dna_line+="${COLORS[bright_blue]}${char}${COLORS[reset]}" ;; # Thymine
+                    2) dna_line+="${COLORS[bright_green]}${char}${COLORS[reset]}" ;; # Guanine
+                    3) dna_line+="${COLORS[bright_yellow]}${char}${COLORS[reset]}" ;; # Cytosine
+                esac
+            else
+                dna_line+=" "
+            fi
+        done
+        
+        echo -e "$dna_line"
+        sleep "$sleep_time"
+    done
+    
+    echo
+    echo -e "${COLORS[bright_green]}[DNA REPLICATION COMPLETE - LIFE FORM IDENTIFIED]${COLORS[reset]}"
+    
+    screenfx::show_cursor
+}
+
+screenfx::firewall() {
+    local file="$1"
+    local sleep_time
+    sleep_time=$(screenfx::get_sleep_time)
+    local -a lines
+    local total_lines=0
+    
+    # Read all lines into array
+    while IFS= read -r line; do
+        lines[total_lines]="$line"
+        ((total_lines++))
+    done < "$file"
+    
+    screenfx::hide_cursor
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_red]}[FIREWALL DETECTION SYSTEM ACTIVE]${COLORS[reset]}"
+    echo -e "${COLORS[red]}[UNAUTHORIZED ACCESS ATTEMPT DETECTED]${COLORS[reset]}"
+    echo
+    
+    # Show firewall barriers
+    local term_size
+    term_size=$(screenfx::get_terminal_size)
+    local cols=${term_size%% *}
+    local firewall_chars=("█" "▓" "▒" "░" "║" "╫" "╬" "┃")
+    
+    for ((layer=0; layer<5; layer++)); do
+        screenfx::clear_screen
+        echo -e "${COLORS[bright_red]}[FIREWALL LAYER $((layer + 1))/5 - PENETRATION: $((layer * 20))%]${COLORS[reset]}"
+        echo
+        
+        for ((i=0; i<total_lines; i++)); do
+            local line="${lines[i]}"
+            local protected_line=""
+            
+            for ((j=0; j<${#line}; j++)); do
+                local char="${line:$j:1}"
+                local protection_level=$((RANDOM % (6 - layer)))
+                
+                if [[ $protection_level -gt 1 ]]; then
+                    local wall_idx=$((RANDOM % ${#firewall_chars[@]}))
+                    local wall_char="${firewall_chars[$wall_idx]}"
+                    case $protection_level in
+                        5) protected_line+="${COLORS[bright_red]}${wall_char}${COLORS[reset]}" ;;
+                        4) protected_line+="${COLORS[red]}${wall_char}${COLORS[reset]}" ;;
+                        3) protected_line+="${COLORS[yellow]}${wall_char}${COLORS[reset]}" ;;
+                        2) protected_line+="${COLORS[gray]}${wall_char}${COLORS[reset]}" ;;
+                    esac
+                else
+                    protected_line+="$char"
+                fi
+            done
+            
+            echo -e "$protected_line"
+        done
+        
+        sleep 0.4
+    done
+    
+    echo
+    echo -e "${COLORS[bright_yellow]}[FIREWALL BYPASSED - ADVANCED PENETRATION TOOLS DEPLOYED]${COLORS[reset]}"
+    echo
+    
+    # Show final breakthrough
+    for ((i=0; i<total_lines; i++)); do
+        screenfx::colorize_line "${lines[i]}"
+        sleep "$sleep_time"
+    done
+    
+    echo
+    echo -e "${COLORS[bright_green]}[FIREWALL BREACH COMPLETE - SYSTEM ACCESS GRANTED]${COLORS[reset]}"
+    
+    screenfx::show_cursor
+}
+
+screenfx::wormhole() {
+    local file="$1"
+    local sleep_time
+    sleep_time=$(screenfx::get_sleep_time)
+    local -a lines
+    local total_lines=0
+    
+    # Read all lines into array
+    while IFS= read -r line; do
+        lines[total_lines]="$line"
+        ((total_lines++))
+    done < "$file"
+    
+    screenfx::hide_cursor
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_magenta]}[DIMENSIONAL RIFT DETECTED]${COLORS[reset]}"
+    echo -e "${COLORS[magenta]}[WORMHOLE FORMATION IN PROGRESS...]${COLORS[reset]}"
+    echo
+    
+    # Create wormhole tunnel effect
+    local term_size
+    term_size=$(screenfx::get_terminal_size)
+    local cols=${term_size%% *}
+    local center_col=$((cols / 2))
+    local tunnel_chars=("◦" "○" "◯" "●" "◉" "⬟" "⬢" "⬡")
+    
+    for ((depth=8; depth>=1; depth--)); do
+        screenfx::clear_screen
+        echo -e "${COLORS[bright_magenta]}[WORMHOLE DEPTH: $((9 - depth))/8]${COLORS[reset]}"
+        echo
+        
+        for ((row=0; row<8; row++)); do
+            local tunnel_line=""
+            local row_center=$((4))
+            local row_distance=$((row - row_center))
+            if [[ $row_distance -lt 0 ]]; then row_distance=$((-row_distance)); fi
+            
+            for ((col=0; col<cols-1; col++)); do
+                local col_distance=$((col - center_col))
+                if [[ $col_distance -lt 0 ]]; then col_distance=$((-col_distance)); fi
+                local total_distance=$((col_distance + row_distance * 2))
+                
+                if [[ $total_distance -eq $depth ]] || [[ $total_distance -eq $((depth + 1)) ]]; then
+                    local char_idx=$(((depth + col + row) % ${#tunnel_chars[@]}))
+                    local char="${tunnel_chars[$char_idx]}"
+                    case $((depth % 4)) in
+                        0) tunnel_line+="${COLORS[bright_magenta]}${char}${COLORS[reset]}" ;;
+                        1) tunnel_line+="${COLORS[magenta]}${char}${COLORS[reset]}" ;;
+                        2) tunnel_line+="${COLORS[bright_cyan]}${char}${COLORS[reset]}" ;;
+                        3) tunnel_line+="${COLORS[cyan]}${char}${COLORS[reset]}" ;;
+                    esac
+                else
+                    tunnel_line+=" "
+                fi
+            done
+            echo -e "$tunnel_line"
+        done
+        
+        sleep 0.15
+    done
+    
+    sleep 0.5
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_cyan]}[DIMENSIONAL BARRIER BREACHED]${COLORS[reset]}"
+    echo -e "${COLORS[cyan]}[RECEIVING TRANSMISSION FROM PARALLEL UNIVERSE...]${COLORS[reset]}"
+    echo
+    
+    # Show content emerging from wormhole
+    for ((i=0; i<total_lines; i++)); do
+        local line="${lines[i]}"
+        
+        # Show distorted version first (interdimensional interference)
+        local distorted=""
+        for ((j=0; j<${#line}; j++)); do
+            local char="${line:$j:1}"
+            if [[ $((RANDOM % 3)) -eq 0 && "$char" != " " ]]; then
+                distorted+="${COLORS[magenta]}◦${COLORS[reset]}"
+            else
+                distorted+="$char"
+            fi
+        done
+        
+        echo -e "$distorted"
+        sleep 0.05
+        printf "\033[1A\033[K"  # Clear and replace
+        
+        screenfx::colorize_line "$line"
+        sleep "$sleep_time"
+    done
+    
+    echo
+    echo -e "${COLORS[bright_magenta]}[WORMHOLE STABILIZED - INTERDIMENSIONAL LINK ESTABLISHED]${COLORS[reset]}"
+    
+    screenfx::show_cursor
+}
+
+screenfx::cryptocurrency() {
+    local file="$1"
+    local sleep_time
+    sleep_time=$(screenfx::get_sleep_time)
+    local -a lines
+    local total_lines=0
+    
+    # Read all lines into array
+    while IFS= read -r line; do
+        lines[total_lines]="$line"
+        ((total_lines++))
+    done < "$file"
+    
+    screenfx::hide_cursor
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_yellow]}[BLOCKCHAIN MINER INITIALIZED]${COLORS[reset]}"
+    echo -e "${COLORS[yellow]}[MINING CRYPTOCURRENCY...]${COLORS[reset]}"
+    echo
+    
+    # Show mining process
+    local crypto_symbols=("₿" "Ξ" "Ð" "Ł" "₿" "◈" "⬢" "⟐")
+    local hash_chars=("0" "1" "2" "3" "4" "5" "6" "7" "8" "9" "A" "B" "C" "D" "E" "F")
+    
+    for ((block=1; block<=5; block++)); do
+        echo -e "${COLORS[bright_yellow]}[MINING BLOCK #$block]${COLORS[reset]}"
+        
+        # Show hash generation
+        for ((attempt=1; attempt<=10; attempt++)); do
+            local hash=""
+            for ((h=0; h<16; h++)); do
+                local char_idx=$((RANDOM % ${#hash_chars[@]}))
+                hash+="${hash_chars[$char_idx]}"
+            done
+            
+            local difficulty=$((attempt * 10))
+            printf "\r${COLORS[gray]}Hash: %s... Difficulty: %d%%${COLORS[reset]}" "$hash" "$difficulty"
+            sleep 0.08
+        done
+        
+        echo
+        local reward=$(echo "scale=8; 0.00$(printf "%02d" $((RANDOM % 100)))$(printf "%06d" $((RANDOM % 1000000)))" | bc 2>/dev/null || echo "0.00001234")
+        echo -e "${COLORS[bright_green]}Block #$block mined! Reward: $reward BTC${COLORS[reset]}"
+        
+        # Show crypto symbols flowing
+        local crypto_line=""
+        for ((c=0; c<20; c++)); do
+            local symbol_idx=$((RANDOM % ${#crypto_symbols[@]}))
+            local symbol="${crypto_symbols[$symbol_idx]}"
+            crypto_line+="${COLORS[bright_yellow]}$symbol ${COLORS[reset]}"
+        done
+        echo -e "$crypto_line"
+        echo
+        sleep 0.3
+    done
+    
+    echo -e "${COLORS[bright_green]}[MINING COMPLETE - WALLET UPDATED]${COLORS[reset]}"
+    echo -e "${COLORS[green]}[DECRYPTING DATA WITH MINING REWARDS...]${COLORS[reset]}"
+    echo
+    
+    # Show content with cryptocurrency theming
+    for ((i=0; i<total_lines; i++)); do
+        local line="${lines[i]}"
+        
+        # Add crypto prefix
+        local crypto_idx=$((i % ${#crypto_symbols[@]}))
+        local crypto_symbol="${crypto_symbols[$crypto_idx]}"
+        echo -e "${COLORS[bright_yellow]}$crypto_symbol${COLORS[reset]} $(screenfx::colorize_line "$line")"
+        sleep "$sleep_time"
+    done
+    
+    echo
+    echo -e "${COLORS[bright_yellow]}[BLOCKCHAIN VERIFIED - TRANSACTION COMPLETE]${COLORS[reset]}"
+    
+    screenfx::show_cursor
+}
+
+screenfx::alien() {
+    local file="$1"
+    local sleep_time
+    sleep_time=$(screenfx::get_sleep_time)
+    local -a lines
+    local total_lines=0
+    
+    # Read all lines into array
+    while IFS= read -r line; do
+        lines[total_lines]="$line"
+        ((total_lines++))
+    done < "$file"
+    
+    screenfx::hide_cursor
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_green]}[EXTRATERRESTRIAL SIGNAL DETECTED]${COLORS[reset]}"
+    echo -e "${COLORS[green]}[ALIEN COMMUNICATION PROTOCOL ENGAGED...]${COLORS[reset]}"
+    echo
+    
+    # Show alien transmission static
+    local alien_chars=("∾" "⟐" "⟡" "⟢" "⟣" "⟤" "⟥" "⟦" "⟧" "⟨" "⟩" "⧨" "⧩")
+    local signal_strength=10
+    
+    for ((transmission=0; transmission<6; transmission++)); do
+        screenfx::clear_screen
+        echo -e "${COLORS[bright_green]}[SIGNAL STRENGTH: $signal_strength%] [DECODING...]${COLORS[reset]}"
+        echo
+        
+        for ((i=0; i<total_lines; i++)); do
+            local line="${lines[i]}"
+            local alien_line=""
+            
+            for ((j=0; j<${#line}; j++)); do
+                local char="${line:$j:1}"
+                local signal_clarity=$((RANDOM % 10))
+                
+                if [[ $signal_clarity -lt $((signal_strength / 20)) ]] && [[ "$char" != " " ]]; then
+                    alien_line+="$char"
+                elif [[ "$char" != " " ]]; then
+                    local alien_idx=$((RANDOM % ${#alien_chars[@]}))
+                    local alien_char="${alien_chars[$alien_idx]}"
+                    case $((RANDOM % 4)) in
+                        0) alien_line+="${COLORS[bright_green]}${alien_char}${COLORS[reset]}" ;;
+                        1) alien_line+="${COLORS[green]}${alien_char}${COLORS[reset]}" ;;
+                        2) alien_line+="${COLORS[cyan]}${alien_char}${COLORS[reset]}" ;;
+                        3) alien_line+="${COLORS[gray]}${alien_char}${COLORS[reset]}" ;;
+                    esac
+                else
+                    alien_line+=" "
+                fi
+            done
+            
+            echo -e "$alien_line"
+        done
+        
+        signal_strength=$((signal_strength + 15))
+        if [[ $signal_strength -gt 100 ]]; then signal_strength=100; fi
+        sleep 0.4
+    done
+    
+    sleep 0.5
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_cyan]}[UNIVERSAL TRANSLATOR ACTIVATED]${COLORS[reset]}"
+    echo -e "${COLORS[cyan]}[CONVERTING ALIEN LANGUAGE TO HUMAN READABLE...]${COLORS[reset]}"
+    echo
+    
+    # Show final translation with alien indicators
+    for ((i=0; i<total_lines; i++)); do
+        local line="${lines[i]}"
+        
+        # Show brief alien version
+        local alien_preview=""
+        for ((j=0; j<${#line}; j++)); do
+            if [[ $((j % 3)) -eq 0 ]]; then
+                local alien_idx=$((RANDOM % ${#alien_chars[@]}))
+                alien_preview+="${COLORS[green]}${alien_chars[$alien_idx]}${COLORS[reset]}"
+            else
+                alien_preview+="${line:$j:1}"
+            fi
+        done
+        
+        echo -e "${COLORS[gray]}[TRANSLATING]${COLORS[reset]} $alien_preview"
+        sleep 0.1
+        printf "\033[1A\033[K"  # Clear line
+        
+        echo -e "${COLORS[bright_green]}[TRANSLATED]${COLORS[reset]} $(screenfx::colorize_line "$line")"
+        sleep "$sleep_time"
+    done
+    
+    echo
+    echo -e "${COLORS[bright_green]}[FIRST CONTACT ESTABLISHED - MESSAGE DECODED]${COLORS[reset]}"
+    
+    screenfx::show_cursor
+}
+
 # Main function
 screenfx::show() {
     local file="${1:-$HOME/screen.txt}"
@@ -2151,6 +2593,21 @@ screenfx::show() {
             ;;
         blackhole)
             screenfx::blackhole "$file"
+            ;;
+        dna)
+            screenfx::dna "$file"
+            ;;
+        firewall)
+            screenfx::firewall "$file"
+            ;;
+        wormhole)
+            screenfx::wormhole "$file"
+            ;;
+        cryptocurrency)
+            screenfx::cryptocurrency "$file"
+            ;;
+        alien)
+            screenfx::alien "$file"
             ;;
         *)
             screenfx::log "Unknown style: $style, using static"
