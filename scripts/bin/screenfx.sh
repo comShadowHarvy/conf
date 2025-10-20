@@ -10,7 +10,7 @@ SCREENFX_STYLE=${SCREENFX_STYLE:-"random"}        # random, static, typewriter, 
 SCREENFX_SPEED=${SCREENFX_SPEED:-"normal"}        # fast, normal, slow
 SCREENFX_FORCE=${SCREENFX_FORCE:-0}               # Force in SSH sessions
 SCREENFX_MODE=${SCREENFX_MODE:-"startup"}         # startup, prompt
-SCREENFX_STYLES=(static typewriter loader glitch matrix waves bounce scan fade reveal cascade hologram neon terminal hack decrypt spiral plasma lightning explode radar binary_rain quantum virus neural blackhole dna firewall wormhole cryptocurrency alien) # Available styles
+SCREENFX_STYLES=(static typewriter loader glitch matrix waves bounce scan fade reveal cascade hologram neon terminal hack decrypt spiral plasma lightning explode radar binary_rain quantum virus neural blackhole dna firewall wormhole cryptocurrency alien time_travel magnetic seismic solar_flare teleport stealth meltdown ice mirror echo gravity phase prism turbulence metamorphosis origami kaleidoscope tessellation fibonacci constellation) # Available styles
 
 # Color definitions (cyberpunk theme)
 declare -A COLORS
@@ -2483,6 +2483,1444 @@ screenfx::alien() {
     screenfx::show_cursor
 }
 
+screenfx::time_travel() {
+    local file="$1"
+    local sleep_time
+    sleep_time=$(screenfx::get_sleep_time)
+    local -a lines
+    local total_lines=0
+    
+    # Read all lines into array
+    while IFS= read -r line; do
+        lines[total_lines]="$line"
+        ((total_lines++))
+    done < "$file"
+    
+    screenfx::hide_cursor
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_cyan]}[TEMPORAL DISPLACEMENT DEVICE ACTIVATED]${COLORS[reset]}"
+    echo -e "${COLORS[cyan]}[INITIATING CHRONOMETER SEQUENCE...]${COLORS[reset]}"
+    echo
+    
+    # Show time distortion effect
+    local time_chars=("⏰" "⏱" "⏲" "⏳" "⌛" "⧖" "⧗" "🕐" "🕑" "🕒")
+    local years=(2025 2024 2023 2020 2019 2018 2015 2010 2005 2000 1995 1990 1985 1980)
+    
+    for year in "${years[@]}"; do
+        screenfx::clear_screen
+        local time_idx=$(((2025 - year) % ${#time_chars[@]}))
+        local time_char="${time_chars[$time_idx]}"
+        echo -e "${COLORS[bright_cyan]}[$time_char TEMPORAL COORDINATES: $year CE]${COLORS[reset]}"
+        echo
+        
+        for ((i=0; i<total_lines; i++)); do
+            local line="${lines[i]}"
+            local distorted_line=""
+            
+            for ((j=0; j<${#line}; j++)); do
+                local char="${line:$j:1}"
+                local distortion=$((RANDOM % 6))
+                if [[ $distortion -eq 0 && "$char" != " " ]]; then
+                    distorted_line+="${COLORS[bright_cyan]}${time_char}${COLORS[reset]}"
+                elif [[ $distortion -eq 1 ]]; then
+                    distorted_line+="${COLORS[cyan]}${char}${COLORS[reset]}"
+                else
+                    distorted_line+="$char"
+                fi
+            done
+            
+            echo -e "$distorted_line"
+        done
+        
+        sleep 0.2
+        if [[ $year -eq 2025 ]]; then break; fi
+    done
+    
+    sleep 0.5
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_green]}[TEMPORAL STABILIZATION ACHIEVED]${COLORS[reset]}"
+    echo -e "${COLORS[green]}[RETURNING TO PRESENT TIMELINE...]${COLORS[reset]}"
+    echo
+    
+    for ((i=0; i<total_lines; i++)); do
+        screenfx::colorize_line "${lines[i]}"
+        sleep "$sleep_time"
+    done
+    
+    echo
+    echo -e "${COLORS[bright_cyan]}[TIME TRAVEL COMPLETE - PARADOX AVOIDED]${COLORS[reset]}"
+    
+    screenfx::show_cursor
+}
+
+screenfx::magnetic() {
+    local file="$1"
+    local sleep_time
+    sleep_time=$(screenfx::get_sleep_time)
+    local -a lines
+    local total_lines=0
+    
+    # Read all lines into array
+    while IFS= read -r line; do
+        lines[total_lines]="$line"
+        ((total_lines++))
+    done < "$file"
+    
+    screenfx::hide_cursor
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_blue]}[ELECTROMAGNETIC FIELD GENERATOR ONLINE]${COLORS[reset]}"
+    echo -e "${COLORS[blue]}[MAGNETIC FLUX DENSITY INCREASING...]${COLORS[reset]}"
+    echo
+    
+    # Show magnetic field lines
+    local term_size
+    term_size=$(screenfx::get_terminal_size)
+    local cols=${term_size%% *}
+    local magnetic_chars=("⟶" "⟵" "↗" "↘" "↖" "↙" "⤴" "⤵")
+    
+    for ((field=0; field<6; field++)); do
+        for ((row=0; row<8; row++)); do
+            local field_line=""
+            for ((col=0; col<cols-10; col+=4)); do
+                local mag_idx=$(((col + row + field) % ${#magnetic_chars[@]}))
+                local mag_char="${magnetic_chars[$mag_idx]}"
+                case $((field % 3)) in
+                    0) field_line+="${COLORS[bright_blue]}${mag_char}${COLORS[reset]} " ;;
+                    1) field_line+="${COLORS[blue]}${mag_char}${COLORS[reset]} " ;;
+                    2) field_line+="${COLORS[cyan]}${mag_char}${COLORS[reset]} " ;;
+                esac
+            done
+            echo -e "$field_line"
+        done
+        sleep 0.15
+        if [[ $field -lt 5 ]]; then
+            printf "\033[8A"  # Move cursor up
+        fi
+    done
+    
+    sleep 0.5
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_blue]}[MAGNETIC RESONANCE ACHIEVED]${COLORS[reset]}"
+    echo -e "${COLORS[blue]}[ALIGNING DATA WITH MAGNETIC FIELD...]${COLORS[reset]}"
+    echo
+    
+    for ((i=0; i<total_lines; i++)); do
+        local line="${lines[i]}"
+        # Add magnetic field effect to each character
+        local magnetic_line=""
+        for ((j=0; j<${#line}; j++)); do
+            local char="${line:$j:1}"
+            if [[ $((RANDOM % 4)) -eq 0 && "$char" != " " ]]; then
+                magnetic_line+="${COLORS[bright_blue]}${char}${COLORS[reset]}"
+            else
+                magnetic_line+="$char"
+            fi
+        done
+        
+        screenfx::colorize_line "$line"
+        sleep "$sleep_time"
+    done
+    
+    echo
+    echo -e "${COLORS[bright_blue]}[ELECTROMAGNETIC ALIGNMENT COMPLETE]${COLORS[reset]}"
+    
+    screenfx::show_cursor
+}
+
+screenfx::seismic() {
+    local file="$1"
+    local sleep_time
+    sleep_time=$(screenfx::get_sleep_time)
+    local -a lines
+    local total_lines=0
+    
+    # Read all lines into array
+    while IFS= read -r line; do
+        lines[total_lines]="$line"
+        ((total_lines++))
+    done < "$file"
+    
+    screenfx::hide_cursor
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_red]}[SEISMIC ACTIVITY DETECTED]${COLORS[reset]}"
+    echo -e "${COLORS[red]}[MAGNITUDE 8.5 EARTHQUAKE IMMINENT...]${COLORS[reset]}"
+    echo
+    
+    # Show earthquake tremors
+    local magnitudes=(2.1 3.4 4.7 6.2 7.8 8.5)
+    
+    for magnitude in "${magnitudes[@]}"; do
+        screenfx::clear_screen
+        echo -e "${COLORS[bright_red]}[RICHTER SCALE: $magnitude - TREMOR INTENSITY: ${magnitude%.*}]${COLORS[reset]}"
+        echo
+        
+        for ((i=0; i<total_lines; i++)); do
+            local line="${lines[i]}"
+            local shaken_line=""
+            
+            # Create earthquake shake effect
+            local shake_intensity=$((${magnitude%.*} - 1))
+            for ((s=0; s<shake_intensity; s++)); do
+                shaken_line+=" "
+            done
+            
+            for ((j=0; j<${#line}; j++)); do
+                local char="${line:$j:1}"
+                local tremor=$((RANDOM % 4))
+                case $tremor in
+                    0) shaken_line+="${COLORS[bright_red]}${char}${COLORS[reset]}" ;;
+                    1) shaken_line+="${COLORS[red]}${char}${COLORS[reset]}" ;;
+                    2) shaken_line+="${COLORS[yellow]}${char}${COLORS[reset]}" ;;
+                    3) shaken_line+="$char" ;;
+                esac
+            done
+            
+            echo -e "$shaken_line"
+        done
+        
+        sleep 0.3
+    done
+    
+    sleep 0.5
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_green]}[SEISMIC ACTIVITY SUBSIDING]${COLORS[reset]}"
+    echo -e "${COLORS[green]}[STRUCTURAL INTEGRITY RESTORED...]${COLORS[reset]}"
+    echo
+    
+    for ((i=0; i<total_lines; i++)); do
+        screenfx::colorize_line "${lines[i]}"
+        sleep "$sleep_time"
+    done
+    
+    echo
+    echo -e "${COLORS[bright_green]}[EARTHQUAKE ANALYSIS COMPLETE - ALL CLEAR]${COLORS[reset]}"
+    
+    screenfx::show_cursor
+}
+
+screenfx::solar_flare() {
+    local file="$1"
+    local sleep_time
+    sleep_time=$(screenfx::get_sleep_time)
+    local -a lines
+    local total_lines=0
+    
+    # Read all lines into array
+    while IFS= read -r line; do
+        lines[total_lines]="$line"
+        ((total_lines++))
+    done < "$file"
+    
+    screenfx::hide_cursor
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_yellow]}[SOLAR OBSERVATORY ALERT]${COLORS[reset]}"
+    echo -e "${COLORS[yellow]}[MASSIVE CORONAL MASS EJECTION DETECTED...]${COLORS[reset]}"
+    echo
+    
+    # Show solar flare intensity buildup
+    local flare_classes=("A1.2" "B3.7" "C2.8" "M5.4" "X9.3")
+    local flare_chars=("☀" "🌟" "✨" "💥" "🔥")
+    
+    for ((f=0; f<${#flare_classes[@]}; f++)); do
+        local flare_class="${flare_classes[$f]}"
+        local flare_char="${flare_chars[$f]}"
+        
+        screenfx::clear_screen
+        echo -e "${COLORS[bright_yellow]}[SOLAR FLARE CLASS: $flare_class] $flare_char${COLORS[reset]}"
+        echo
+        
+        for ((i=0; i<total_lines; i++)); do
+            local line="${lines[i]}"
+            local flare_line=""
+            
+            for ((j=0; j<${#line}; j++)); do
+                local char="${line:$j:1}"
+                local radiation=$((RANDOM % (f + 2)))
+                case $radiation in
+                    0) flare_line+="${COLORS[bright_yellow]}${char}${COLORS[reset]}" ;;
+                    1) flare_line+="${COLORS[yellow]}${char}${COLORS[reset]}" ;;
+                    2) flare_line+="${COLORS[bright_red]}${char}${COLORS[reset]}" ;;
+                    3) flare_line+="${COLORS[red]}${char}${COLORS[reset]}" ;;
+                    4) flare_line+="${COLORS[bright_white]}${char}${COLORS[reset]}" ;;
+                    *) flare_line+="$char" ;;
+                esac
+            done
+            
+            echo -e "$flare_line"
+        done
+        
+        sleep 0.4
+    done
+    
+    sleep 0.5
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_green]}[SOLAR STORM PASSING]${COLORS[reset]}"
+    echo -e "${COLORS[green]}[COMMUNICATION SYSTEMS STABILIZING...]${COLORS[reset]}"
+    echo
+    
+    for ((i=0; i<total_lines; i++)); do
+        screenfx::colorize_line "${lines[i]}"
+        sleep "$sleep_time"
+    done
+    
+    echo
+    echo -e "${COLORS[bright_yellow]}[SOLAR ACTIVITY NORMAL - DATA TRANSMISSION CLEAR]${COLORS[reset]}"
+    
+    screenfx::show_cursor
+}
+
+screenfx::teleport() {
+    local file="$1"
+    local sleep_time
+    sleep_time=$(screenfx::get_sleep_time)
+    local -a lines
+    local total_lines=0
+    
+    # Read all lines into array
+    while IFS= read -r line; do
+        lines[total_lines]="$line"
+        ((total_lines++))
+    done < "$file"
+    
+    screenfx::hide_cursor
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_magenta]}[QUANTUM TELEPORTATION DEVICE READY]${COLORS[reset]}"
+    echo -e "${COLORS[magenta]}[MOLECULAR DISINTEGRATION COMMENCING...]${COLORS[reset]}"
+    echo
+    
+    # Show content first
+    for ((i=0; i<total_lines; i++)); do
+        screenfx::colorize_line "${lines[i]}"
+    done
+    
+    sleep 1
+    
+    # Disintegration effect
+    for ((phase=1; phase<=5; phase++)); do
+        screenfx::clear_screen
+        echo -e "${COLORS[bright_magenta]}[DISINTEGRATION PHASE: $phase/5]${COLORS[reset]}"
+        echo
+        
+        for ((i=0; i<total_lines; i++)); do
+            local line="${lines[i]}"
+            local teleport_line=""
+            
+            for ((j=0; j<${#line}; j++)); do
+                local char="${line:$j:1}"
+                local dissolution=$((RANDOM % (6 - phase)))
+                
+                if [[ $dissolution -eq 0 ]]; then
+                    teleport_line+=" "
+                elif [[ $dissolution -eq 1 ]]; then
+                    teleport_line+="${COLORS[magenta]}·${COLORS[reset]}"
+                elif [[ $dissolution -eq 2 ]]; then
+                    teleport_line+="${COLORS[bright_magenta]}∘${COLORS[reset]}"
+                else
+                    teleport_line+="$char"
+                fi
+            done
+            
+            echo -e "$teleport_line"
+        done
+        
+        sleep 0.3
+    done
+    
+    # Complete disintegration
+    screenfx::clear_screen
+    echo -e "${COLORS[bright_white]}[QUANTUM VOID STATE ACHIEVED]${COLORS[reset]}"
+    echo
+    for ((i=0; i<10; i++)); do
+        echo
+    done
+    
+    sleep 1
+    
+    # Reintegration
+    echo -e "${COLORS[bright_cyan]}[REINTEGRATING AT DESTINATION...]${COLORS[reset]}"
+    echo
+    
+    for ((phase=5; phase>=1; phase--)); do
+        screenfx::clear_screen
+        echo -e "${COLORS[bright_cyan]}[REINTEGRATION PHASE: $((6-phase))/5]${COLORS[reset]}"
+        echo
+        
+        for ((i=0; i<total_lines; i++)); do
+            local line="${lines[i]}"
+            local reform_line=""
+            
+            for ((j=0; j<${#line}; j++)); do
+                local char="${line:$j:1}"
+                local reformation=$((RANDOM % (6 - phase)))
+                
+                if [[ $reformation -eq 0 ]]; then
+                    reform_line+=" "
+                elif [[ $reformation -eq 1 ]]; then
+                    reform_line+="${COLORS[cyan]}·${COLORS[reset]}"
+                elif [[ $reformation -eq 2 ]]; then
+                    reform_line+="${COLORS[bright_cyan]}∘${COLORS[reset]}"
+                else
+                    reform_line+="$char"
+                fi
+            done
+            
+            echo -e "$reform_line"
+        done
+        
+        sleep 0.3
+    done
+    
+    screenfx::clear_screen
+    echo -e "${COLORS[bright_green]}[TELEPORTATION SUCCESSFUL]${COLORS[reset]}"
+    echo -e "${COLORS[green]}[MOLECULAR INTEGRITY VERIFIED...]${COLORS[reset]}"
+    echo
+    
+    for ((i=0; i<total_lines; i++)); do
+        screenfx::colorize_line "${lines[i]}"
+        sleep "$sleep_time"
+    done
+    
+    echo
+    echo -e "${COLORS[bright_magenta]}[QUANTUM TELEPORTATION COMPLETE - WELCOME TO YOUR DESTINATION]${COLORS[reset]}"
+    
+    screenfx::show_cursor
+}
+
+screenfx::stealth() {
+    local file="$1"
+    local sleep_time
+    sleep_time=$(screenfx::get_sleep_time)
+    local -a lines
+    local total_lines=0
+    
+    # Read all lines into array
+    while IFS= read -r line; do
+        lines[total_lines]="$line"
+        ((total_lines++))
+    done < "$file"
+    
+    screenfx::hide_cursor
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_gray]}[STEALTH TECHNOLOGY ENGAGED]${COLORS[reset]}"
+    echo -e "${COLORS[gray]}[CLOAKING DEVICE INITIALIZATION...]${COLORS[reset]}"
+    echo
+    
+    # Show content first
+    for ((i=0; i<total_lines; i++)); do
+        screenfx::colorize_line "${lines[i]}"
+    done
+    
+    sleep 1
+    
+    # Cloaking effect - fade out
+    for ((opacity=100; opacity>=0; opacity-=20)); do
+        screenfx::clear_screen
+        echo -e "${COLORS[bright_gray]}[OPTICAL CAMOUFLAGE: $opacity% VISIBLE]${COLORS[reset]}"
+        echo
+        
+        for ((i=0; i<total_lines; i++)); do
+            local line="${lines[i]}"
+            local stealth_line=""
+            
+            for ((j=0; j<${#line}; j++)); do
+                local char="${line:$j:1}"
+                local visibility=$((RANDOM % 100))
+                
+                if [[ $visibility -lt $opacity ]]; then
+                    if [[ $opacity -lt 40 ]]; then
+                        stealth_line+="${COLORS[gray]}${char}${COLORS[reset]}"
+                    elif [[ $opacity -lt 70 ]]; then
+                        stealth_line+="${COLORS[bright_gray]}${char}${COLORS[reset]}"
+                    else
+                        stealth_line+="$char"
+                    fi
+                else
+                    stealth_line+=" "
+                fi
+            done
+            
+            echo -e "$stealth_line"
+        done
+        
+        sleep 0.4
+    done
+    
+    # Fully cloaked
+    screenfx::clear_screen
+    echo -e "${COLORS[bright_white]}[STEALTH MODE: FULLY CLOAKED]${COLORS[reset]}"
+    echo
+    for ((i=0; i<total_lines; i++)); do
+        echo
+    done
+    
+    sleep 2
+    
+    # Decloak
+    echo -e "${COLORS[bright_cyan]}[DECLOAKING SEQUENCE INITIATED...]${COLORS[reset]}"
+    echo
+    
+    for ((opacity=0; opacity<=100; opacity+=20)); do
+        screenfx::clear_screen
+        echo -e "${COLORS[bright_cyan]}[OPTICAL CAMOUFLAGE: $opacity% VISIBLE]${COLORS[reset]}"
+        echo
+        
+        for ((i=0; i<total_lines; i++)); do
+            local line="${lines[i]}"
+            local decloak_line=""
+            
+            for ((j=0; j<${#line}; j++)); do
+                local char="${line:$j:1}"
+                local visibility=$((RANDOM % 100))
+                
+                if [[ $visibility -lt $opacity ]]; then
+                    if [[ $opacity -lt 40 ]]; then
+                        decloak_line+="${COLORS[gray]}${char}${COLORS[reset]}"
+                    elif [[ $opacity -lt 70 ]]; then
+                        decloak_line+="${COLORS[bright_gray]}${char}${COLORS[reset]}"
+                    else
+                        decloak_line+="$char"
+                    fi
+                else
+                    decloak_line+=" "
+                fi
+            done
+            
+            echo -e "$decloak_line"
+        done
+        
+        sleep 0.4
+    done
+    
+    screenfx::clear_screen
+    echo -e "${COLORS[bright_green]}[STEALTH DISENGAGED]${COLORS[reset]}"
+    echo -e "${COLORS[green]}[FULL VISIBILITY RESTORED...]${COLORS[reset]}"
+    echo
+    
+    for ((i=0; i<total_lines; i++)); do
+        screenfx::colorize_line "${lines[i]}"
+        sleep "$sleep_time"
+    done
+    
+    echo
+    echo -e "${COLORS[bright_gray]}[STEALTH MISSION COMPLETE - TARGET ACQUIRED]${COLORS[reset]}"
+    
+    screenfx::show_cursor
+}
+
+screenfx::meltdown() {
+    local file="$1"
+    local sleep_time
+    sleep_time=$(screenfx::get_sleep_time)
+    local -a lines
+    local total_lines=0
+    
+    # Read all lines into array
+    while IFS= read -r line; do
+        lines[total_lines]="$line"
+        ((total_lines++))
+    done < "$file"
+    
+    screenfx::hide_cursor
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_red]}[REACTOR CORE BREACH DETECTED]${COLORS[reset]}"
+    echo -e "${COLORS[red]}[NUCLEAR MELTDOWN IMMINENT...]${COLORS[reset]}"
+    echo
+    
+    # Show temperature rising
+    local temperatures=(100 250 500 1000 2000 3000)
+    local temp_colors=("${COLORS[white]}" "${COLORS[yellow]}" "${COLORS[bright_yellow]}" "${COLORS[red]}" "${COLORS[bright_red]}" "${COLORS[bright_white]}")
+    
+    for ((t=0; t<${#temperatures[@]}; t++)); do
+        local temp="${temperatures[$t]}"
+        local temp_color="${temp_colors[$t]}"
+        
+        screenfx::clear_screen
+        echo -e "${COLORS[bright_red]}[CORE TEMPERATURE: ${temp}°C - CRITICAL LEVEL $((t+1))/6]${COLORS[reset]}"
+        echo
+        
+        for ((i=0; i<total_lines; i++)); do
+            local line="${lines[i]}"
+            local melt_line=""
+            
+            for ((j=0; j<${#line}; j++)); do
+                local char="${line:$j:1}"
+                local heat_effect=$((RANDOM % (7 - t)))
+                
+                if [[ $heat_effect -eq 0 && "$char" != " " ]]; then
+                    # Melting character
+                    case $((RANDOM % 4)) in
+                        0) melt_line+="${temp_color}▄${COLORS[reset]}" ;;
+                        1) melt_line+="${temp_color}▀${COLORS[reset]}" ;;
+                        2) melt_line+="${temp_color}█${COLORS[reset]}" ;;
+                        3) melt_line+="${temp_color}░${COLORS[reset]}" ;;
+                    esac
+                elif [[ $heat_effect -eq 1 ]]; then
+                    melt_line+="${temp_color}${char}${COLORS[reset]}"
+                else
+                    melt_line+="$char"
+                fi
+            done
+            
+            echo -e "$melt_line"
+        done
+        
+        sleep 0.5
+    done
+    
+    # Complete meltdown
+    screenfx::clear_screen
+    echo -e "${COLORS[bright_white]}[REACTOR MELTDOWN - TOTAL CORE FAILURE]${COLORS[reset]}"
+    echo
+    
+    for ((i=0; i<total_lines; i++)); do
+        local molten_line=""
+        for ((j=0; j<80; j++)); do
+            local molten_char=$((RANDOM % 4))
+            case $molten_char in
+                0) molten_line+="${COLORS[bright_red]}▄${COLORS[reset]}" ;;
+                1) molten_line+="${COLORS[red]}░${COLORS[reset]}" ;;
+                2) molten_line+="${COLORS[bright_yellow]}▒${COLORS[reset]}" ;;
+                3) molten_line+="${COLORS[yellow]}▓${COLORS[reset]}" ;;
+            esac
+        done
+        echo -e "$molten_line"
+    done
+    
+    sleep 1
+    
+    # Cooling down
+    echo
+    echo -e "${COLORS[bright_cyan]}[EMERGENCY COOLING SYSTEM ACTIVATED]${COLORS[reset]}"
+    echo -e "${COLORS[cyan]}[CORE TEMPERATURE DECREASING...]${COLORS[reset]}"
+    echo
+    
+    sleep 1
+    screenfx::clear_screen
+    
+    for ((i=0; i<total_lines; i++)); do
+        screenfx::colorize_line "${lines[i]}"
+        sleep "$sleep_time"
+    done
+    
+    echo
+    echo -e "${COLORS[bright_green]}[REACTOR STABILIZED - MELTDOWN AVERTED]${COLORS[reset]}"
+    
+    screenfx::show_cursor
+}
+
+screenfx::ice() {
+    local file="$1"
+    local sleep_time
+    sleep_time=$(screenfx::get_sleep_time)
+    local -a lines
+    local total_lines=0
+    
+    # Read all lines into array
+    while IFS= read -r line; do
+        lines[total_lines]="$line"
+        ((total_lines++))
+    done < "$file"
+    
+    screenfx::hide_cursor
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_cyan]}[CRYOGENIC PROTOCOL INITIATED]${COLORS[reset]}"
+    echo -e "${COLORS[cyan]}[FLASH FREEZING SEQUENCE...]${COLORS[reset]}"
+    echo
+    
+    # Show content first
+    for ((i=0; i<total_lines; i++)); do
+        screenfx::colorize_line "${lines[i]}"
+    done
+    
+    sleep 1
+    
+    # Freezing effect
+    local ice_chars=("❄" "❅" "❆" "*" "◦" "○" "◇" "◈")
+    local freeze_temps=(-10 -50 -100 -150 -200 -273)
+    
+    for temp in "${freeze_temps[@]}"; do
+        screenfx::clear_screen
+        echo -e "${COLORS[bright_cyan]}[TEMPERATURE: ${temp}°C - CRYSTALLIZATION PHASE]${COLORS[reset]}"
+        echo
+        
+        for ((i=0; i<total_lines; i++)); do
+            local line="${lines[i]}"
+            local frozen_line=""
+            
+            for ((j=0; j<${#line}; j++)); do
+                local char="${line:$j:1}"
+                local freeze_chance=$((RANDOM % 5))
+                
+                if [[ $freeze_chance -eq 0 && "$char" != " " ]]; then
+                    local ice_idx=$((RANDOM % ${#ice_chars[@]}))
+                    local ice_char="${ice_chars[$ice_idx]}"
+                    frozen_line+="${COLORS[bright_cyan]}${ice_char}${COLORS[reset]}"
+                elif [[ $freeze_chance -eq 1 ]]; then
+                    frozen_line+="${COLORS[cyan]}${char}${COLORS[reset]}"
+                elif [[ $freeze_chance -eq 2 ]]; then
+                    frozen_line+="${COLORS[bright_white]}${char}${COLORS[reset]}"
+                else
+                    frozen_line+="$char"
+                fi
+            done
+            
+            echo -e "$frozen_line"
+        done
+        
+        sleep 0.4
+    done
+    
+    sleep 0.5
+    
+    # Thawing
+    echo
+    echo -e "${COLORS[bright_yellow]}[THERMAL RECOVERY INITIATED]${COLORS[reset]}"
+    echo -e "${COLORS[yellow]}[MOLECULAR MOTION RESTORING...]${COLORS[reset]}"
+    echo
+    
+    sleep 1
+    screenfx::clear_screen
+    
+    for ((i=0; i<total_lines; i++)); do
+        screenfx::colorize_line "${lines[i]}"
+        sleep "$sleep_time"
+    done
+    
+    echo
+    echo -e "${COLORS[bright_cyan]}[CRYOGENIC CYCLE COMPLETE - SAMPLE PRESERVED]${COLORS[reset]}"
+    
+    screenfx::show_cursor
+}
+
+screenfx::mirror() {
+    local file="$1"
+    local sleep_time
+    sleep_time=$(screenfx::get_sleep_time)
+    local -a lines
+    local total_lines=0
+    
+    # Read all lines into array
+    while IFS= read -r line; do
+        lines[total_lines]="$line"
+        ((total_lines++))
+    done < "$file"
+    
+    screenfx::hide_cursor
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_white]}[QUANTUM MIRROR ARRAY ACTIVATED]${COLORS[reset]}"
+    echo -e "${COLORS[white]}[MULTIDIMENSIONAL REFLECTION PROCESSING...]${COLORS[reset]}"
+    echo
+    
+    # Show original
+    echo -e "${COLORS[bright_cyan]}[ORIGINAL DIMENSION]${COLORS[reset]}"
+    for ((i=0; i<total_lines; i++)); do
+        screenfx::colorize_line "${lines[i]}"
+    done
+    
+    sleep 1
+    
+    # Show mirror effects
+    local mirror_types=("HORIZONTAL" "VERTICAL" "DIAGONAL" "FRACTAL")
+    
+    for mirror_type in "${mirror_types[@]}"; do
+        screenfx::clear_screen
+        echo -e "${COLORS[bright_white]}[${mirror_type} REFLECTION ACTIVE]${COLORS[reset]}"
+        echo
+        
+        case $mirror_type in
+            "HORIZONTAL")
+                # Show original then mirror horizontally
+                for ((i=0; i<total_lines; i++)); do
+                    screenfx::colorize_line "${lines[i]}"
+                done
+                echo -e "${COLORS[gray]}--- REFLECTION AXIS ---${COLORS[reset]}"
+                for ((i=$((total_lines-1)); i>=0; i--)); do
+                    echo -e "${COLORS[gray]}$(screenfx::colorize_line "${lines[i]}")${COLORS[reset]}"
+                done
+                ;;
+            "VERTICAL")
+                # Show side by side
+                for ((i=0; i<total_lines; i++)); do
+                    local line="${lines[i]}"
+                    local reversed=""
+                    for ((j=${#line}-1; j>=0; j--)); do
+                        reversed+="${line:$j:1}"
+                    done
+                    echo -e "$(screenfx::colorize_line "$line") ${COLORS[gray]}|${COLORS[reset]} ${COLORS[gray]}$(screenfx::colorize_line "$reversed")${COLORS[reset]}"
+                done
+                ;;
+            "DIAGONAL")
+                # Transpose the matrix
+                for ((j=0; j<40; j++)); do
+                    local diag_line=""
+                    for ((i=0; i<total_lines; i++)); do
+                        if [[ $j -lt ${#lines[i]} ]]; then
+                            diag_line+="${lines[i]:$j:1}"
+                        fi
+                    done
+                    if [[ -n "$diag_line" ]]; then
+                        echo -e "${COLORS[bright_magenta]}$(screenfx::colorize_line "$diag_line")${COLORS[reset]}"
+                    fi
+                done
+                ;;
+            "FRACTAL")
+                # Recursive mirror pattern
+                for ((scale=1; scale<=3; scale++)); do
+                    for ((i=0; i<total_lines; i++)); do
+                        local line="${lines[i]}"
+                        local fractal_line=""
+                        for ((rep=0; rep<scale; rep++)); do
+                            fractal_line+="$line "
+                        done
+                        case $scale in
+                            1) echo -e "${COLORS[bright_white]}$fractal_line${COLORS[reset]}" ;;
+                            2) echo -e "${COLORS[white]}$fractal_line${COLORS[reset]}" ;;
+                            3) echo -e "${COLORS[gray]}$fractal_line${COLORS[reset]}" ;;
+                        esac
+                    done
+                    if [[ $scale -lt 3 ]]; then
+                        echo -e "${COLORS[bright_cyan]}--- SCALE $scale → $((scale+1)) ---${COLORS[reset]}"
+                    fi
+                done
+                ;;
+        esac
+        
+        sleep 1
+    done
+    
+    screenfx::clear_screen
+    echo -e "${COLORS[bright_green]}[QUANTUM MIRRORS STABILIZED]${COLORS[reset]}"
+    echo -e "${COLORS[green]}[RETURNING TO PRIMARY DIMENSION...]${COLORS[reset]}"
+    echo
+    
+    for ((i=0; i<total_lines; i++)); do
+        screenfx::colorize_line "${lines[i]}"
+        sleep "$sleep_time"
+    done
+    
+    echo
+    echo -e "${COLORS[bright_white]}[MIRROR ARRAY COMPLETE - REALITY CONFIRMED]${COLORS[reset]}"
+    
+    screenfx::show_cursor
+}
+
+screenfx::echo() {
+    local file="$1"
+    local sleep_time
+    sleep_time=$(screenfx::get_sleep_time)
+    local -a lines
+    local total_lines=0
+    
+    # Read all lines into array
+    while IFS= read -r line; do
+        lines[total_lines]="$line"
+        ((total_lines++))
+    done < "$file"
+    
+    screenfx::hide_cursor
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_green]}[ACOUSTIC RESONANCE CHAMBER ACTIVE]${COLORS[reset]}"
+    echo -e "${COLORS[green]}[SOUND WAVE PROPAGATION ANALYSIS...]${COLORS[reset]}"
+    echo
+    
+    # Show echo effects
+    local echo_delays=(5 4 3 2 1)
+    local echo_intensities=(100 80 60 40 20)
+    
+    for ((echo=0; echo<${#echo_delays[@]}; echo++)); do
+        local delay="${echo_delays[$echo]}"
+        local intensity="${echo_intensities[$echo]}"
+        
+        screenfx::clear_screen
+        echo -e "${COLORS[bright_green]}[ECHO $((echo+1)): DELAY ${delay}ms, INTENSITY ${intensity}%]${COLORS[reset]}"
+        echo
+        
+        # Show multiple echoes
+        for ((e=0; e<=echo; e++)); do
+            local echo_color
+            case $e in
+                0) echo_color="${COLORS[bright_white]}" ;;
+                1) echo_color="${COLORS[white]}" ;;
+                2) echo_color="${COLORS[bright_gray]}" ;;
+                3) echo_color="${COLORS[gray]}" ;;
+                *) echo_color="${COLORS[gray]}" ;;
+            esac
+            
+            # Add spacing for echo delay effect
+            for ((s=0; s<e*2; s++)); do
+                echo -n " "
+            done
+            
+            for ((i=0; i<total_lines; i++)); do
+                local line="${lines[i]}"
+                local echo_line=""
+                
+                for ((j=0; j<${#line}; j++)); do
+                    local char="${line:$j:1}"
+                    if [[ $((RANDOM % 100)) -lt $((intensity - e * 15)) ]]; then
+                        echo_line+="${echo_color}${char}${COLORS[reset]}"
+                    else
+                        echo_line+=" "
+                    fi
+                done
+                
+                echo -e "$(printf "%*s" $((e*2)) "")$echo_line"
+            done
+            
+            if [[ $e -lt $echo ]]; then
+                echo
+            fi
+        done
+        
+        sleep 0.6
+    done
+    
+    sleep 0.5
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_green]}[ACOUSTIC ANALYSIS COMPLETE]${COLORS[reset]}"
+    echo -e "${COLORS[green]}[SOUND WAVES STABILIZED...]${COLORS[reset]}"
+    echo
+    
+    for ((i=0; i<total_lines; i++)); do
+        screenfx::colorize_line "${lines[i]}"
+        sleep "$sleep_time"
+    done
+    
+    echo
+    echo -e "${COLORS[bright_green]}[ECHO CHAMBER SILENT - MESSAGE RECEIVED]${COLORS[reset]}"
+    
+    screenfx::show_cursor
+}
+
+screenfx::gravity() {
+    local file="$1"
+    local sleep_time
+    sleep_time=$(screenfx::get_sleep_time)
+    local -a lines
+    local total_lines=0
+    
+    while IFS= read -r line; do
+        lines[total_lines]="$line"
+        ((total_lines++))
+    done < "$file"
+    
+    screenfx::hide_cursor
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_blue]}[GRAVITATIONAL WAVE DETECTOR ONLINE]${COLORS[reset]}"
+    echo -e "${COLORS[blue]}[SPACETIME DISTORTION DETECTED...]${COLORS[reset]}"
+    echo
+    
+    for ((wave=1; wave<=5; wave++)); do
+        screenfx::clear_screen
+        echo -e "${COLORS[bright_blue]}[GRAVITY WAVE $wave/5 - AMPLITUDE: $((wave * 2))G]${COLORS[reset]}"
+        echo
+        
+        for ((i=0; i<total_lines; i++)); do
+            local line="${lines[i]}"
+            local gravity_line=""
+            local distortion=$((wave * 2))
+            
+            for ((s=0; s<distortion; s++)); do
+                gravity_line+=" "
+            done
+            
+            for ((j=0; j<${#line}; j++)); do
+                local char="${line:$j:1}"
+                if [[ $((RANDOM % 5)) -eq 0 ]]; then
+                    gravity_line+="${COLORS[bright_blue]}${char}${COLORS[reset]}"
+                else
+                    gravity_line+="$char"
+                fi
+            done
+            
+            echo -e "$gravity_line"
+        done
+        sleep 0.4
+    done
+    
+    screenfx::clear_screen
+    echo -e "${COLORS[bright_green]}[GRAVITATIONAL WAVES STABILIZED]${COLORS[reset]}"
+    echo
+    
+    for ((i=0; i<total_lines; i++)); do
+        screenfx::colorize_line "${lines[i]}"
+        sleep "$sleep_time"
+    done
+    
+    echo
+    echo -e "${COLORS[bright_blue]}[SPACETIME GEOMETRY RESTORED]${COLORS[reset]}"
+    
+    screenfx::show_cursor
+}
+
+screenfx::phase() {
+    local file="$1"
+    local sleep_time
+    sleep_time=$(screenfx::get_sleep_time)
+    local -a lines
+    local total_lines=0
+    
+    while IFS= read -r line; do
+        lines[total_lines]="$line"
+        ((total_lines++))
+    done < "$file"
+    
+    screenfx::hide_cursor
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_magenta]}[PHASE TRANSITION CHAMBER ACTIVE]${COLORS[reset]}"
+    echo -e "${COLORS[magenta]}[MATTER STATE TRANSFORMATION...]${COLORS[reset]}"
+    echo
+    
+    local phases=("SOLID" "LIQUID" "GAS" "PLASMA" "BOSE-EINSTEIN")
+    local phase_colors=("${COLORS[white]}" "${COLORS[blue]}" "${COLORS[yellow]}" "${COLORS[red]}" "${COLORS[bright_cyan]}")
+    
+    for ((p=0; p<${#phases[@]}; p++)); do
+        local phase="${phases[$p]}"
+        local color="${phase_colors[$p]}"
+        
+        screenfx::clear_screen
+        echo -e "${COLORS[bright_magenta]}[PHASE: $phase STATE]${COLORS[reset]}"
+        echo
+        
+        for ((i=0; i<total_lines; i++)); do
+            local line="${lines[i]}"
+            echo -e "${color}$(screenfx::colorize_line "$line")${COLORS[reset]}"
+        done
+        sleep 0.5
+    done
+    
+    echo
+    echo -e "${COLORS[bright_magenta]}[PHASE TRANSITION COMPLETE]${COLORS[reset]}"
+    
+    screenfx::show_cursor
+}
+
+screenfx::prism() {
+    local file="$1"
+    local sleep_time
+    sleep_time=$(screenfx::get_sleep_time)
+    local -a lines
+    local total_lines=0
+    
+    while IFS= read -r line; do
+        lines[total_lines]="$line"
+        ((total_lines++))
+    done < "$file"
+    
+    screenfx::hide_cursor
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_white]}[OPTICAL PRISM ARRAY ACTIVATED]${COLORS[reset]}"
+    echo -e "${COLORS[white]}[LIGHT SPECTRUM REFRACTION...]${COLORS[reset]}"
+    echo
+    
+    local spectrum_colors=("${COLORS[bright_red]}" "${COLORS[red]}" "${COLORS[yellow]}" "${COLORS[bright_yellow]}" "${COLORS[green]}" "${COLORS[bright_green]}" "${COLORS[cyan]}" "${COLORS[blue]}" "${COLORS[bright_blue]}" "${COLORS[magenta]}" "${COLORS[bright_magenta]}")
+    
+    for ((spectrum=0; spectrum<${#spectrum_colors[@]}; spectrum++)); do
+        local color="${spectrum_colors[$spectrum]}"
+        
+        screenfx::clear_screen
+        echo -e "${COLORS[bright_white]}[WAVELENGTH: $((400 + spectrum * 30))nm]${COLORS[reset]}"
+        echo
+        
+        for ((i=0; i<total_lines; i++)); do
+            local line="${lines[i]}"
+            echo -e "${color}$(screenfx::colorize_line "$line")${COLORS[reset]}"
+        done
+        sleep 0.2
+    done
+    
+    echo
+    echo -e "${COLORS[bright_white]}[FULL SPECTRUM ANALYSIS COMPLETE]${COLORS[reset]}"
+    
+    screenfx::show_cursor
+}
+
+screenfx::turbulence() {
+    local file="$1"
+    local sleep_time
+    sleep_time=$(screenfx::get_sleep_time)
+    local -a lines
+    local total_lines=0
+    
+    while IFS= read -r line; do
+        lines[total_lines]="$line"
+        ((total_lines++))
+    done < "$file"
+    
+    screenfx::hide_cursor
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_cyan]}[FLUID DYNAMICS SIMULATION ACTIVE]${COLORS[reset]}"
+    echo -e "${COLORS[cyan]}[TURBULENCE PATTERNS DETECTED...]${COLORS[reset]}"
+    echo
+    
+    for ((turb=1; turb<=6; turb++)); do
+        screenfx::clear_screen
+        echo -e "${COLORS[bright_cyan]}[REYNOLDS NUMBER: $((turb * 1000))]${COLORS[reset]}"
+        echo
+        
+        for ((i=0; i<total_lines; i++)); do
+            local line="${lines[i]}"
+            local turbulent_line=""
+            local chaos=$((RANDOM % turb))
+            
+            for ((c=0; c<chaos; c++)); do
+                turbulent_line+=" "
+            done
+            
+            for ((j=0; j<${#line}; j++)); do
+                local char="${line:$j:1}"
+                local flow=$((RANDOM % 3))
+                case $flow in
+                    0) turbulent_line+="${COLORS[bright_cyan]}${char}${COLORS[reset]}" ;;
+                    1) turbulent_line+="${COLORS[cyan]}${char}${COLORS[reset]}" ;;
+                    2) turbulent_line+="$char" ;;
+                esac
+            done
+            
+            echo -e "$turbulent_line"
+        done
+        sleep 0.3
+    done
+    
+    echo
+    echo -e "${COLORS[bright_cyan]}[FLUID FLOW STABILIZED]${COLORS[reset]}"
+    
+    screenfx::show_cursor
+}
+
+screenfx::metamorphosis() {
+    local file="$1"
+    local sleep_time
+    sleep_time=$(screenfx::get_sleep_time)
+    local -a lines
+    local total_lines=0
+    
+    while IFS= read -r line; do
+        lines[total_lines]="$line"
+        ((total_lines++))
+    done < "$file"
+    
+    screenfx::hide_cursor
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_green]}[BIOLOGICAL METAMORPHOSIS INITIATED]${COLORS[reset]}"
+    echo -e "${COLORS[green]}[CELLULAR TRANSFORMATION...]${COLORS[reset]}"
+    echo
+    
+    local stages=("LARVA" "PUPA" "CHRYSALIS" "EMERGENCE" "BUTTERFLY")
+    local stage_chars=("∙" "◦" "○" "●" "★")
+    
+    for ((stage=0; stage<${#stages[@]}; stage++)); do
+        local stage_name="${stages[$stage]}"
+        local stage_char="${stage_chars[$stage]}"
+        
+        screenfx::clear_screen
+        echo -e "${COLORS[bright_green]}[STAGE: $stage_name] $stage_char${COLORS[reset]}"
+        echo
+        
+        for ((i=0; i<total_lines; i++)); do
+            local line="${lines[i]}"
+            local morph_line=""
+            
+            for ((j=0; j<${#line}; j++)); do
+                local char="${line:$j:1}"
+                local morph_chance=$((RANDOM % (6 - stage)))
+                
+                if [[ $morph_chance -eq 0 && "$char" != " " ]]; then
+                    morph_line+="${COLORS[bright_green]}${stage_char}${COLORS[reset]}"
+                else
+                    morph_line+="$char"
+                fi
+            done
+            
+            echo -e "$morph_line"
+        done
+        sleep 0.6
+    done
+    
+    echo
+    echo -e "${COLORS[bright_green]}[METAMORPHOSIS COMPLETE - TRANSFORMATION ACHIEVED]${COLORS[reset]}"
+    
+    screenfx::show_cursor
+}
+
+screenfx::origami() {
+    local file="$1"
+    local sleep_time
+    sleep_time=$(screenfx::get_sleep_time)
+    local -a lines
+    local total_lines=0
+    
+    while IFS= read -r line; do
+        lines[total_lines]="$line"
+        ((total_lines++))
+    done < "$file"
+    
+    screenfx::hide_cursor
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_white]}[ORIGAMI FOLD SEQUENCE INITIATED]${COLORS[reset]}"
+    echo -e "${COLORS[white]}[PAPER GEOMETRY TRANSFORMATION...]${COLORS[reset]}"
+    echo
+    
+    local fold_patterns=("VALLEY" "MOUNTAIN" "REVERSE" "PETAL" "SQUASH")
+    
+    for ((fold=0; fold<${#fold_patterns[@]}; fold++)); do
+        local pattern="${fold_patterns[$fold]}"
+        
+        screenfx::clear_screen
+        echo -e "${COLORS[bright_white]}[FOLD $((fold+1)): $pattern FOLD]${COLORS[reset]}"
+        echo
+        
+        local fold_spacing=$((fold * 2))
+        for ((i=0; i<total_lines; i++)); do
+            local line="${lines[i]}"
+            local folded_line=""
+            
+            for ((s=0; s<fold_spacing; s++)); do
+                folded_line+=" "
+            done
+            
+            local fold_width=$((80 - fold_spacing * 2))
+            if [[ ${#line} -gt $fold_width ]]; then
+                folded_line+="${line:0:$fold_width}"
+            else
+                folded_line+="$line"
+            fi
+            
+            echo -e "${COLORS[white]}$folded_line${COLORS[reset]}"
+        done
+        sleep 0.5
+    done
+    
+    echo
+    echo -e "${COLORS[bright_white]}[ORIGAMI SCULPTURE COMPLETE]${COLORS[reset]}"
+    
+    screenfx::show_cursor
+}
+
+screenfx::kaleidoscope() {
+    local file="$1"
+    local sleep_time
+    sleep_time=$(screenfx::get_sleep_time)
+    local -a lines
+    local total_lines=0
+    
+    while IFS= read -r line; do
+        lines[total_lines]="$line"
+        ((total_lines++))
+    done < "$file"
+    
+    screenfx::hide_cursor
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_magenta]}[KALEIDOSCOPE MANDALA GENERATOR]${COLORS[reset]}"
+    echo -e "${COLORS[magenta]}[SYMMETRICAL PATTERN SYNTHESIS...]${COLORS[reset]}"
+    echo
+    
+    local kaleidoscope_colors=("${COLORS[bright_red]}" "${COLORS[bright_green]}" "${COLORS[bright_blue]}" "${COLORS[bright_yellow]}" "${COLORS[bright_magenta]}" "${COLORS[bright_cyan]}")
+    
+    for ((rotation=0; rotation<6; rotation++)); do
+        local color="${kaleidoscope_colors[$rotation]}"
+        
+        screenfx::clear_screen
+        echo -e "${COLORS[bright_magenta]}[ROTATION: $((rotation * 60))°]${COLORS[reset]}"
+        echo
+        
+        for ((i=0; i<total_lines; i++)); do
+            local line="${lines[i]}"
+            echo -e "${color}$(screenfx::colorize_line "$line")${COLORS[reset]}"
+        done
+        sleep 0.3
+    done
+    
+    echo
+    echo -e "${COLORS[bright_magenta]}[KALEIDOSCOPE PATTERN COMPLETE]${COLORS[reset]}"
+    
+    screenfx::show_cursor
+}
+
+screenfx::tessellation() {
+    local file="$1"
+    local sleep_time
+    sleep_time=$(screenfx::get_sleep_time)
+    local -a lines
+    local total_lines=0
+    
+    while IFS= read -r line; do
+        lines[total_lines]="$line"
+        ((total_lines++))
+    done < "$file"
+    
+    screenfx::hide_cursor
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_blue]}[GEOMETRIC TESSELLATION ENGINE]${COLORS[reset]}"
+    echo -e "${COLORS[blue]}[PATTERN TILING ALGORITHM...]${COLORS[reset]}"
+    echo
+    
+    for ((tile=1; tile<=4; tile++)); do
+        screenfx::clear_screen
+        echo -e "${COLORS[bright_blue]}[TESSELLATION TILE: $tile/4]${COLORS[reset]}"
+        echo
+        
+        for ((repeat=0; repeat<tile; repeat++)); do
+            for ((i=0; i<total_lines; i++)); do
+                local line="${lines[i]}"
+                local tiled_line=""
+                for ((t=0; t<tile; t++)); do
+                    tiled_line+="${line:0:$((80/tile))} "
+                done
+                echo -e "${COLORS[blue]}$tiled_line${COLORS[reset]}"
+            done
+        done
+        sleep 0.5
+    done
+    
+    echo
+    echo -e "${COLORS[bright_blue]}[TESSELLATION PATTERN COMPLETE]${COLORS[reset]}"
+    
+    screenfx::show_cursor
+}
+
+screenfx::fibonacci() {
+    local file="$1"
+    local sleep_time
+    sleep_time=$(screenfx::get_sleep_time)
+    local -a lines
+    local total_lines=0
+    
+    while IFS= read -r line; do
+        lines[total_lines]="$line"
+        ((total_lines++))
+    done < "$file"
+    
+    screenfx::hide_cursor
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_yellow]}[FIBONACCI SEQUENCE GENERATOR]${COLORS[reset]}"
+    echo -e "${COLORS[yellow]}[GOLDEN RATIO VISUALIZATION...]${COLORS[reset]}"
+    echo
+    
+    local fib=(1 1 2 3 5 8 13 21)
+    
+    for ((f=0; f<${#fib[@]}; f++)); do
+        local num="${fib[$f]}"
+        
+        screenfx::clear_screen
+        echo -e "${COLORS[bright_yellow]}[FIBONACCI: $num - φ APPROXIMATION]${COLORS[reset]}"
+        echo
+        
+        for ((i=0; i<total_lines; i++)); do
+            local line="${lines[i]}"
+            local fib_line=""
+            
+            local segments=$((num % 5 + 1))
+            local segment_size=$((${#line} / segments))
+            
+            for ((seg=0; seg<segments; seg++)); do
+                local start=$((seg * segment_size))
+                local segment="${line:$start:$segment_size}"
+                case $((seg % 3)) in
+                    0) fib_line+="${COLORS[bright_yellow]}$segment${COLORS[reset]}" ;;
+                    1) fib_line+="${COLORS[yellow]}$segment${COLORS[reset]}" ;;
+                    2) fib_line+="$segment" ;;
+                esac
+            done
+            
+            echo -e "$fib_line"
+        done
+        sleep 0.4
+    done
+    
+    echo
+    echo -e "${COLORS[bright_yellow]}[GOLDEN SPIRAL COMPLETE - ΦRATIO ACHIEVED]${COLORS[reset]}"
+    
+    screenfx::show_cursor
+}
+
+screenfx::constellation() {
+    local file="$1"
+    local sleep_time
+    sleep_time=$(screenfx::get_sleep_time)
+    local -a lines
+    local total_lines=0
+    
+    while IFS= read -r line; do
+        lines[total_lines]="$line"
+        ((total_lines++))
+    done < "$file"
+    
+    screenfx::hide_cursor
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_white]}[STELLAR CARTOGRAPHY SYSTEM ONLINE]${COLORS[reset]}"
+    echo -e "${COLORS[white]}[CONSTELLATION FORMATION DETECTED...]${COLORS[reset]}"
+    echo
+    
+    local constellations=("ORION" "URSA_MAJOR" "CASSIOPEIA" "DRACO" "CYGNUS")
+    local star_chars=("★" "☆" "✪" "✹" "✴")
+    
+    for ((c=0; c<${#constellations[@]}; c++)); do
+        local constellation="${constellations[$c]}"
+        local star_char="${star_chars[$c]}"
+        
+        screenfx::clear_screen
+        echo -e "${COLORS[bright_white]}[CONSTELLATION: $constellation]${COLORS[reset]}"
+        echo
+        
+        for ((i=0; i<total_lines; i++)); do
+            local line="${lines[i]}"
+            local star_line=""
+            
+            for ((j=0; j<${#line}; j++)); do
+                local char="${line:$j:1}"
+                if [[ $((RANDOM % 8)) -eq 0 && "$char" != " " ]]; then
+                    star_line+="${COLORS[bright_white]}${star_char}${COLORS[reset]}"
+                else
+                    star_line+="$char"
+                fi
+            done
+            
+            echo -e "$star_line"
+        done
+        sleep 0.6
+    done
+    
+    screenfx::clear_screen
+    echo -e "${COLORS[bright_white]}[STELLAR MAP COMPLETE]${COLORS[reset]}"
+    echo
+    
+    for ((i=0; i<total_lines; i++)); do
+        screenfx::colorize_line "${lines[i]}"
+        sleep "$sleep_time"
+    done
+    
+    echo
+    echo -e "${COLORS[bright_white]}[NAVIGATION STARS LOCKED - COURSE SET]${COLORS[reset]}"
+    
+    screenfx::show_cursor
+}
+
 # Main function
 screenfx::show() {
     local file="${1:-$HOME/screen.txt}"
@@ -2608,6 +4046,66 @@ screenfx::show() {
             ;;
         alien)
             screenfx::alien "$file"
+            ;;
+        time_travel)
+            screenfx::time_travel "$file"
+            ;;
+        magnetic)
+            screenfx::magnetic "$file"
+            ;;
+        seismic)
+            screenfx::seismic "$file"
+            ;;
+        solar_flare)
+            screenfx::solar_flare "$file"
+            ;;
+        teleport)
+            screenfx::teleport "$file"
+            ;;
+        stealth)
+            screenfx::stealth "$file"
+            ;;
+        meltdown)
+            screenfx::meltdown "$file"
+            ;;
+        ice)
+            screenfx::ice "$file"
+            ;;
+        mirror)
+            screenfx::mirror "$file"
+            ;;
+        echo)
+            screenfx::echo "$file"
+            ;;
+        gravity)
+            screenfx::gravity "$file"
+            ;;
+        phase)
+            screenfx::phase "$file"
+            ;;
+        prism)
+            screenfx::prism "$file"
+            ;;
+        turbulence)
+            screenfx::turbulence "$file"
+            ;;
+        metamorphosis)
+            screenfx::metamorphosis "$file"
+            ;;
+        origami)
+            screenfx::origami "$file"
+            ;;
+        kaleidoscope)
+            screenfx::kaleidoscope "$file"
+            ;;
+        tessellation)
+            screenfx::tessellation "$file"
+            ;;
+        fibonacci)
+            screenfx::fibonacci "$file"
+            ;;
+        constellation)
+            screenfx::constellation "$file"
             ;;
         *)
             screenfx::log "Unknown style: $style, using static"
