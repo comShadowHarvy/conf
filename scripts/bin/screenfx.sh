@@ -10,7 +10,7 @@ SCREENFX_STYLE=${SCREENFX_STYLE:-"random"}        # random, static, typewriter, 
 SCREENFX_SPEED=${SCREENFX_SPEED:-"normal"}        # fast, normal, slow
 SCREENFX_FORCE=${SCREENFX_FORCE:-0}               # Force in SSH sessions
 SCREENFX_MODE=${SCREENFX_MODE:-"startup"}         # startup, prompt
-SCREENFX_STYLES=(static typewriter loader glitch matrix waves bounce scan fade reveal cascade hologram neon terminal hack decrypt spiral plasma lightning explode radar) # Available styles
+SCREENFX_STYLES=(static typewriter loader glitch matrix waves bounce scan fade reveal cascade hologram neon terminal hack decrypt spiral plasma lightning explode radar binary_rain quantum virus neural blackhole) # Available styles
 
 # Color definitions (cyberpunk theme)
 declare -A COLORS
@@ -1617,6 +1617,430 @@ screenfx::radar() {
     screenfx::show_cursor
 }
 
+screenfx::binary_rain() {
+    local file="$1"
+    local sleep_time
+    sleep_time=$(screenfx::get_sleep_time)
+    local -a lines
+    local total_lines=0
+    
+    # Read all lines into array
+    while IFS= read -r line; do
+        lines[total_lines]="$line"
+        ((total_lines++))
+    done < "$file"
+    
+    screenfx::hide_cursor
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_green]}[BINARY RAIN PROTOCOL INITIATED]${COLORS[reset]}"
+    echo -e "${COLORS[green]}[DIGITAL PRECIPITATION DETECTED...]${COLORS[reset]}"
+    echo
+    
+    # Generate binary rain effect
+    local term_size
+    term_size=$(screenfx::get_terminal_size)
+    local cols=${term_size%% *}
+    
+    for ((rain=0; rain<12; rain++)); do
+        for ((row=0; row<6; row++)); do
+            local rain_line=""
+            for ((col=0; col<cols-1; col++)); do
+                local binary_char=$((RANDOM % 2))
+                local drop_speed=$(((col + rain) % 4))
+                case $drop_speed in
+                    0) rain_line+="${COLORS[bright_green]}${binary_char}${COLORS[reset]}" ;;
+                    1) rain_line+="${COLORS[green]}${binary_char}${COLORS[reset]}" ;;
+                    2) rain_line+="${COLORS[gray]}${binary_char}${COLORS[reset]}" ;;
+                    3) rain_line+=" " ;;
+                esac
+            done
+            echo -e "$rain_line"
+        done
+        sleep 0.1
+        if [[ $rain -lt 11 ]]; then
+            printf "\033[6A"  # Move cursor up 6 lines
+        fi
+    done
+    
+    sleep 0.5
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_green]}[BINARY STREAM DECODED]${COLORS[reset]}"
+    echo -e "${COLORS[green]}[RECONSTRUCTING DATA...]${COLORS[reset]}"
+    echo
+    
+    # Show content materializing from binary
+    for ((i=0; i<total_lines; i++)); do
+        local line="${lines[i]}"
+        
+        # Show binary version first
+        local binary_line=""
+        for ((j=0; j<${#line}; j++)); do
+            if [[ "${line:$j:1}" != " " ]]; then
+                binary_line+="${COLORS[green]}$((RANDOM % 2))${COLORS[reset]}"
+            else
+                binary_line+=" "
+            fi
+        done
+        
+        echo -e "$binary_line"
+        sleep 0.1
+        
+        # Replace with actual content
+        printf "\033[1A\033[K"  # Move up and clear
+        screenfx::colorize_line "$line"
+        sleep "$sleep_time"
+    done
+    
+    echo
+    echo -e "${COLORS[bright_green]}[BINARY RAIN COMPLETE - DATA MATERIALIZED]${COLORS[reset]}"
+    
+    screenfx::show_cursor
+}
+
+screenfx::quantum() {
+    local file="$1"
+    local sleep_time
+    sleep_time=$(screenfx::get_sleep_time)
+    local -a lines
+    local total_lines=0
+    
+    # Read all lines into array
+    while IFS= read -r line; do
+        lines[total_lines]="$line"
+        ((total_lines++))
+    done < "$file"
+    
+    screenfx::hide_cursor
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_blue]}[QUANTUM PROCESSOR INITIALIZED]${COLORS[reset]}"
+    echo -e "${COLORS[blue]}[ENTERING SUPERPOSITION STATE...]${COLORS[reset]}"
+    echo
+    
+    # Show quantum superposition effect
+    local quantum_states=("ψ" "Φ" "α" "β" "γ" "δ" "⟩" "⟨" "∞" "∆")
+    
+    for ((wave=0; wave<8; wave++)); do
+        screenfx::clear_screen
+        echo -e "${COLORS[bright_blue]}[QUANTUM WAVE FUNCTION: $((wave + 1))/8]${COLORS[reset]}"
+        echo
+        
+        for ((i=0; i<total_lines; i++)); do
+            local line="${lines[i]}"
+            local quantum_line=""
+            
+            for ((j=0; j<${#line}; j++)); do
+                local char="${line:$j:1}"
+                if [[ "$char" != " " ]]; then
+                    local state_idx=$((RANDOM % ${#quantum_states[@]}))
+                    local probability=$((RANDOM % 4))
+                    case $probability in
+                        0) quantum_line+="${COLORS[bright_blue]}${quantum_states[$state_idx]}${COLORS[reset]}" ;;
+                        1) quantum_line+="${COLORS[blue]}${char}${COLORS[reset]}" ;;
+                        2) quantum_line+="${COLORS[cyan]}${quantum_states[$state_idx]}${COLORS[reset]}" ;;
+                        3) quantum_line+="${COLORS[white]}${char}${COLORS[reset]}" ;;
+                    esac
+                else
+                    quantum_line+=" "
+                fi
+            done
+            echo -e "$quantum_line"
+        done
+        
+        sleep 0.2
+    done
+    
+    echo
+    echo -e "${COLORS[bright_blue]}[QUANTUM COLLAPSE - OBSERVING REALITY]${COLORS[reset]}"
+    echo
+    
+    # Collapse to actual content
+    for ((i=0; i<total_lines; i++)); do
+        screenfx::colorize_line "${lines[i]}"
+        sleep "$sleep_time"
+    done
+    
+    echo
+    echo -e "${COLORS[bright_blue]}[QUANTUM STATE COLLAPSED - REALITY STABILIZED]${COLORS[reset]}"
+    
+    screenfx::show_cursor
+}
+
+screenfx::virus() {
+    local file="$1"
+    local sleep_time
+    sleep_time=$(screenfx::get_sleep_time)
+    local -a lines
+    local total_lines=0
+    
+    # Read all lines into array
+    while IFS= read -r line; do
+        lines[total_lines]="$line"
+        ((total_lines++))
+    done < "$file"
+    
+    screenfx::hide_cursor
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_red]}[VIRUS DETECTED - INITIATING QUARANTINE]${COLORS[reset]}"
+    echo -e "${COLORS[red]}[MALICIOUS CODE SPREADING...]${COLORS[reset]}"
+    echo
+    
+    # Show virus infection spreading
+    local virus_chars=("☣" "⚠" "⚡" "※" "⚆" "◉" "●" "▲")
+    
+    # Initial clean state
+    for ((i=0; i<total_lines; i++)); do
+        echo -e "${COLORS[green]}[CLEAN] ${lines[i]}${COLORS[reset]}"
+    done
+    
+    sleep 1
+    
+    # Virus infection waves
+    for ((infection=1; infection<=4; infection++)); do
+        printf "\033[%dA" $total_lines  # Move cursor back up
+        
+        for ((i=0; i<total_lines; i++)); do
+            local line="${lines[i]}"
+            local infection_chance=$((RANDOM % 4))
+            
+            if [[ $infection_chance -eq 0 ]] || [[ $i -eq $((infection * 2)) ]]; then
+                # Show infected line
+                local infected_line=""
+                for ((j=0; j<${#line}; j++)); do
+                    local char="${line:$j:1}"
+                    if [[ $((RANDOM % 3)) -eq 0 && "$char" != " " ]]; then
+                        local virus_idx=$((RANDOM % ${#virus_chars[@]}))
+                        infected_line+="${COLORS[bright_red]}${virus_chars[$virus_idx]}${COLORS[reset]}"
+                    else
+                        infected_line+="$char"
+                    fi
+                done
+                echo -e "${COLORS[red]}[VIRUS] $infected_line${COLORS[reset]}"
+            else
+                echo -e "${COLORS[green]}[CLEAN] $line${COLORS[reset]}"
+            fi
+        done
+        
+        sleep 0.5
+    done
+    
+    echo
+    echo -e "${COLORS[bright_yellow]}[ANTIVIRUS ACTIVATED - PURGING INFECTION]${COLORS[reset]}"
+    echo
+    
+    # Antivirus cleanup
+    for ((i=0; i<total_lines; i++)); do
+        echo -e "${COLORS[yellow]}[SCANNING] ${lines[i]}${COLORS[reset]}"
+        sleep 0.1
+        printf "\033[1A\033[K"  # Move up and clear
+        echo -e "${COLORS[bright_green]}[CLEANED] $(screenfx::colorize_line "${lines[i]}")${COLORS[reset]}"
+        sleep "$sleep_time"
+    done
+    
+    echo
+    echo -e "${COLORS[bright_green]}[SYSTEM DISINFECTED - ALL THREATS ELIMINATED]${COLORS[reset]}"
+    
+    screenfx::show_cursor
+}
+
+screenfx::neural() {
+    local file="$1"
+    local sleep_time
+    sleep_time=$(screenfx::get_sleep_time)
+    local -a lines
+    local total_lines=0
+    
+    # Read all lines into array
+    while IFS= read -r line; do
+        lines[total_lines]="$line"
+        ((total_lines++))
+    done < "$file"
+    
+    screenfx::hide_cursor
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_magenta]}[NEURAL NETWORK ACTIVATION]${COLORS[reset]}"
+    echo -e "${COLORS[magenta]}[SYNAPSES FIRING...]${COLORS[reset]}"
+    echo
+    
+    # Show neural network visualization
+    local term_size
+    term_size=$(screenfx::get_terminal_size)
+    local cols=${term_size%% *}
+    local neurons=("◉" "○" "●" "◎" "⬡" "⬢")
+    local connections=("-" "=" "~" "∼" "≈" "∿")
+    
+    for ((pulse=0; pulse<6; pulse++)); do
+        for ((row=0; row<4; row++)); do
+            local neural_line=""
+            for ((col=0; col<cols-10; col+=8)); do
+                local neuron_idx=$((RANDOM % ${#neurons[@]}))
+                local conn_idx=$((RANDOM % ${#connections[@]}))
+                local activation=$((RANDOM % 3))
+                
+                case $activation in
+                    0) neural_line+="${COLORS[bright_magenta]}${neurons[$neuron_idx]}${COLORS[reset]}" ;;
+                    1) neural_line+="${COLORS[magenta]}${neurons[$neuron_idx]}${COLORS[reset]}" ;;
+                    2) neural_line+="${COLORS[cyan]}${neurons[$neuron_idx]}${COLORS[reset]}" ;;
+                esac
+                
+                # Add connections
+                for ((c=0; c<6; c++)); do
+                    neural_line+="${COLORS[gray]}${connections[$conn_idx]}${COLORS[reset]}"
+                done
+            done
+            echo -e "$neural_line"
+        done
+        
+        sleep 0.2
+        if [[ $pulse -lt 5 ]]; then
+            printf "\033[4A"  # Move cursor up
+        fi
+    done
+    
+    sleep 0.5
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_magenta]}[NEURAL PATTERN RECOGNITION COMPLETE]${COLORS[reset]}"
+    echo -e "${COLORS[magenta]}[CONSCIOUSNESS EMERGING...]${COLORS[reset]}"
+    echo
+    
+    # Show content with neural processing effect
+    for ((i=0; i<total_lines; i++)); do
+        local line="${lines[i]}"
+        
+        # Show processing pattern
+        echo -e "${COLORS[gray]}Processing neural pathway $((i + 1))...${COLORS[reset]}"
+        sleep 0.1
+        printf "\033[1A\033[K"  # Clear processing line
+        
+        # Show activated line
+        echo -e "${COLORS[bright_magenta]}◉${COLORS[reset]} $(screenfx::colorize_line "$line")"
+        sleep "$sleep_time"
+    done
+    
+    echo
+    echo -e "${COLORS[bright_magenta]}[NEURAL CONSCIOUSNESS ACHIEVED]${COLORS[reset]}"
+    
+    screenfx::show_cursor
+}
+
+screenfx::blackhole() {
+    local file="$1"
+    local sleep_time
+    sleep_time=$(screenfx::get_sleep_time)
+    local -a lines
+    local total_lines=0
+    
+    # Read all lines into array
+    while IFS= read -r line; do
+        lines[total_lines]="$line"
+        ((total_lines++))
+    done < "$file"
+    
+    screenfx::hide_cursor
+    screenfx::clear_screen
+    
+    echo -e "${COLORS[bright_white]}[GRAVITATIONAL ANOMALY DETECTED]${COLORS[reset]}"
+    echo -e "${COLORS[gray]}[BLACK HOLE FORMATION IMMINENT...]${COLORS[reset]}"
+    echo
+    
+    # Show all content first
+    for ((i=0; i<total_lines; i++)); do
+        screenfx::colorize_line "${lines[i]}"
+    done
+    
+    sleep 1
+    
+    # Create black hole effect - content gets sucked in
+    local term_size
+    term_size=$(screenfx::get_terminal_size)
+    local cols=${term_size%% *}
+    local center_col=$((cols / 2))
+    local center_row=$((total_lines / 2 + 3))
+    
+    echo
+    echo -e "${COLORS[bright_red]}[EVENT HORIZON BREACHED - SPACETIME COLLAPSE]${COLORS[reset]}"
+    echo
+    
+    # Suck content into black hole
+    for ((radius=20; radius>=1; radius--)); do
+        screenfx::clear_screen
+        echo -e "${COLORS[bright_white]}[SINGULARITY RADIUS: $radius]${COLORS[reset]}"
+        echo
+        
+        for ((i=0; i<total_lines; i++)); do
+            local line="${lines[i]}"
+            local warped_line=""
+            local row_distance=$((i + 3 - center_row))
+            if [[ $row_distance -lt 0 ]]; then row_distance=$((-row_distance)); fi
+            
+            for ((j=0; j<${#line}; j++)); do
+                local char="${line:$j:1}"
+                local col_distance=$((j - center_col))
+                if [[ $col_distance -lt 0 ]]; then col_distance=$((-col_distance)); fi
+                local total_distance=$((col_distance + row_distance))
+                
+                if [[ $total_distance -le $radius ]]; then
+                    # Character is being pulled in
+                    local distortion=$((RANDOM % 4))
+                    case $distortion in
+                        0) warped_line+="${COLORS[red]}${char}${COLORS[reset]}" ;;
+                        1) warped_line+="${COLORS[yellow]}·${COLORS[reset]}" ;;
+                        2) warped_line+="${COLORS[gray]}░${COLORS[reset]}" ;;
+                        3) warped_line+=" " ;;
+                    esac
+                else
+                    warped_line+="$char"
+                fi
+            done
+            
+            echo -e "$warped_line"
+        done
+        
+        # Show black hole center
+        printf "\033[%d;%dH" $center_row $((center_col - 1))
+        echo -e "${COLORS[bright_white]}◉${COLORS[reset]}"
+        
+        sleep 0.1
+    done
+    
+    # Show singularity
+    screenfx::clear_screen
+    printf "\033[%d;%dH" $((center_row - 1)) $((center_col - 10))
+    echo -e "${COLORS[bright_white]}[SINGULARITY ACHIEVED]${COLORS[reset]}"
+    printf "\033[%d;%dH" $center_row $center_col
+    echo -e "${COLORS[bright_white]}●${COLORS[reset]}"
+    
+    sleep 1
+    
+    # Hawking radiation - information escapes
+    echo
+    printf "\033[%d;%dH" $((center_row + 2)) $((center_col - 15))
+    echo -e "${COLORS[bright_cyan]}[HAWKING RADIATION DETECTED - INFORMATION ESCAPING]${COLORS[reset]}"
+    
+    sleep 1
+    screenfx::clear_screen
+    
+    # Reconstruct content from radiation
+    echo -e "${COLORS[bright_cyan]}[QUANTUM INFORMATION PRESERVED]${COLORS[reset]}"
+    echo -e "${COLORS[cyan]}[RECONSTRUCTING FROM HAWKING RADIATION...]${COLORS[reset]}"
+    echo
+    
+    for ((i=0; i<total_lines; i++)); do
+        screenfx::colorize_line "${lines[i]}"
+        sleep "$sleep_time"
+    done
+    
+    echo
+    echo -e "${COLORS[bright_white]}[BLACK HOLE EVAPORATED - INFORMATION PARADOX RESOLVED]${COLORS[reset]}"
+    
+    screenfx::show_cursor
+}
+
 # Main function
 screenfx::show() {
     local file="${1:-$HOME/screen.txt}"
@@ -1712,6 +2136,21 @@ screenfx::show() {
             ;;
         radar)
             screenfx::radar "$file"
+            ;;
+        binary_rain)
+            screenfx::binary_rain "$file"
+            ;;
+        quantum)
+            screenfx::quantum "$file"
+            ;;
+        virus)
+            screenfx::virus "$file"
+            ;;
+        neural)
+            screenfx::neural "$file"
+            ;;
+        blackhole)
+            screenfx::blackhole "$file"
             ;;
         *)
             screenfx::log "Unknown style: $style, using static"
