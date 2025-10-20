@@ -639,21 +639,23 @@ screenfx::reveal() {
     
     sleep 1
     
-    # Reveal character by character
+    # Reveal character by character - simplified approach
     for ((i=0; i<total_lines; i++)); do
         local line="${lines[i]}"
-        printf "\033[%dA" $((total_lines - i))  # Move cursor to line i from bottom
+        # Move cursor to the specific line we want to reveal
+        printf "\033[%d;1H" $((i + 4))  # +4 to account for header lines
         
+        # Reveal each character in place
         for ((j=0; j<${#line}; j++)); do
             local char="${line:$j:1}"
-            printf "\033[%dC" $j  # Move cursor to position j
+            printf "\033[%d;%dH" $((i + 4)) $((j + 1))  # Position cursor exactly
             printf "%s" "$char"
-            printf "\033[%dD" $((j + 1))  # Move cursor back to start
-            sleep 0.02
+            sleep 0.01
         done
-        
-        printf "\033[%dB" $((total_lines - i))  # Move cursor back to bottom
     done
+    
+    # Move cursor to end
+    printf "\033[%d;1H" $((total_lines + 4))
     
     # Re-colorize all lines
     printf "\033[%dA" $total_lines  # Move to top
