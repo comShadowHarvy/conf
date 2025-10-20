@@ -1,0 +1,4 @@
+{"timestamp":"2025-10-19 13:46:48","level":"DEBUG","message":"Initialized directories and logging","transaction":"20251019_134648_24662"}
+{"timestamp":"2025-10-19 13:46:48","level":"DEBUG","message":"Log file: /home/me/git/conf/logs/stow-20251019_134648_24662.log","transaction":"20251019_134648_24662"}
+{"timestamp":"2025-10-19 13:46:48","level":"ERROR","message":"Required command 'stow' not found","transaction":"20251019_134648_24662"}
+{"timestamp":"2025-10-19 13:46:48","level":"ERROR","message":"Please install it and try again","transaction":"20251019_134648_24662"}

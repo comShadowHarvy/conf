@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Simple wrapper for stow configuration restore
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+exec "$SCRIPT_DIR/restore-stow.sh" "$@"
