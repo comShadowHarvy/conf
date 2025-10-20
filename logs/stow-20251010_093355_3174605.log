@@ -1,6 +1,0 @@
-{"timestamp":"2025-10-10 09:33:55","level":"DEBUG","message":"Initialized directories and logging","transaction":"20251010_093355_3174605"}
-{"timestamp":"2025-10-10 09:33:55","level":"DEBUG","message":"Log file: /home/me/conf/logs/stow-20251010_093355_3174605.log","transaction":"20251010_093355_3174605"}
-{"timestamp":"2025-10-10 09:33:55","level":"STEP","message":"Unstowing package: test-package","transaction":"20251010_093355_3174605"}
-{"timestamp":"2025-10-10 09:33:55","level":"INFO","message":"Unstowing 'test-package'...","transaction":"20251010_093355_3174605"}
-{"timestamp":"2025-10-10 09:33:55","level":"SUCCESS","message":"Successfully unstowed 'test-package'","transaction":"20251010_093355_3174605"}
-{"timestamp":"2025-10-10 09:33:55","level":"SUCCESS","message":"Operation completed successfully","transaction":"20251010_093355_3174605"}
