@@ -332,8 +332,9 @@ _run_deferred_startup_visuals() {
     add-zsh-hook -d precmd _run_deferred_startup_visuals
 
     # Show system info based on available tools and configuration
+    # Skip fastfetch if it already ran in startup function
     if [[ "$SHOW_POKEMON" == "true" ]]; then
-        if (( $+commands[pokemon-colorscripts] )) && (( $+commands[fastfetch] )); then
+        if (( $+commands[pokemon-colorscripts] )) && (( $+commands[fastfetch] )) && [[ -z "$SCREENFX_FASTFETCH_RAN" ]]; then
             # Run pokemon piped to fastfetch with custom config
             pokemon-colorscripts --no-title -s -r | \
             fastfetch -c "$HOME/.config/fastfetch/config-pokemon.jsonc" \
@@ -345,7 +346,7 @@ _run_deferred_startup_visuals() {
             else
                 pokemon-colorscripts --no-title -r -b
             fi
-        elif (( $+commands[fastfetch] )); then
+        elif (( $+commands[fastfetch] )) && [[ -z "$SCREENFX_FASTFETCH_RAN" ]]; then
             # Just fastfetch with appropriate sizing
             if [[ -n "$TMUX" ]]; then
                 fastfetch --logo-width 15
@@ -353,7 +354,7 @@ _run_deferred_startup_visuals() {
                 fastfetch --logo-width 20
             fi
         fi
-    elif (( $+commands[fastfetch] )); then
+    elif (( $+commands[fastfetch] )) && [[ -z "$SCREENFX_FASTFETCH_RAN" ]]; then
         # Use a compact fastfetch config for speed
         if [[ -n "$TMUX" ]]; then
             fastfetch --logo none
@@ -773,11 +774,52 @@ _setup_ohmyposh() {
 # Initialize Oh My Posh
 _setup_ohmyposh
 
-# ── Shadow-Harvey intro ──────────────────────────────
-[[ -o interactive ]] && {
-  source ~/bin/screenfx.sh
-  screenfx::show "$HOME/screen.txt"
+# ScreenFX random animation + immediate fastfetch on interactive TTYs
+_screenfx_startup() {
+  # Only run in interactive terminals with a usable TTY
+  [[ -o interactive && -t 1 && "$TERM" != "dumb" ]] || return 0
+
+  # Load ScreenFX
+  [[ -r "$HOME/bin/screenfx.sh" ]] || return 0
+  source "$HOME/bin/screenfx.sh" || return 0
+
+  # Choose a random style (exclude 'static'); zsh arrays are 1-based
+  local -a _sf_styles
+  local -i _sf_n _sf_idx
+  local _sf_style
+
+  if (( ${+SCREENFX_STYLES} )); then
+    _sf_styles=("${(@)SCREENFX_STYLES:#static}")
+    _sf_n=${#_sf_styles[@]}
+    if (( _sf_n > 0 )); then
+      _sf_idx=$(( (RANDOM % _sf_n) + 1 ))
+      _sf_style="${_sf_styles[_sf_idx]}"
+    else
+      _sf_style="static"
+    fi
+  else
+    _sf_style="static"
+  fi
+
+  # Show your screen with the chosen style
+  SCREENFX_STYLE="$_sf_style" screenfx::show "$HOME/git/conf/screen.txt" 2>/dev/null || true
+
+  # Run fastfetch immediately after the animation (reuse your preferred args if any)
+  if command -v fastfetch >/dev/null 2>&1; then
+    fastfetch --logo-width 15
+  fi
+
+  # Mark that fastfetch already ran so deferred hook can skip it
+  export SCREENFX_FASTFETCH_RAN=1
 }
+
+# ScreenFX Configuration
+export SCREENFX=1
+export SCREENFX_SPEED="fast"
+
+# ── Shadow-Harvey intro ──────────────────────────────
+# Run ScreenFX + fastfetch at startup (not deferred)
+_screenfx_startup
 
 # --- Feature Functions & Aliases ---
 
@@ -1009,3 +1051,4 @@ alias unprofile-zsh="sed -i 's/zmodload zsh\\/zprof/# zmodload zsh\\/zprof/' .zs
 # ZSHRC_ELAPSED=$(($ZSHRC_END_TIME - $ZSHRC_START_TIME))
 # _log_message "INFO" "Zsh initialized in $ZSHRC_ELAPSED seconds"
 # zprof # Print profiling info
+
