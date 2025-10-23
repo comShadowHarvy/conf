@@ -6,7 +6,7 @@
 
 # Configuration defaults
 SCREENFX=${SCREENFX:-1}                           # 1=enabled, 0=disabled
-SCREENFX_STYLE=${SCREENFX_STYLE:-"random"}        # random, static, typewriter, loader, glitch
+SCREENFX_STYLE=${SCREENFX_STYLE:-"static"}        # random, static, typewriter, loader, glitch
 SCREENFX_SPEED=${SCREENFX_SPEED:-"normal"}        # fast, normal, slow
 SCREENFX_FORCE=${SCREENFX_FORCE:-0}               # Force in SSH sessions
 SCREENFX_MODE=${SCREENFX_MODE:-"startup"}         # startup, prompt
@@ -39,18 +39,36 @@ SPEEDS[slow]=0.06
 
 # Self-test mode (must be after function definitions)
 _run_self_test() {
+    local test_file="${1:-/tmp/screenfx_test.txt}"
+    local cleanup_temp=false
+    
     echo "ScreenFX Self-Test:"
     echo "- tput colors: $(tput colors 2>/dev/null || echo "N/A")"
     echo "- Terminal: $TERM"
     echo "- Available styles: ${SCREENFX_STYLES[*]}"
+    echo "- Test file: $test_file"
     echo "Running quick test of each style..."
-    echo "Testing..." > /tmp/screenfx_test.txt
+    
+    # Create temp file only if using default
+    if [[ "$test_file" == "/tmp/screenfx_test.txt" ]]; then
+        echo "Testing..." > "$test_file"
+        cleanup_temp=true
+    fi
+    
+    # Check if test file exists
+    if [[ ! -f "$test_file" ]]; then
+        echo "Error: Test file '$test_file' not found!"
+        exit 1
+    fi
+    
     for style in "${SCREENFX_STYLES[@]}"; do
         echo "Testing $style:"
-        SCREENFX_STYLE=$style SCREENFX_SPEED=fast screenfx::show /tmp/screenfx_test.txt
+        SCREENFX_STYLE=$style SCREENFX_SPEED=fast screenfx::show "$test_file"
         echo
     done
-    rm -f /tmp/screenfx_test.txt
+    
+    # Clean up only if we created the temp file
+    [[ "$cleanup_temp" == "true" ]] && rm -f "$test_file"
     exit 0
 }
 
@@ -165,14 +183,14 @@ screenfx::loader() {
     local file="$1"
     local sleep_time
     sleep_time=$(screenfx::get_sleep_time)
-    local -a lines
+    local -a lines=()
     local total_lines=0
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     
@@ -279,12 +297,12 @@ screenfx::matrix() {
     local file="$1"
     local sleep_time
     sleep_time=$(screenfx::get_sleep_time)
-    local -a lines
+    local -a lines=()
     local total_lines=0
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
+        lines[$total_lines]="$line"
         ((total_lines++))
     done < "$file"
     
@@ -4119,7 +4137,7 @@ screenfx::show() {
 
 # Handle self-test mode after functions are defined
 if [[ "$1" == "--self-test" ]]; then
-    _run_self_test
+    _run_self_test "$2"
 fi
 
 # Functions are automatically available when sourced in both bash and zsh
