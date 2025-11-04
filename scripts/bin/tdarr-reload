@@ -1,0 +1,186 @@
+#!/bin/bash
+# ============================================================================
+# Tdarr Network Share Reloader
+# Author: ShadowHarvy
+# Description: Stops Tdarr, remounts network shares, and restarts Tdarr
+# ============================================================================
+
+set -e
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
+BOLD='\033[1m'
+NC='\033[0m' # No Color
+
+# Configuration
+TDARR_CONTAINER="tdarr-node"
+SMB_SCRIPT="$HOME/betterstrap/smb.sh"
+SHARE_PATH="/share"
+EXPECTED_DIRS=("downloads" "emulatorjs" "incomplete" "jellyfin" "metube" "minecraftbe" "ollama" "qBittorrent" "storage" "taildrop" "trans" "USB1" "USB2")
+WAIT_TIME=12
+
+# Function to print centered text
+print_centered() {
+    local text="$1"
+    local color="$2"
+    local width=$(tput cols)
+    local padding=$(( (width - ${#text}) / 2 ))
+    printf "${color}%*s%s%*s${NC}\n" $padding "" "$text" $padding ""
+}
+
+# Function to print the title screen
+print_title() {
+    clear
+    echo ""
+    echo -e "${CYAN}╔══════════════════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}║${NC}                                                                              ${CYAN}║${NC}"
+    print_centered "████████╗██████╗  █████╗ ██████╗ ██████╗     ██████╗ ███████╗██╗      ██████╗  █████╗ ██████╗ " "${MAGENTA}"
+    print_centered "╚══██╔══╝██╔══██╗██╔══██╗██╔══██╗██╔══██╗    ██╔══██╗██╔════╝██║     ██╔═══██╗██╔══██╗██╔══██╗" "${MAGENTA}"
+    print_centered "   ██║   ██║  ██║███████║██████╔╝██████╔╝    ██████╔╝█████╗  ██║     ██║   ██║███████║██║  ██║" "${MAGENTA}"
+    print_centered "   ██║   ██║  ██║██╔══██║██╔══██╗██╔══██╗    ██╔══██╗██╔══╝  ██║     ██║   ██║██╔══██║██║  ██║" "${MAGENTA}"
+    print_centered "   ██║   ██████╔╝██║  ██║██║  ██║██║  ██║    ██║  ██║███████╗███████╗╚██████╔╝██║  ██║██████╔╝" "${MAGENTA}"
+    print_centered "   ╚═╝   ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝    ╚═╝  ╚═╝╚══════╝╚══════╝ ╚═════╝ ╚═╝  ╚═╝╚═════╝ " "${MAGENTA}"
+    echo -e "${CYAN}║${NC}                                                                              ${CYAN}║${NC}"
+    print_centered "Network Share Reloader v1.0" "${YELLOW}"
+    print_centered "by ShadowHarvy" "${CYAN}"
+    echo -e "${CYAN}║${NC}                                                                              ${CYAN}║${NC}"
+    echo -e "${CYAN}╚══════════════════════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+}
+
+# Function to print a loading bar
+loading_bar() {
+    local duration=$1
+    local message="$2"
+    local width=50
+    local progress=0
+    
+    echo -ne "\n${BLUE}${message}${NC}\n"
+    
+    for ((i=0; i<=duration; i++)); do
+        progress=$((i * width / duration))
+        bar=$(printf '%*s' "$progress" | tr ' ' '█')
+        spaces=$(printf '%*s' "$((width - progress))" | tr ' ' '░')
+        percentage=$((i * 100 / duration))
+        
+        echo -ne "\r[${GREEN}${bar}${NC}${spaces}] ${percentage}%"
+        sleep 1
+    done
+    echo -e "\n"
+}
+
+# Function to print status messages
+print_status() {
+    local status="$1"
+    local message="$2"
+    
+    case "$status" in
+        "info")
+            echo -e "${BLUE}[INFO]${NC} $message"
+            ;;
+        "success")
+            echo -e "${GREEN}[✓]${NC} $message"
+            ;;
+        "error")
+            echo -e "${RED}[✗]${NC} $message"
+            ;;
+        "warning")
+            echo -e "${YELLOW}[!]${NC} $message"
+            ;;
+    esac
+}
+
+# Function to check if Docker container is running
+check_container() {
+    docker ps --format '{{.Names}}' | grep -q "^${TDARR_CONTAINER}$"
+}
+
+# Function to verify share accessibility
+verify_shares() {
+    print_status "info" "Verifying share accessibility..."
+    
+    if [ ! -d "$SHARE_PATH" ]; then
+        print_status "error" "Share path $SHARE_PATH does not exist!"
+        return 1
+    fi
+    
+    local missing_dirs=()
+    for dir in "${EXPECTED_DIRS[@]}"; do
+        if [ ! -d "$SHARE_PATH/$dir" ]; then
+            missing_dirs+=("$dir")
+        fi
+    done
+    
+    if [ ${#missing_dirs[@]} -gt 0 ]; then
+        print_status "warning" "Missing directories: ${missing_dirs[*]}"
+        return 1
+    fi
+    
+    print_status "success" "All expected directories found in $SHARE_PATH"
+    return 0
+}
+
+# Main execution
+print_title
+
+# Step 1: Stop Tdarr container
+print_status "info" "Stopping Tdarr container..."
+if check_container; then
+    docker stop "$TDARR_CONTAINER" >/dev/null 2>&1
+    print_status "success" "Tdarr container stopped successfully"
+else
+    print_status "warning" "Tdarr container was not running"
+fi
+
+echo ""
+
+# Step 2: Remount network shares
+print_status "info" "Remounting network shares..."
+if [ -f "$SMB_SCRIPT" ]; then
+    sudo "$SMB_SCRIPT" >/dev/null 2>&1
+    print_status "success" "Network shares remounted"
+else
+    print_status "error" "SMB script not found at $SMB_SCRIPT"
+    exit 1
+fi
+
+echo ""
+
+# Step 3: Wait with loading bar
+loading_bar "$WAIT_TIME" "Waiting for shares to stabilize..."
+
+# Step 4: Verify shares
+if ! verify_shares; then
+    print_status "error" "Share verification failed!"
+    print_status "warning" "Attempting to continue anyway..."
+fi
+
+echo ""
+
+# Step 5: Restart Tdarr
+print_status "info" "Starting Tdarr container..."
+docker start "$TDARR_CONTAINER" >/dev/null 2>&1
+sleep 3
+
+if check_container; then
+    print_status "success" "Tdarr container started successfully"
+else
+    print_status "error" "Failed to start Tdarr container"
+    exit 1
+fi
+
+echo ""
+
+# Final status
+echo -e "${GREEN}${BOLD}╔══════════════════════════════════════════════════════════════════════════════╗${NC}"
+print_centered "✓ Operation Completed Successfully!" "${GREEN}${BOLD}"
+echo -e "${GREEN}${BOLD}╚══════════════════════════════════════════════════════════════════════════════╝${NC}"
+echo ""
+print_status "info" "Tdarr is now running with refreshed network shares"
+print_status "info" "Check logs with: ${CYAN}docker logs tdarr-node -f${NC}"
+echo ""
