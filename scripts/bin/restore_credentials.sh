@@ -6,24 +6,31 @@
 #   ./restore_credentials.sh -d <backup_directory> [options]
 #
 # OPTIONS:
-#   -f, --file <path>     Restore from specific archive (.tar or .tar.gpg)
-#   -d, --dir <path>      Restore from backup directory (uses collected/ subdir)
-#   --dry-run             Show what would be restored without making changes
-#   --skip-ssh            Don't restore SSH keys/config
-#   --skip-gpg            Don't import GPG keys
-#   --skip-git            Don't restore git configs
-#   --skip-github         Don't restore GitHub CLI tokens
-#   --skip-vscode         Don't restore VS Code settings
-#   --add-ssh-keys        Automatically add SSH keys to agent after restore
-#   --no-ssh-agent        Don't automatically add SSH keys to agent
+#   -f, --file <path>         Restore from specific archive (.tar or .tar.gpg)
+#   -d, --dir <path>          Restore from backup directory (uses collected/ subdir)
+#   --dry-run                 Show what would be restored without making changes
+#   --skip-ssh                Don't restore SSH keys/config
+#   --skip-gpg                Don't import GPG keys
+#   --skip-git                Don't restore git configs
+#   --skip-github             Don't restore GitHub CLI tokens
+#   --skip-vscode             Don't restore VS Code settings
+#   --skip-docker             Don't restore Docker/Podman registry auth
+#   --skip-aws                Don't restore AWS credentials
+#   --skip-kube               Don't restore Kubernetes config
+#   --skip-keyring            Don't restore system keyring
+#   --skip-package-managers   Don't restore npm/PyPI/Cargo credentials
+#   --add-ssh-keys            Automatically add SSH keys to agent after restore
+#   --no-ssh-agent            Don't automatically add SSH keys to agent
 #
 # SECURITY WARNINGS:
 # - This restores private keys and tokens to your home directory.
 # - Ensure the source archive is trusted and from your own backup.
 # - SSH keys will be restored with proper restrictive permissions (600/700).
+# - Keyring backups are machine-specific and may not restore cleanly on different systems.
 
 set -euo pipefail
 shopt -s nullglob
+umask 077  # Ensure no world-readable files/directories are created
 
 ARCHIVE_FILE=""
 BACKUP_DIR=""
@@ -33,21 +40,31 @@ SKIP_GPG=0
 SKIP_GIT=0
 SKIP_GITHUB=0
 SKIP_VSCODE=0
+SKIP_DOCKER=0
+SKIP_AWS=0
+SKIP_KUBE=0
+SKIP_KEYRING=0
+SKIP_PACKAGE_MANAGERS=0
 ADD_SSH_KEYS=1
 NO_SSH_AGENT=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -f|--file)        ARCHIVE_FILE="${2:-}"; shift 2 ;;
-    -d|--dir)         BACKUP_DIR="${2:-}"; shift 2 ;;
-    --dry-run)        DRY_RUN=1; shift ;;
-    --skip-ssh)       SKIP_SSH=1; shift ;;
-    --skip-gpg)       SKIP_GPG=1; shift ;;
-    --skip-git)       SKIP_GIT=1; shift ;;
-    --skip-github)    SKIP_GITHUB=1; shift ;;
-    --skip-vscode)    SKIP_VSCODE=1; shift ;;
-    --add-ssh-keys)   ADD_SSH_KEYS=1; shift ;;
-    --no-ssh-agent)   NO_SSH_AGENT=1; ADD_SSH_KEYS=0; shift ;;
+    -f|--file)               ARCHIVE_FILE="${2:-}"; shift 2 ;;
+    -d|--dir)                BACKUP_DIR="${2:-}"; shift 2 ;;
+    --dry-run)               DRY_RUN=1; shift ;;
+    --skip-ssh)              SKIP_SSH=1; shift ;;
+    --skip-gpg)              SKIP_GPG=1; shift ;;
+    --skip-git)              SKIP_GIT=1; shift ;;
+    --skip-github)           SKIP_GITHUB=1; shift ;;
+    --skip-vscode)           SKIP_VSCODE=1; shift ;;
+    --skip-docker)           SKIP_DOCKER=1; shift ;;
+    --skip-aws)              SKIP_AWS=1; shift ;;
+    --skip-kube)             SKIP_KUBE=1; shift ;;
+    --skip-keyring)          SKIP_KEYRING=1; shift ;;
+    --skip-package-managers) SKIP_PACKAGE_MANAGERS=1; shift ;;
+    --add-ssh-keys)          ADD_SSH_KEYS=1; shift ;;
+    --no-ssh-agent)          NO_SSH_AGENT=1; ADD_SSH_KEYS=0; shift ;;
     -h|--help)
       sed -n '1,30p' "$0"; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
@@ -261,12 +278,125 @@ if [[ $SKIP_GIT -eq 0 ]]; then
   fi
 fi
 
-# 4) GitHub CLI
-if [[ $SKIP_GITHUB -eq 0 && -f "$WORK_DIR/gh/hosts.yml" ]]; then
-  safe_restore "$WORK_DIR/gh/hosts.yml" "$HOME/.config/gh/hosts.yml" "600"
+# 4) GitHub CLI (hosts.yml and config.yml)
+if [[ $SKIP_GITHUB -eq 0 && -d "$WORK_DIR/gh" ]]; then
+  echo "[info] Restoring GitHub CLI configuration"
+  mkdir -p "$HOME/.config/gh"
+  chmod 700 "$HOME/.config/gh"
+  
+  if [[ -f "$WORK_DIR/gh/hosts.yml" ]]; then
+    safe_restore "$WORK_DIR/gh/hosts.yml" "$HOME/.config/gh/hosts.yml" "600"
+  fi
+  
+  if [[ -f "$WORK_DIR/gh/config.yml" ]]; then
+    safe_restore "$WORK_DIR/gh/config.yml" "$HOME/.config/gh/config.yml" "600"
+  fi
 fi
 
-# 5) VS Code Settings
+# 5) System Keyring
+if [[ $SKIP_KEYRING -eq 0 && -d "$WORK_DIR/keyrings" ]]; then
+  echo "[info] Restoring system keyring"
+  echo "[warn] Keyring data is machine/user specific and may not work on different systems"
+  
+  mkdir -p "$HOME/.local/share"
+  chmod 700 "$HOME/.local/share"
+  
+  if [[ $DRY_RUN -eq 1 ]]; then
+    echo "[dry-run] Would restore system keyring to ~/.local/share/keyrings"
+  else
+    rsync -aH "$WORK_DIR/keyrings/" "$HOME/.local/share/keyrings/"
+    echo "[info] Restored system keyring"
+  fi
+fi
+
+# 6) Docker/Podman
+if [[ $SKIP_DOCKER -eq 0 ]]; then
+  if [[ -f "$WORK_DIR/docker/config.json" ]]; then
+    echo "[info] Restoring Docker registry auth"
+    safe_restore "$WORK_DIR/docker/config.json" "$HOME/.docker/config.json" "600"
+  fi
+  
+  if [[ -f "$WORK_DIR/containers/auth.json" ]]; then
+    echo "[info] Restoring Podman registry auth"
+    safe_restore "$WORK_DIR/containers/auth.json" "$HOME/.config/containers/auth.json" "600"
+  fi
+fi
+
+# 7) AWS
+if [[ $SKIP_AWS -eq 0 && -d "$WORK_DIR/aws" ]]; then
+  echo "[info] Restoring AWS credentials"
+  mkdir -p "$HOME/.aws"
+  chmod 700 "$HOME/.aws"
+  
+  if [[ $DRY_RUN -eq 1 ]]; then
+    echo "[dry-run] Would restore AWS credentials to ~/.aws"
+  else
+    rsync -a "$WORK_DIR/aws/" "$HOME/.aws/"
+    
+    # Set specific permissions
+    [[ -f "$HOME/.aws/credentials" ]] && chmod 600 "$HOME/.aws/credentials"
+    [[ -f "$HOME/.aws/config" ]] && chmod 644 "$HOME/.aws/config"
+    
+    # Set 600 on all other files, 700 on directories
+    find "$HOME/.aws" -type f ! -name "config" ! -name "credentials" -exec chmod 600 {} \; || true
+    find "$HOME/.aws" -type d -exec chmod 700 {} \; || true
+    
+    echo "[info] Restored AWS credentials"
+  fi
+fi
+
+# 8) Kubernetes
+if [[ $SKIP_KUBE -eq 0 && -f "$WORK_DIR/kube/config" ]]; then
+  echo "[info] Restoring Kubernetes config"
+  mkdir -p "$HOME/.kube"
+  chmod 700 "$HOME/.kube"
+  safe_restore "$WORK_DIR/kube/config" "$HOME/.kube/config" "600"
+fi
+
+# 9) Package Managers
+if [[ $SKIP_PACKAGE_MANAGERS -eq 0 ]]; then
+  # npm
+  if [[ -f "$WORK_DIR/package-managers/.npmrc" ]]; then
+    echo "[info] Restoring npm config (~/.npmrc)"
+    safe_restore "$WORK_DIR/package-managers/.npmrc" "$HOME/.npmrc" "600"
+  fi
+  
+  if [[ -f "$WORK_DIR/package-managers/npm/npmrc" ]]; then
+    echo "[info] Restoring npm config (~/.config/npm/npmrc)"
+    mkdir -p "$HOME/.config/npm"
+    chmod 700 "$HOME/.config/npm"
+    safe_restore "$WORK_DIR/package-managers/npm/npmrc" "$HOME/.config/npm/npmrc" "600"
+  fi
+  
+  # PyPI
+  if [[ -f "$WORK_DIR/package-managers/.pypirc" ]]; then
+    echo "[info] Restoring PyPI config (~/.pypirc)"
+    safe_restore "$WORK_DIR/package-managers/.pypirc" "$HOME/.pypirc" "600"
+  fi
+  
+  # Cargo
+  if [[ -f "$WORK_DIR/package-managers/cargo/credentials" ]]; then
+    echo "[info] Restoring Cargo credentials"
+    mkdir -p "$HOME/.cargo"
+    chmod 700 "$HOME/.cargo"
+    safe_restore "$WORK_DIR/package-managers/cargo/credentials" "$HOME/.cargo/credentials" "600"
+  fi
+  
+  if [[ -f "$WORK_DIR/package-managers/cargo/credentials.toml" ]]; then
+    echo "[info] Restoring Cargo credentials (TOML)"
+    mkdir -p "$HOME/.cargo"
+    chmod 700 "$HOME/.cargo"
+    safe_restore "$WORK_DIR/package-managers/cargo/credentials.toml" "$HOME/.cargo/credentials.toml" "600"
+  fi
+fi
+
+# 10) .netrc
+if [[ -f "$WORK_DIR/.netrc" ]]; then
+  echo "[info] Restoring .netrc"
+  safe_restore "$WORK_DIR/.netrc" "$HOME/.netrc" "600"
+fi
+
+# 11) VS Code Settings
 if [[ $SKIP_VSCODE -eq 0 && -d "$WORK_DIR/vscode" ]]; then
   echo "[info] Restoring VS Code settings"
   
@@ -296,6 +426,15 @@ if [[ $DRY_RUN -eq 0 ]]; then
   echo "  - Test GitHub CLI: gh auth status"  
   echo "  - Verify GPG keys: gpg --list-keys"
   echo "  - Test SSH connection: ssh -T git@github.com"
+  if [[ $SKIP_AWS -eq 0 ]]; then
+    echo "  - Verify AWS credentials: aws sts get-caller-identity"
+  fi
+  if [[ $SKIP_KUBE -eq 0 ]]; then
+    echo "  - Test Kubernetes config: kubectl config view"
+  fi
+  if [[ $SKIP_DOCKER -eq 0 ]]; then
+    echo "  - Verify Docker login: docker info"
+  fi
 else
   echo "[dry-run] Credential restore simulation completed"
   if [[ $ADD_SSH_KEYS -eq 1 && $NO_SSH_AGENT -eq 0 ]]; then
