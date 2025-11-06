@@ -1,3 +1,7 @@
 [user]
 	email = jimbob343@gmail.com
 	name = comShadoHarvy
+[credential]
+	helper = /usr/bin/gh auth git-credential
+[url "git@github.com:"]
+	insteadOf = https://github.com/
