@@ -4,8 +4,14 @@
 # Supported items (all optional, discovered automatically):
 # - SSH: ~/.ssh (keys, config, known_hosts) with strict filtering
 # - GPG: exported public/secret keys + ownertrust (ASCII armored)
-# - GitHub CLI: ~/.config/gh/hosts.yml
+# - GitHub CLI: ~/.config/gh/hosts.yml and config.yml
 # - Git: ~/.gitconfig, ~/.git-credentials (if present)
+# - System Keyring: ~/.local/share/keyrings (GNOME Keyring, etc.; highly sensitive)
+# - Docker/Podman: ~/.docker/config.json, ~/.config/containers/auth.json
+# - AWS: ~/.aws/ (credentials, config, etc.)
+# - Kubernetes: ~/.kube/config
+# - Package Managers: npm (~/.npmrc), PyPI (~/.pypirc), Cargo (~/.cargo/credentials*)
+# - Misc: ~/.netrc
 # - VS Code settings: ~/.config/Code/User (settings.json, keybindings.json, snippets)
 #
 # OUTPUT: A timestamped directory under ~/secure-backups/YYYYmmdd-HHMMSS containing
@@ -27,9 +33,11 @@
 # - Handle the resulting archive as HIGHLY SENSITIVE (contains private keys).
 # - Store offline or on an encrypted volume. Do NOT commit anywhere.
 # - Prefer encryption options; plain tar is for temporary/air-gapped use only.
+# - Keyring backups are machine-specific and may not restore cleanly on different systems.
 
 set -euo pipefail
 shopt -s nullglob
+umask 077  # Ensure no world-readable files/directories are created
 
 ENCRYPT_MODE="symmetric"   # default to symmetric encryption
 RECIPIENT=""
@@ -97,11 +105,24 @@ if command -v gpg >/dev/null 2>&1; then
   gpg --export-ownertrust > "$WORK_DIR/gpg/ownertrust.txt" || true
 fi
 
-# 3) GitHub CLI auth
-if [[ -f "$HOME/.config/gh/hosts.yml" ]]; then
-  echo "[info] Backing up GitHub CLI tokens (~/.config/gh/hosts.yml)"
-  mkdir -p "$WORK_DIR/gh"
-  cp -f "$HOME/.config/gh/hosts.yml" "$WORK_DIR/gh/" || true
+# 3) GitHub CLI auth (hosts.yml and config.yml)
+if [[ -d "$HOME/.config/gh" ]]; then
+  GH_HAS_FILES=0
+  [[ -f "$HOME/.config/gh/hosts.yml" ]] && GH_HAS_FILES=1
+  [[ -f "$HOME/.config/gh/config.yml" ]] && GH_HAS_FILES=1
+  
+  if [[ $GH_HAS_FILES -eq 1 ]]; then
+    echo "[info] Backing up GitHub CLI configuration (~/.config/gh/)"
+    mkdir -p "$WORK_DIR/gh"
+    
+    if [[ -f "$HOME/.config/gh/hosts.yml" ]]; then
+      cp -f "$HOME/.config/gh/hosts.yml" "$WORK_DIR/gh/" || true
+    fi
+    
+    if [[ -f "$HOME/.config/gh/config.yml" ]]; then
+      cp -f "$HOME/.config/gh/config.yml" "$WORK_DIR/gh/" || true
+    fi
+  fi
 fi
 
 # 4) Git configs/credentials
@@ -114,7 +135,79 @@ if [[ -f "$HOME/.git-credentials" ]]; then
   cp -f "$HOME/.git-credentials" "$WORK_DIR/" || true
 fi
 
-# 5) VS Code settings (OPTIONAL, no login tokens)
+# 5) System Keyring (GNOME Keyring, KWallet, etc.)
+if [[ -d "$HOME/.local/share/keyrings" ]]; then
+  echo "[info] Backing up system keyring (~/.local/share/keyrings)"
+  echo "[warn] Keyring data is machine/user specific and may not restore on different systems"
+  mkdir -p "$WORK_DIR/keyrings"
+  rsync -aH "$HOME/.local/share/keyrings/" "$WORK_DIR/keyrings/" || true
+fi
+
+# 6) Docker/Podman registry auth
+if [[ -f "$HOME/.docker/config.json" ]]; then
+  echo "[info] Backing up Docker registry auth (~/.docker/config.json)"
+  mkdir -p "$WORK_DIR/docker"
+  cp -f "$HOME/.docker/config.json" "$WORK_DIR/docker/" || true
+fi
+if [[ -f "$HOME/.config/containers/auth.json" ]]; then
+  echo "[info] Backing up Podman registry auth (~/.config/containers/auth.json)"
+  mkdir -p "$WORK_DIR/containers"
+  cp -f "$HOME/.config/containers/auth.json" "$WORK_DIR/containers/" || true
+fi
+
+# 7) AWS credentials and config
+if [[ -d "$HOME/.aws" ]]; then
+  echo "[info] Backing up AWS credentials (~/.aws)"
+  mkdir -p "$WORK_DIR/aws"
+  rsync -a "$HOME/.aws/" "$WORK_DIR/aws/" || true
+fi
+
+# 8) Kubernetes config
+if [[ -f "$HOME/.kube/config" ]]; then
+  echo "[info] Backing up Kubernetes config (~/.kube/config)"
+  mkdir -p "$WORK_DIR/kube"
+  cp -f "$HOME/.kube/config" "$WORK_DIR/kube/" || true
+fi
+
+# 9) Package manager credentials
+# npm
+if [[ -f "$HOME/.npmrc" ]]; then
+  echo "[info] Backing up npm config (~/.npmrc)"
+  mkdir -p "$WORK_DIR/package-managers"
+  cp -f "$HOME/.npmrc" "$WORK_DIR/package-managers/" || true
+fi
+if [[ -f "$HOME/.config/npm/npmrc" ]]; then
+  echo "[info] Backing up npm config (~/.config/npm/npmrc)"
+  mkdir -p "$WORK_DIR/package-managers/npm"
+  cp -f "$HOME/.config/npm/npmrc" "$WORK_DIR/package-managers/npm/" || true
+fi
+
+# PyPI
+if [[ -f "$HOME/.pypirc" ]]; then
+  echo "[info] Backing up PyPI config (~/.pypirc)"
+  mkdir -p "$WORK_DIR/package-managers"
+  cp -f "$HOME/.pypirc" "$WORK_DIR/package-managers/" || true
+fi
+
+# Cargo/Rust
+if [[ -f "$HOME/.cargo/credentials" ]]; then
+  echo "[info] Backing up Cargo credentials (~/.cargo/credentials)"
+  mkdir -p "$WORK_DIR/package-managers/cargo"
+  cp -f "$HOME/.cargo/credentials" "$WORK_DIR/package-managers/cargo/" || true
+fi
+if [[ -f "$HOME/.cargo/credentials.toml" ]]; then
+  echo "[info] Backing up Cargo credentials (~/.cargo/credentials.toml)"
+  mkdir -p "$WORK_DIR/package-managers/cargo"
+  cp -f "$HOME/.cargo/credentials.toml" "$WORK_DIR/package-managers/cargo/" || true
+fi
+
+# 10) .netrc
+if [[ -f "$HOME/.netrc" ]]; then
+  echo "[info] Backing up .netrc (~/.netrc)"
+  cp -f "$HOME/.netrc" "$WORK_DIR/" || true
+fi
+
+# 11) VS Code settings (OPTIONAL, no login tokens)
 if [[ $INCLUDE_VSCODE -eq 1 ]]; then
   VSC_USER_DIR="$HOME/.config/Code/User"
   if [[ -d "$VSC_USER_DIR" ]]; then
