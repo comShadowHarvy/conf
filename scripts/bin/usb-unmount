@@ -1,0 +1,118 @@
+#!/bin/bash
+#
+# USB Device Unmount Utility
+# Author: ShadowHarvy
+# Description: Safely unmount and power off USB devices
+#
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
+BOLD='\033[1m'
+DIM='\033[2m'
+RESET='\033[0m'
+
+# Header
+clear
+echo -e "${BOLD}${CYAN}╔═══════════════════════════════════════════════════════════╗${RESET}"
+echo -e "${BOLD}${CYAN}║${RESET}          ${BOLD}USB Device Unmount Utility${RESET}                 ${BOLD}${CYAN}║${RESET}"
+echo -e "${BOLD}${CYAN}║${RESET}                ${DIM}Author: ShadowHarvy${RESET}                     ${BOLD}${CYAN}║${RESET}"
+echo -e "${BOLD}${CYAN}╚═══════════════════════════════════════════════════════════╝${RESET}"
+echo ""
+
+# Get list of removable USB devices
+mapfile -t devices < <(lsblk -ndo NAME,TYPE,TRAN,SIZE,MODEL | grep 'usb' | awk '{print $1}')
+
+if [ ${#devices[@]} -eq 0 ]; then
+    echo -e "${YELLOW}⚠ No USB devices found.${RESET}"
+    exit 0
+fi
+
+echo -e "${BOLD}Available USB Devices:${RESET}"
+echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+echo ""
+
+# Display numbered list with details
+for i in "${!devices[@]}"; do
+    dev="${devices[$i]}"
+    size=$(lsblk -ndo SIZE "/dev/$dev")
+    model=$(lsblk -ndo MODEL "/dev/$dev")
+    
+    echo -e "${BOLD}${GREEN}$((i+1)).${RESET} ${BOLD}/dev/$dev${RESET} ${DIM}─${RESET} ${CYAN}$size${RESET} ${DIM}─${RESET} ${MAGENTA}$model${RESET}"
+    
+    # Show partitions if any
+    while IFS= read -r line; do
+        part_name=$(echo "$line" | awk '{print $1}')
+        part_size=$(echo "$line" | awk '{print $2}')
+        part_fstype=$(echo "$line" | awk '{print $3}')
+        part_mount=$(echo "$line" | awk '{for(i=4;i<=NF;i++) printf "%s ", $i; print ""}' | sed 's/ $//')
+        
+        if [ -n "$part_mount" ]; then
+            mount_info="${GREEN}✓${RESET} ${part_mount}"
+        else
+            mount_info="${DIM}(not mounted)${RESET}"
+        fi
+        
+        if [ -n "$part_fstype" ]; then
+            fs_info="[${YELLOW}$part_fstype${RESET}]"
+        else
+            fs_info=""
+        fi
+        
+        echo -e "   ${DIM}└─${RESET} ${part_name} ${DIM}─${RESET} ${part_size} ${fs_info} ${mount_info}"
+    done < <(lsblk -no NAME,SIZE,FSTYPE,MOUNTPOINT "/dev/$dev" | tail -n +2)
+    
+    echo ""
+done
+
+echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+echo -ne "${BOLD}Select device number to unmount ${DIM}(or 'q' to quit)${RESET}: "
+read choice
+
+if [[ "$choice" == "q" ]] || [[ "$choice" == "Q" ]]; then
+    echo -e "${YELLOW}⚠ Cancelled.${RESET}"
+    exit 0
+fi
+
+# Validate input
+if ! [[ "$choice" =~ ^[0-9]+$ ]] || [ "$choice" -lt 1 ] || [ "$choice" -gt ${#devices[@]} ]; then
+    echo -e "${RED}✗ Invalid selection.${RESET}"
+    exit 1
+fi
+
+selected_device="${devices[$((choice-1))]}"
+echo ""
+echo -e "${BOLD}${CYAN}➜ Selected: /dev/$selected_device${RESET}"
+echo ""
+
+# Find all mounted partitions for this device
+mapfile -t partitions < <(lsblk -nlo NAME,MOUNTPOINT "/dev/$selected_device" | awk '$2 != "" {print $1}')
+
+if [ ${#partitions[@]} -eq 0 ]; then
+    echo -e "${YELLOW}⚠ No mounted partitions found on /dev/$selected_device${RESET}"
+else
+    echo -e "${BOLD}Unmounting partitions...${RESET}"
+    for part in "${partitions[@]}"; do
+        echo -ne "  ${BLUE}◆${RESET} Unmounting /dev/$part... "
+        if udisksctl unmount -b "/dev/$part" &>/dev/null; then
+            echo -e "${GREEN}✓${RESET}"
+        else
+            echo -e "${RED}✗ Failed${RESET}"
+            exit 1
+        fi
+    done
+fi
+
+echo -ne "${BOLD}Powering off /dev/$selected_device...${RESET} "
+if udisksctl power-off -b "/dev/$selected_device" &>/dev/null; then
+    echo -e "${GREEN}✓${RESET}"
+    echo ""
+    echo -e "${BOLD}${GREEN}✓ /dev/$selected_device is now safe to remove!${RESET}"
+else
+    echo -e "${RED}✗ Failed${RESET}"
+    exit 1
+fi
