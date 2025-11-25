@@ -1018,3 +1018,7 @@ alias unprofile-zsh="sed -i 's/zmodload zsh\\/zprof/# zmodload zsh\\/zprof/' .zs
 # _log_message "INFO" "Zsh initialized in $ZSHRC_ELAPSED seconds"
 # zprof # Print profiling info
 
+
+# BEGIN Betterstrap YubiKey - GPG_AGENT SSH
+export SSH_AUTH_SOCK="${XDG_RUNTIME_DIR}/gnupg/S.gpg-agent.ssh"
+# END Betterstrap YubiKey

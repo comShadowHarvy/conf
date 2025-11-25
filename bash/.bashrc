@@ -42,3 +42,11 @@ if [[ -d "$HOME/.aliases.d" ]]; then
         [[ -f "$alias_file" ]] && source "$alias_file"
     done
 fi
+. "$HOME/.cargo/env"
+
+# opencode
+export PATH=/home/me/.opencode/bin:$PATH
+
+# BEGIN Betterstrap YubiKey - GPG_AGENT SSH
+export SSH_AUTH_SOCK="${XDG_RUNTIME_DIR}/gnupg/S.gpg-agent.ssh"
+# END Betterstrap YubiKey
