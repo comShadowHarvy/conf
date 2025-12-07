@@ -1,0 +1,107 @@
+# Modern CLI Tool Aliases
+# Intelligent defaults for broot, zellij, hexyl, just, hyperfine, atuin, ouch, gping, bandwhich, starship, fzf
+
+# --- broot (tree replacement) ---
+alias br='broot'
+alias tree='broot --sizes'  # Show tree with file sizes
+alias dt='broot --only-folders'  # Directory tree only
+
+# --- zellij (tmux replacement) ---
+alias zj='zellij'
+alias zja='zellij attach'  # Attach to existing session
+alias zjl='zellij list-sessions'  # List sessions
+alias zjk='zellij kill-session'  # Kill a session
+alias zjka='zellij kill-all-sessions'  # Kill all sessions
+
+# --- hexyl (hexdump replacement) ---
+alias hex='hexyl'
+alias hd='hexyl'  # Traditional hexdump alias
+
+# --- just (make replacement) ---
+alias j='just'
+alias jl='just --list'  # List available recipes
+alias jc='just --choose'  # Interactive recipe chooser (if installed)
+
+# --- hyperfine (time/benchmark replacement) ---
+alias bench='hyperfine'
+alias benchmark='hyperfine --warmup 3'  # With warmup runs
+
+# --- atuin (history replacement) ---
+# Atuin's Ctrl+R is already configured by 'atuin init bash'
+alias hist='atuin search'  # Interactive search
+alias histsync='atuin sync'  # Sync history across machines
+alias histstats='atuin stats'  # Show statistics
+
+# --- ouch (tar/zip replacement) ---
+alias compress='ouch compress'
+alias decompress='ouch decompress'
+alias extract='ouch decompress'  # More intuitive name
+alias list-archive='ouch list'  # List archive contents
+
+# --- gping (ping replacement) ---
+alias ping='gping'  # Replace default ping with graphical version
+alias oldping='/usr/bin/ping'  # Keep original ping available
+
+# --- bandwhich (iftop replacement) ---
+alias bandwidth='sudo bandwhich'  # Needs sudo
+alias bw='sudo bandwhich'
+alias netmon='sudo bandwhich'  # Network monitor
+
+# --- fzf helpers ---
+# File finder with preview
+alias ff='fd --type f --hidden --exclude .git | fzf --preview "bat --color=always --style=numbers --line-range=:500 {}" --preview-window=right:60%:wrap'
+# Directory finder and cd
+alias fcd='cd $(fd --type d --hidden --exclude .git | fzf --preview "ls -la {}")'
+# Process killer
+alias fkill='ps aux | fzf --header="Select process to kill" | awk "{print \$2}" | xargs kill'
+# Git branch switcher
+alias fgb='git branch | fzf | xargs git checkout'
+
+# --- fd + fzf combinations ---
+alias fv='$EDITOR $(ff)'  # Find and edit file
+alias fo='xdg-open $(ff) 2>/dev/null'  # Find and open file
+
+# --- Convenience combinations ---
+# Quick benchmark comparison
+alias vs='hyperfine --warmup 3'  # "versus" - compare commands
+# Compress with best compression
+alias squeeze='ouch compress --level 9'
+# Interactive directory navigation
+alias nav='broot'
+
+# --- Enhanced ls alternatives (if using eza/exa) ---
+# These work well with the modern toolset if you have eza installed
+if command -v eza &> /dev/null; then
+    alias ls='eza --icons'
+    alias ll='eza -lh --icons --git'
+    alias la='eza -lah --icons --git'
+    alias lt='eza --tree --icons --level=2'
+    alias lta='eza --tree --icons --level=3 -a'
+fi
+
+# --- Intelligent history search ---
+# Quick access to last commands in current directory
+alias here-hist='atuin search --cwd $(pwd)'
+# Commands from last hour
+alias recent='atuin search --before "1h ago"'
+
+# --- Archive operations made easy ---
+# Smart extract that works with any format
+alias unpack='ouch decompress'
+alias pack='ouch compress'
+# Create tar.gz with one command
+alias targz='ouch compress --format tar.gz'
+alias tarxz='ouch compress --format tar.xz'
+
+# --- Network diagnostics ---
+# Ping multiple hosts
+alias pingall='gping google.com cloudflare.com 8.8.8.8'
+# Check local network
+alias pinglocal='gping 192.168.1.1 google.com'
+
+# --- Quick project commands ---
+# If in a project with justfile, run default recipe
+alias run='just'
+alias build='just build'
+alias test='just test'
+alias dev='just dev'
