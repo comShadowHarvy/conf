@@ -7,3 +7,4 @@ WARP.md
 .zshrc.orig_*
 logs/
 .last_backup
+*.AppImage
