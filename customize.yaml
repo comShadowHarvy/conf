@@ -1,38 +1,133 @@
+# ============================================================================
+# HYPRLAND CUSTOMIZATION CONFIG
+# ============================================================================
 
+# ============================================================================
+# ENVIRONMENT VARIABLES
+# ============================================================================
+env = GDK_SCALE, 1
+env = SDL_VIDEODRIVER, wayland,x11
+
+# Force modern apps to use Wayland/GPU correctly (commented out)
+#env = MOZ_ENABLE_WAYLAND,1
+#env = QT_QPA_PLATFORM,wayland;xcb
+#env = QT_WAYLAND_DISABLE_WINDOWDECORATION,1
+
+# ============================================================================
+# VARIABLES
+# ============================================================================
+$browser = chromium --force-device-scale-factor=0.8
+
+# ============================================================================
+# MONITOR CONFIGURATION
+# ============================================================================
+monitor = ,preferred,auto,1
+
+# ============================================================================
+# MISC SETTINGS
+# ============================================================================
 misc {
     enable_swallow = true
     swallow_regex = ^(Alacritty|kitty|ghostty|wezterm|foot|footclient|urxvt|xterm|gnome-terminal|konsole|xfce4-terminal)$
     mouse_move_enables_dpms = true
     key_press_enables_dpms = true
+    vrr = 1
 }
 
-env = GDK_SCALE, 1
-env = SDL_VIDEODRIVER, wayland,x11
-
-monitor = ,preferred,auto,1
-
-$browser = chromium --force-device-scale-factor=0.8
-
+# ============================================================================
+# GENERAL APPEARANCE
+# ============================================================================
 general {
     gaps_in = 3
     gaps_out = 5
     border_size = 2
     col.active_border = rgb(89b4fa)
     col.inactive_border = rgb(313244)
+    allow_tearing = true
 }
 
+# ============================================================================
+# DECORATION
+# ============================================================================
 decoration {
     rounding = 8
+    
+    # Global opacity (Active / Inactive)
+    active_opacity = 0.95
+    inactive_opacity = 0.6
+    
+    # Blur settings
+    blur {
+        enabled = true
+        size = 3
+        passes = 3
+        vibrancy = 0.1696
+    }
 }
 
-windowrulev2 = opacity 0.8 0.8, class:^(?!.*special).*$
-windowrulev2 = opacity 0.6 0.6, class:^(?!.*special).*$, focuspoint:w
+# ============================================================================
+# INPUT SETTINGS
+# ============================================================================
+input {
+    repeat_rate = 50
+    repeat_delay = 220
+}
 
-#repeat_rate = 50
-#repeat_delay = 220                # Slight delay before repeat kicks in
+# ============================================================================
+# GESTURES (commented out)
+# ============================================================================
+#gestures {
+#    workspace_swipe = true
+#    workspace_swipe_fingers = 3
+#}
 
+# ============================================================================
+# ANIMATIONS
+# ============================================================================
+animations {
+    enabled = true
 
+    # Bezier curves
+    # "Bouncy" - Controls bounce intensity (1.1 subtle, 1.25 moderate, 1.35 extreme)
+    bezier = bouncy, 0.1, 0.9, 0.1, 1.25
+    
+    # "SmoothOut" - Clean ease-out curve for window exits
+    bezier = smoothOut, 0.1, 1, 0.5, 1
 
+    # Window animations
+    animation = windows, 1, 10, bouncy, popin 60%
+    animation = windowsOut, 1, 10, smoothOut, popin 80%
+    
+    # Border and fade animations
+    animation = border, 1, 10, default
+    animation = borderangle, 1, 8, default
+    animation = fade, 1, 10, default
+    
+    # Workspace animations
+    animation = workspaces, 1, 9, bouncy, slide
+}
 
+# ============================================================================
+# DWINDLE LAYOUT
+# ============================================================================
+dwindle {
+    pseudotile = true
+    preserve_split = true  # Essential for coding (allows precise window splitting)
+}
 
+# ============================================================================
+# KEYBINDINGS
+# ============================================================================
+# Monitor scale controls
+bind = SUPER, F9, exec, hyprctl keyword monitor ,preferred,auto,1      # Normal scale (1.0)
+bind = SUPER, F10, exec, hyprctl keyword monitor ,preferred,auto,1.6   # Zoomed scale (1.6)
 
+# ============================================================================
+# WINDOW RULES
+# ============================================================================
+# Gaming rules - Force games to be opaque and allow tearing for performance
+windowrulev2 = opacity 1.0 override 1.0 override, class:^(Cyberpunk2077|steam_app_\d+)$
+windowrulev2 = immediate, class:^(Cyberpunk2077|steam_app_\d+)$
+
+# Note: Special workspace opacity is handled by the decoration block above
+# windowrulev2 = opacity 1.0 override 1.0 override, class:^(.*special.*)$
