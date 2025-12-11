@@ -28,7 +28,7 @@ unset -f bind 2>/dev/null  # Remove bash bind function if it exists
 # Make an alias for invoking commands you use constantly
 # alias p='python'
 
-. "$HOME/.local/share/../bin/env"
+[[ -f "$HOME/.local/bin/env" ]] && . "$HOME/.local/bin/env"
 . "$HOME/.cargo/env"
 
 # --- Core Environment Setup (Set Early) ---
@@ -600,7 +600,7 @@ load_alias_module() {
   elif [[ -d "$PWD/aliases.d" ]]; then
     config_dir="$PWD"
   else
-    _log_message "WARNING" "aliases.d directory not found"
+    # Silently return if no aliases directory found
     return 1
   fi
   
@@ -610,9 +610,8 @@ load_alias_module() {
   # Skip if already loaded
   [[ -v $module_id ]] && return 0
   
-  # Check if file exists and is readable
+  # Check if file exists and is readable - silently skip if not
   if [[ ! -r "$file" ]]; then
-    _log_message "WARNING" "Alias module not found or not readable: $file"
     return 1
   fi
   
@@ -622,7 +621,7 @@ load_alias_module() {
     typeset -g "$module_id"=1
     return 0
   else
-    _log_message "WARNING" "Failed to load alias module: $mod"
+    # Silently fail if sourcing fails
     return 1
   fi
 }
@@ -784,7 +783,12 @@ export SCREENFX_SPEED="fast"
   local -a _styles=("${(@)SCREENFX_STYLES:#static}")
   local -i _idx=$(( (RANDOM % ${#_styles[@]}) + 1 ))
   export SCREENFX_STYLE="${_styles[_idx]}"
-  screenfx::show "$HOME/git/conf/screen.txt"
+  # Pick random screen file
+  local -a _screen_files=("$HOME/git/conf"/screen*.txt)
+  if [[ ${#_screen_files[@]} -gt 0 ]]; then
+    local -i _screen_idx=$(( (RANDOM % ${#_screen_files[@]}) ))
+    screenfx::show "${_screen_files[_screen_idx]}"
+  fi
 }
 
 # --- Feature Functions & Aliases ---
