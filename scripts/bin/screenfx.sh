@@ -380,9 +380,9 @@ screenfx::waves() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -459,9 +459,9 @@ screenfx::bounce() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -530,9 +530,9 @@ screenfx::scan() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -585,9 +585,9 @@ screenfx::fade() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -630,9 +630,9 @@ screenfx::reveal() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -697,9 +697,9 @@ screenfx::cascade() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -775,9 +775,9 @@ screenfx::hologram() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -861,9 +861,9 @@ screenfx::neon() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -925,9 +925,9 @@ screenfx::terminal() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -984,9 +984,9 @@ screenfx::hack() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -1067,9 +1067,9 @@ screenfx::decrypt() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -1155,9 +1155,9 @@ screenfx::spiral() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -1242,9 +1242,9 @@ screenfx::plasma() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -1319,9 +1319,9 @@ screenfx::lightning() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -1422,9 +1422,9 @@ screenfx::explode() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -1538,9 +1538,9 @@ screenfx::radar() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -1644,9 +1644,9 @@ screenfx::binary_rain() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -1726,9 +1726,9 @@ screenfx::quantum() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -1795,9 +1795,9 @@ screenfx::virus() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -1873,9 +1873,9 @@ screenfx::neural() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -1955,9 +1955,9 @@ screenfx::blackhole() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -2068,9 +2068,9 @@ screenfx::dna() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -2163,9 +2163,9 @@ screenfx::firewall() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -2238,9 +2238,9 @@ screenfx::wormhole() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -2336,9 +2336,9 @@ screenfx::cryptocurrency() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -2413,9 +2413,9 @@ screenfx::alien() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -2510,9 +2510,9 @@ screenfx::time_travel() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -2582,9 +2582,9 @@ screenfx::magnetic() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -2658,9 +2658,9 @@ screenfx::seismic() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -2731,9 +2731,9 @@ screenfx::solar_flare() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -2804,9 +2804,9 @@ screenfx::teleport() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -2922,9 +2922,9 @@ screenfx::stealth() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -3044,9 +3044,9 @@ screenfx::meltdown() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -3146,9 +3146,9 @@ screenfx::ice() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -3231,9 +3231,9 @@ screenfx::mirror() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -3344,9 +3344,9 @@ screenfx::echo() {
     
     # Read all lines into array
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -3433,9 +3433,9 @@ screenfx::gravity() {
     local total_lines=0
     
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -3495,9 +3495,9 @@ screenfx::phase() {
     local total_lines=0
     
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -3538,9 +3538,9 @@ screenfx::prism() {
     local total_lines=0
     
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -3579,9 +3579,9 @@ screenfx::turbulence() {
     local total_lines=0
     
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -3633,9 +3633,9 @@ screenfx::metamorphosis() {
     local total_lines=0
     
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -3689,9 +3689,9 @@ screenfx::origami() {
     local total_lines=0
     
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -3744,9 +3744,9 @@ screenfx::kaleidoscope() {
     local total_lines=0
     
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -3785,9 +3785,9 @@ screenfx::tessellation() {
     local total_lines=0
     
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -3828,9 +3828,9 @@ screenfx::fibonacci() {
     local total_lines=0
     
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
@@ -3884,9 +3884,9 @@ screenfx::constellation() {
     local total_lines=0
     
     while IFS= read -r line; do
-        lines[total_lines]="$line"
-        ((total_lines++))
+        lines+=("$line")
     done < "$file"
+    total_lines=${#lines[@]}
     
     screenfx::hide_cursor
     screenfx::clear_screen
