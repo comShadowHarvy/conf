@@ -2218,3 +2218,38 @@ if command -v nvim &>/dev/null; then
     echo "    \$HOME/.config/nvim-Lazyman/lazyman.sh"
   fi
 fi
+
+
+
+
+
+# --- Modern CLI Replacements ---
+
+# Replace cat with bat
+alias cat='bat --style=plain' # plain style usually better for simple output
+alias catt='bat'              # fully decorated bat
+
+# Replace ls with eza
+alias ls='eza --icons'
+alias ll='eza -l --icons --git'
+alias la='eza -la --icons --git'
+alias tree='eza --tree --icons'
+
+# Replace grep with ripgrep
+alias grep='rg'
+
+# Replace find with fd
+alias find='fd'
+
+# Replace ps with procs
+alias ps='procs'
+
+# Replace du with dust
+alias du='dust'
+
+# Replace df with duf
+alias df='duf'
+
+# Initialize zoxide (Replace cd)
+# Note: This line must be at the very end of your config
+eval "$(zoxide init bash)" # Change 'bash' to 'zsh' or 'fish' if you use those

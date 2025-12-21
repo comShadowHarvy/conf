@@ -1026,3 +1026,15 @@ alias unprofile-zsh="sed -i 's/zmodload zsh\\/zprof/# zmodload zsh\\/zprof/' .zs
 # BEGIN Betterstrap YubiKey - GPG_AGENT SSH
 export SSH_AUTH_SOCK="${XDG_RUNTIME_DIR}/gnupg/S.gpg-agent.ssh"
 # END Betterstrap YubiKey
+
+
+gemini() {
+    if command -v gemini &> /dev/null; then
+        # If gemini is installed, run it with any arguments passed
+        command gemini "$@"
+    else
+        # If not installed, tell the user and install it
+        echo "Gemini not found. Installing..."
+        npm install -g @google/gemini-cli
+    fi
+}

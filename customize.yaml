@@ -119,8 +119,9 @@ dwindle {
 # KEYBINDINGS
 # ============================================================================
 # Monitor scale controls
+bind = SUPER, F8, exec, hyprctl keyword monitor ,preferred,auto,0.8    # Zoomed out (0.5)
 bind = SUPER, F9, exec, hyprctl keyword monitor ,preferred,auto,1      # Normal scale (1.0)
-bind = SUPER, F10, exec, hyprctl keyword monitor ,preferred,auto,1.6   # Zoomed scale (1.6)
+bind = SUPER, F10, exec, hyprctl keyword monitor ,preferred,auto,1.5   # Zoomed scale (1.6)
 
 # ============================================================================
 # WINDOW RULES
