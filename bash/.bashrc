@@ -9,3 +9,8 @@ source ~/.local/share/omarchy/default/bash/rc
 #
 # Make an alias for invoking commands you use constantly
 # alias p='python'
+
+# Added by LM Studio CLI (lms)
+export PATH="$PATH:/home/me/.lmstudio/bin"
+# End of LM Studio CLI section
+

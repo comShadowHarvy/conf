@@ -16,7 +16,7 @@ env = SDL_VIDEODRIVER, wayland,x11
 # ============================================================================
 # VARIABLES
 # ============================================================================
-$browser = chromium --force-device-scale-factor=0.8
+#$browser = chromium --force-device-scale-factor=0.8
 
 # ============================================================================
 # MONITOR CONFIGURATION

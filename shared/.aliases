@@ -2227,7 +2227,7 @@ fi
 
 # Replace cat with bat
 alias cat='bat --style=plain' # plain style usually better for simple output
-alias catt='bat'              # fully decorated bat
+alias cattt='bat'              # fully decorated bat
 
 # Replace ls with eza
 alias ls='eza --icons'
