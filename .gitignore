@@ -8,4 +8,4 @@ WARP.md
 logs/
 .last_backup
 *.AppImage
-vscode/.vscode
+.vscode/
