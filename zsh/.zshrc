@@ -193,3 +193,5 @@ bindkey '^[[1;5D' backward-word
 
 # --- 11. Local Overrides ---
 [[ -f "$HOME/.zshrc.local" ]] && source "$HOME/.zshrc.local"
+
+. "$HOME/.local/share/../bin/env"
