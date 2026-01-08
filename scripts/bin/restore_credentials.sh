@@ -18,6 +18,7 @@
 #   --skip-aws                Don't restore AWS credentials
 #   --skip-kube               Don't restore Kubernetes config
 #   --skip-keyring            Don't restore system keyring
+#   --skip-gemini             Don't restore Gemini CLI config
 #   --skip-package-managers   Don't restore npm/PyPI/Cargo credentials
 #   --add-ssh-keys            Automatically add SSH keys to agent after restore
 #   --no-ssh-agent            Don't automatically add SSH keys to agent
@@ -44,6 +45,7 @@ SKIP_DOCKER=0
 SKIP_AWS=0
 SKIP_KUBE=0
 SKIP_KEYRING=0
+SKIP_GEMINI=0
 SKIP_PACKAGE_MANAGERS=0
 ADD_SSH_KEYS=1
 NO_SSH_AGENT=0
@@ -62,6 +64,7 @@ while [[ $# -gt 0 ]]; do
     --skip-aws)              SKIP_AWS=1; shift ;;
     --skip-kube)             SKIP_KUBE=1; shift ;;
     --skip-keyring)          SKIP_KEYRING=1; shift ;;
+    --skip-gemini)           SKIP_GEMINI=1; shift ;;
     --skip-package-managers) SKIP_PACKAGE_MANAGERS=1; shift ;;
     --add-ssh-keys)          ADD_SSH_KEYS=1; shift ;;
     --no-ssh-agent)          NO_SSH_AGENT=1; ADD_SSH_KEYS=0; shift ;;
@@ -417,6 +420,25 @@ if [[ $SKIP_VSCODE -eq 0 && -d "$WORK_DIR/vscode" ]]; then
   fi
 fi
 
+# 12) Gemini CLI
+if [[ $SKIP_GEMINI -eq 0 && -d "$WORK_DIR/gemini" ]]; then
+  echo "[info] Restoring Gemini CLI configuration"
+  mkdir -p "$HOME/.gemini"
+  chmod 700 "$HOME/.gemini"
+  
+  if [[ $DRY_RUN -eq 1 ]]; then
+    echo "[dry-run] Would restore Gemini config to ~/.gemini"
+  else
+    rsync -a "$WORK_DIR/gemini/" "$HOME/.gemini/"
+    
+    # Ensure secure permissions for auth tokens
+    find "$HOME/.gemini" -type f -exec chmod 600 {} \; || true
+    find "$HOME/.gemini" -type d -exec chmod 700 {} \; || true
+    
+    echo "[info] Restored Gemini CLI config"
+  fi
+fi
+
 if [[ $DRY_RUN -eq 0 ]]; then
   echo "[done] Credential restore completed"
   echo "[info] You may need to:"
@@ -434,6 +456,9 @@ if [[ $DRY_RUN -eq 0 ]]; then
   fi
   if [[ $SKIP_DOCKER -eq 0 ]]; then
     echo "  - Verify Docker login: docker info"
+  fi
+  if [[ $SKIP_GEMINI -eq 0 ]]; then
+    echo "  - Verify Gemini extensions: gemini extensions list"
   fi
 else
   echo "[dry-run] Credential restore simulation completed"

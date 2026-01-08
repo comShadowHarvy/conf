@@ -13,6 +13,7 @@
 # - Package Managers: npm (~/.npmrc), PyPI (~/.pypirc), Cargo (~/.cargo/credentials*)
 # - Misc: ~/.netrc
 # - VS Code settings: ~/.config/Code/User (settings.json, keybindings.json, snippets)
+# - Gemini CLI: ~/.gemini (Config, Extensions, MCP tokens)
 #
 # OUTPUT: A timestamped directory under ~/secure-backups/YYYYmmdd-HHMMSS containing
 #         files and a consolidated credentials.tar(.gpg) archive
@@ -28,12 +29,6 @@
 #
 # --outdir: Creates $DIR/YYYYmmdd-HHMMSS/ (original standalone mode)
 # --dest: Creates $DEST/credentials/ (centralized mode - no timestamp subdirectory)
-#
-# SECURITY WARNINGS:
-# - Handle the resulting archive as HIGHLY SENSITIVE (contains private keys).
-# - Store offline or on an encrypted volume. Do NOT commit anywhere.
-# - Prefer encryption options; plain tar is for temporary/air-gapped use only.
-# - Keyring backups are machine-specific and may not restore cleanly on different systems.
 
 set -euo pipefail
 shopt -s nullglob
@@ -223,6 +218,14 @@ if [[ $INCLUDE_VSCODE -eq 1 ]]; then
   fi
 fi
 
+# 12) Gemini CLI (Config, Auth Tokens, MCP, Extensions)
+if [[ -d "$HOME/.gemini" ]]; then
+  echo "[info] Backing up Gemini CLI config (~/.gemini)"
+  mkdir -p "$WORK_DIR/gemini"
+  # Back up everything including extensions, history, and mcp-tokens
+  rsync -a "$HOME/.gemini/" "$WORK_DIR/gemini/" || true
+fi
+
 # Summary manifest
 {
   echo "Backup timestamp: $TS"
@@ -300,4 +303,3 @@ fi
 
 echo "[done] Credentials backup complete: $OUT_DIR"
 echo "[info] Latest backup symlink: $OUT_ROOT/latest"
-
