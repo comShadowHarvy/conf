@@ -123,7 +123,10 @@ bind = SUPER, F8, exec, hyprctl keyword monitor ,preferred,auto,0.8    # Zoomed 
 bind = SUPER, F9, exec, hyprctl keyword monitor ,preferred,auto,1      # Normal scale (1.0)
 bind = SUPER, F10, exec, hyprctl keyword monitor ,preferred,auto,1.5   # Zoomed scale (1.6)
 
-# ============================================================================
+# ===========================================================
+#
+#
+# =================
 # WINDOW RULES
 # ============================================================================
 # Gaming rules - Force games to be opaque and allow tearing for performance
@@ -132,3 +135,6 @@ windowrulev2 = immediate, class:^(Cyberpunk2077|steam_app_\d+)$
 
 # Note: Special workspace opacity is handled by the decoration block above
 # windowrulev2 = opacity 1.0 override 1.0 override, class:^(.*special.*)$
+#
+#https://itsohen.github.io/hyprrulefix/
+debug { suppress_errors = true }

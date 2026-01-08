@@ -211,12 +211,45 @@ def get_weather_data():
     except:
         return {"desc": "ERR", "solar": "ERR"}
 
+def get_next_holiday():
+    """Calculates days until the next Ontario holiday."""
+    today = datetime.now().date()
+    year = today.year
+    # Get holidays for this year and next (incase we are in late Dec)
+    # Using 'ON' for Ontario specific holidays
+    on_holidays = holidays.Canada(subdiv='ON', years=[year, year + 1])
+    
+    # Filter for future dates only
+    upcoming = []
+    for date, name in on_holidays.items():
+        if date >= today:
+            upcoming.append((date, name))
+            
+    if not upcoming:
+        return "N/A", "Unknown"
+        
+    # Sort by date to get the nearest one
+    upcoming.sort(key=lambda x: x[0])
+    next_date, next_name = upcoming[0]
+    
+    delta = (next_date - today).days
+    
+    if delta == 0:
+        time_str = "[blink bold red]TODAY[/blink bold red]"
+    elif delta == 1:
+        time_str = "1 day"
+    else:
+        time_str = f"{delta} days"
+        
+    return time_str, next_name
+
 def main():
     sys = get_system_stats()
     net = get_network_info()
     pwr = get_power_stats()
     wx = get_weather_data()
     gpu = get_gpu_info()
+    hol_time, hol_name = get_next_holiday()
     quote = get_glados_quote()
     status_phrase = get_hacker_phrase()
     
@@ -253,7 +286,7 @@ def main():
     right_table.add_row()
     right_table.add_row("TEMP", wx['desc'])
     right_table.add_row("CYCLE", wx['solar'])
-    right_table.add_row("USER", "ShadowHarvy")
+    right_table.add_row("NEXT HOL", f"[yellow]{hol_name}[/yellow] ({hol_time})")
 
     # --- ASSEMBLE ---
     grid.add_row(left_table, right_table)

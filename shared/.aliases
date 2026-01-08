@@ -2253,3 +2253,20 @@ alias df='duf'
 # Initialize zoxide (Replace cd)
 # Note: This line must be at the very end of your config
 eval "$(zoxide init bash)" # Change 'bash' to 'zsh' or 'fish' if you use those
+
+# Primary Coding Model (Qwen 2.5 Coder 14B)
+alias aiderq='aider --model ollama/qwen2.5-coder:14b'
+
+# Reasoning/Deep Thinking Model (DeepSeek R1 8B)
+alias aiderds='aider --model ollama/deepseek-r1:8b'
+
+# General Fast Chat (Ministral 3 8B)
+alias aiderm='aider --model ollama/ministral-3:8b'
+
+# Vision Model for Images (Qwen 3 VL 8B)
+alias aidervl='aider --model ollama/qwen3-vl:8b'
+
+# Legacy General Model (Mistral 7B)
+alias aidermis='aider --model ollama/mistral:7b'
+
+alias aiderq1='aider --model ollama/qwen2.5-coder:7b'
