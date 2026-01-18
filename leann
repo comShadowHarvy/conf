@@ -1,0 +1,1 @@
+CUDA_VISIBLE_DEVICES="" leann build taylor --docs /home/me/Documents/taylor --file-types .doc,.pdf --force --doc-chunk-size 128 --doc-chunk-overlap 64
