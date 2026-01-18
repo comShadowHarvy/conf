@@ -132,6 +132,17 @@ _check_git_updates
 # --- 8. Startup Banner (Reordered) ---
 # Helper function to handle the complex ScreenFX randomization
 function _run_screenfx() {
+    # --- Daily ScreenFX Logic ---
+    # Only show ScreenFX once per day to improve startup speed.
+    local timestamp_file="$XDG_CACHE_HOME/zsh/screenfx_timestamp"
+    [[ ! -d "$(dirname "$timestamp_file")" ]] && mkdir -p "$(dirname "$timestamp_file")"
+
+    # If the timestamp file was modified in the last 24 hours, do nothing.
+    if [[ -n "$timestamp_file"(#qN.m-24h) ]]; then
+        return
+    fi
+
+    # --- ScreenFX Content ---
     source ~/bin/screenfx.sh
     
     # 1. Pick random style (exclude 'static')
@@ -149,6 +160,9 @@ function _run_screenfx() {
         local -i _screen_idx=$(( (RANDOM % ${#_screen_files[@]}) + 1 ))
         screenfx::show "${_screen_files[_screen_idx]}"
     fi
+
+    # Update the timestamp
+    touch "$timestamp_file"
 }
 
 function _show_banner() {
@@ -180,6 +194,7 @@ alias ll='eza -la --icons --group-directories-first --git'
 alias grep='rg'
 alias cat='bat'
 alias updateall='~/bin/zsh_maintain.sh'
+source ~/.aliases 
 
 # Source separated alias files if they exist
 for alias_file in "$HOME/.aliases.d"/*.aliases; do
