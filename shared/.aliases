@@ -2270,3 +2270,9 @@ alias aidervl='aider --model ollama/qwen3-vl:8b'
 alias aidermis='aider --model ollama/mistral:7b'
 
 alias aiderq1='aider --model ollama/qwen2.5-coder:7b'
+
+
+
+
+
+alias proton-ge='STEAM_COMPAT_DATA_PATH="$HOME/.ge-prefix" STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.steam/steam" "$HOME/.config/heroic/tools/proton/GE-Proton-latest/proton" run'
