@@ -221,3 +221,34 @@ export NVM_DIR="$HOME/.nvm"
 # Source the Lazyman .nvimsbind for nvims key binding
 # shellcheck source=.config/nvim-Lazyman/.nvimsbind
 [ -f ~/.config/nvim-Lazyman/.nvimsbind ] && source ~/.config/nvim-Lazyman/.nvimsbind
+
+# --- Dynamic Neovim Config Launcher ---
+nv() {
+  # If no argument is passed, list installed configs and exit
+  if [ -z "$1" ]; then
+    echo "Usage: nv <config-name> [file]"
+    echo "Installed configs:"
+    ls -d ~/.config/nvim-* | xargs -n 1 basename | sed 's/nvim-//'
+    return
+  fi
+
+  # Search for the config (handles both 'lazy' and 'nvim-lazy')
+  local conf_name="$1"
+  if [[ ! "$conf_name" =~ ^nvim- ]]; then
+    conf_name="nvim-$conf_name"
+  fi
+
+  if [ -d "$HOME/.config/$conf_name" ]; then
+    shift
+    NVIM_APPNAME="$conf_name" nvim "$@"
+  else
+    echo "Config '$conf_name' not found in ~/.config/"
+  fi
+}
+
+# Auto-completion for the 'nv' command
+_nv_completions() {
+  local configs=($(ls -d ~/.config/nvim-* 2>/dev/null | xargs -n 1 basename | sed 's/nvim-//'))
+  compadd "${configs[@]}"
+}
+compdef _nv_completions nv

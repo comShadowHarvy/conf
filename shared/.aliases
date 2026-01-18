@@ -128,7 +128,7 @@ fdir() {
 }
 
 # Extract almost any archive format
-extract() {
+extractn() {
   [[ -z "$1" ]] && { echo "Usage: extract <archive_file>" >&2; return 1; }
   local file="$1"
   [[ ! -f "$file" ]] && { echo "Error: File '$file' not found." >&2; return 1; }
