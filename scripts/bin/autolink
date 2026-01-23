@@ -1,0 +1,41 @@
+#!/bin/bash
+
+# 1. Find the Active Interface and its SSID
+# We search for a wifi device in 'connected' state and grab its connection name (SSID)
+ACTIVE_INFO=$(nmcli -t -f DEVICE,STATE,CONNECTION device | grep ":connected:" | grep -v "lo" | head -n 1)
+
+if [ -z "$ACTIVE_INFO" ]; then
+  echo "❌ No active Wi-Fi connection found."
+  exit 1
+fi
+
+ACTIVE_IFACE=$(echo "$ACTIVE_INFO" | cut -d':' -f1)
+CURRENT_SSID=$(echo "$ACTIVE_INFO" | cut -d':' -f3)
+
+echo "✅ Found active connection on $ACTIVE_IFACE connected to '$CURRENT_SSID'"
+
+# 2. Find an Idle Interface
+# We search for a wifi device in 'disconnected' state
+IDLE_IFACE=$(nmcli -t -f DEVICE,TYPE,STATE device | grep ":wifi:disconnected" | head -n 1 | cut -d':' -f1)
+
+if [ -z "$IDLE_IFACE" ]; then
+  echo "⚠️ No idle Wi-Fi interfaces found. Are both already connected?"
+  exit 0
+fi
+
+echo "🔄 Found idle interface: $IDLE_IFACE"
+echo "🚀 Attempting to connect $IDLE_IFACE to '$CURRENT_SSID'..."
+
+# 3. Connect the Idle Interface
+# We try to connect using the existing profile first
+nmcli device wifi connect "$CURRENT_SSID" ifname "$IDLE_IFACE"
+
+# 4. Optional: Fix Routing Metrics
+# If both connect successfully, one usually blocks the other unless metrics are equal.
+# This sets the new connection's metric to 100 (high priority) so both are "active".
+echo "🔧 Adjusting route metrics to ensure simultaneous usage..."
+nmcli connection modify "$CURRENT_SSID" ipv4.route-metric 100
+# Note: This modifies the profile globally. You might need to bring it up again to apply.
+nmcli device reapply "$IDLE_IFACE"
+
+echo "🎉 Done! Both cards should now be connected to $CURRENT_SSID."
