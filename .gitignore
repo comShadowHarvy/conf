@@ -9,3 +9,4 @@ logs/
 .last_backup
 *.AppImage
 .vscode/
+__pycache__/
