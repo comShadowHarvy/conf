@@ -64,7 +64,8 @@ decoration {
         vibrancy = 0.1696
     }
 }
-
+#layerrule = blur, waybar
+#layerrule = ignorealpha 0.1, waybar
 # ============================================================================
 # INPUT SETTINGS
 # ============================================================================
@@ -123,6 +124,9 @@ bind = SUPER, F8, exec, hyprctl keyword monitor ,preferred,auto,0.8    # Zoomed 
 bind = SUPER, F9, exec, hyprctl keyword monitor ,preferred,auto,1      # Normal scale (1.0)
 bind = SUPER, F11, exec, hyprctl keyword monitor ,preferred,auto,1.5   # Zoomed scale (1.6)
 bind = SUPER, F10, exec, hyprctl keyword monitor ,preferred,auto,1.2      # coding scale (1.2)
+bind = SUPER, F5, exec, hyprctl keyword monitor eDP-1,1920x1200@30,auto,1 # Even lower framerate (30Hz)
+bind = SUPER, F6, exec, hyprctl keyword monitor eDP-1,1920x1200@60,auto,1 # Low framerate (60Hz) for battery
+bind = SUPER, F7, exec, hyprctl keyword monitor eDP-1,1920x1200@144,auto,1 # Automatic framerate (144Hz)
 
 # ===========================================================
 #
