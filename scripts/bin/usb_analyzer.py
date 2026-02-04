@@ -5,6 +5,7 @@ import shutil
 import os
 import sys
 import time
+import heapq
 from collections import defaultdict
 from pathlib import Path
 
@@ -73,7 +74,8 @@ def analyze_directory(path):
         'extensions': defaultdict(int),
         'languages': defaultdict(int),
         'languages_size': defaultdict(int),
-        'size_bytes': 0
+        'size_bytes': 0,
+        'largest_files': [] # List of tuples (size, path)
     }
     
     ext_map = {
@@ -109,6 +111,15 @@ def analyze_directory(path):
                 try:
                     file_size = file_path.lstat().st_size
                     stats['size_bytes'] += file_size
+                    
+                    # Store top 10 largest files using a min-heap
+                    # We store (size, path)
+                    # If heap is < 10, push. If > 10, pushpop (pushes new, pops smallest)
+                    if len(stats['largest_files']) < 10:
+                         heapq.heappush(stats['largest_files'], (file_size, str(file_path)))
+                    else:
+                        heapq.heappushpop(stats['largest_files'], (file_size, str(file_path)))
+
                 except (OSError, ValueError):
                     stats['skipped_count'] += 1
                     continue
@@ -125,6 +136,9 @@ def analyze_directory(path):
         print(f"\nWarning: Permission denied accessing some files in {path}")
     except OSError as e:
         print(f"\nError scanning {path}: {e}")
+    
+    # Sort largest files descending for final output (heap is min-heap)
+    stats['largest_files'].sort(key=lambda x: x[0], reverse=True)
 
     # Clear the progress line
     print(f"\rScan Complete! Analyzed {stats['file_count']} files.      ")
@@ -216,19 +230,21 @@ def format_output(device_info, scan_stats=None, disk_usage=None):
                 # Assign distinct color per row
                 color = colors[i % len(colors)]
                 
-                # Apply color to Label, Bars
-                # Using formatting with colors requires being careful about padding length in format string
-                # So we pad the strings first then color them, or put color codes outside padding
-                
                 lang_str = f"{lang:<12}"
                 count_str = f"{str(count):<6}"
                 
-                # Print row:
-                # Color Name | Color CountBar | Color Count | Color SizeBar | Color Size
                 print(f"      {color}{lang_str} {count_bar} {count_str} {size_bar} {size_str}{reset}")
-                
         else:
              print("    No recognized file types found.")
+             
+        if scan_stats.get('largest_files'):
+            print(f"\n    \033[1;35mTop 10 Largest Files:\033[0m")
+            for size, path in scan_stats['largest_files']:
+                # Truncate path if too long?
+                # Let's show relative path if possible, or usually just filename is enough if path is super deep
+                # For now entire path
+                # print formatted: [SIZE] Path
+                print(f"      [{human_readable_size(size):>8}] {path}")
 
     print("-" * 60)
     print("\n") 

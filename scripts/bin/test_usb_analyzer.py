@@ -98,6 +98,9 @@ class TestUSBAnalyzer(unittest.TestCase):
             self.assertEqual(stats['languages_size']['Python'], 0)
             self.assertEqual(stats['languages']['Image'], 1)
             
+            # Since files are 0 bytes, order might be unstable but list should exist
+            self.assertEqual(len(stats['largest_files']), 4)
+            
         finally:
             shutil.rmtree(test_dir)
 
