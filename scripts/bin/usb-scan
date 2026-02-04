@@ -1,0 +1,14 @@
+#!/bin/bash
+# Wrapper to launch usb_analyzer.py from the same directory
+
+# Resolve the directory where this script is located
+SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
+ANALYZER_SCRIPT="$SCRIPT_DIR/usb_analyzer.py"
+
+if [ ! -f "$ANALYZER_SCRIPT" ]; then
+    echo "Error: Could not find usb_analyzer.py in $SCRIPT_DIR"
+    exit 1
+fi
+
+# Pass all arguments to the python script
+python3 "$ANALYZER_SCRIPT" "$@"
