@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Glowing Sphere</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            overflow: hidden;
+            background: #000;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        .controls {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            z-index: 100;
+        }
+
+        .controls button {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .controls button:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: scale(1.05);
+        }
+
+        .info {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 14px;
+            text-align: center;
+            z-index: 100;
+            text-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="info">Move your mouse to rotate the sphere</div>
+    <div class="controls">
+        <button id="colorBtn">Change Color</button>
+        <button id="speedBtn">Toggle Speed</button>
+        <button id="pulseBtn">Toggle Pulse</button>
+        <button id="patternBtn">Toggle Pattern</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Scene setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 5;
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setClearColor(0x000000, 0);
+        document.body.appendChild(renderer.domElement);
+
+        // Create sphere geometry with more segments for better detail
+        const geometry = new THREE.SphereGeometry(2, 128, 128);
+
+        // Create the main sphere material with 3D shading
+        const sphereMaterial = new THREE.ShaderMaterial({
+            uniforms: {
+                time: { value: 0 },
+                color: { value: new THREE.Color(0x00ffff) },
+                pulseSpeed: { value: 1.0 },
+                glowIntensity: { value: 0.8 },
+                viewVector: { value: new THREE.Vector3() },
+                hasPattern: { value: 1.0 }
+            },
+            vertexShader: `
+                varying vec3 vNormal;
+                varying vec3 vPosition;
+                varying vec3 vWorldPosition;
+                varying vec2 vUv;
+
+                void main() {
+                    vNormal = normalize(normalMatrix * normal);
+                    vPosition = position;
+                    vUv = uv;
+                    vec4 worldPos = modelMatrix * vec4(position, 1.0);
+                    vWorldPosition = worldPos.xyz;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform float time;
+                uniform vec3 color;
+                uniform float pulseSpeed;
+                uniform float glowIntensity;
+                uniform float hasPattern;
+                
+                varying vec3 vNormal;
+                varying vec3 vPosition;
+                varying vec3 vWorldPosition;
+                varying vec2 vUv;
+
+                // Simplex noise function
+                vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+                vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+                vec4 permute(vec4 x) { return mod289(((x*34.0)+1.0)*x); }
+                vec4 taylorInvSqrt(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
+
+                float snoise(vec3 v) {
+                    const vec2 C = vec2(1.0/6.0, 1.0/3.0);
+                    const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
+                    
+                    vec3 i = floor(v + dot(v, C.yyy));
+                    vec3 x0 = v - i + dot(i, C.xxx);
+                    
+                    vec3 g = step(x0.yzx, x0.xyz);
+                    vec3 l = 1.0 - g;
+                    vec3 i1 = min(g.xyz, l.zxy);
+                    vec3 i2 = max(g.xyz, l.zxy);
+                    
+                    vec3 x1 = x0 - i1 + C.xxx;
+                    vec3 x2 = x0 - i2 + C.yyy;
+                    vec3 x3 = x0 - D.yyy;
+                    
+                    i = mod289(i);
+                    vec4 p = permute(permute(permute(
+                        i.z + vec4(0.0, i1.z, i2.z, 1.0))
+                        + i.y + vec4(0.0, i1.y, i2.y, 1.0))
+                        + i.x + vec4(0.0, i1.x, i2.x, 1.0));
+                        
+                    float n_ = 0.142857142857;
+                    vec3 ns = n_ * D.wyz - D.xzx;
+                    
+                    vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
+                    
+                    vec4 x_ = floor(j * ns.z);
+                    vec4 y_ = floor(j - 7.0 * x_);
+                    
+                    vec4 x = x_ *ns.x + ns.yyyy;
+                    vec4 y = y_ *ns.x + ns.yyyy;
+                    vec4 h = 1.0 - abs(x) - abs(y);
+                    
+                    vec4 b0 = vec4(x.xy, y.xy);
+                    vec4 b1 = vec4(x.zw, y.zw);
+                    
+                    vec4 s0 = floor(b0)*2.0 + 1.0;
+                    vec4 s1 = floor(b1)*2.0 + 1.0;
+                    vec4 sh = -step(h, vec4(0.0));
+                    
+                    vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy;
+                    vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww;
+                    
+                    vec3 p0 = vec3(a0.xy, h.x);
+                    vec3 p1 = vec3(a0.zw, h.y);
+                    vec3 p2 = vec3(a1.xy, h.z);
+                    vec3 p3 = vec3(a1.zw, h.w);
+                    
+                    vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2,p2), dot(p3,p3)));
+                    p0 *= norm.x;
+                    p1 *= norm.y;
+                    p2 *= norm.z;
+                    p3 *= norm.w;
+                    
+                    vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+                    m = m * m;
+                    return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
+                }
+
+                void main() {
+                    // Calculate lighting based on surface normal
+                    vec3 lightDir = normalize(vec3(1.0, 1.0, 2.0));
+                    vec3 lightDir2 = normalize(vec3(-1.0, -0.5, 1.0));
+                    
+                    // Diffuse lighting
+                    float diff1 = max(dot(vNormal, lightDir), 0.0);
+                    float diff2 = max(dot(vNormal, lightDir2), 0.0);
+                    
+                    // Specular highlight
+                    vec3 viewDir = normalize(cameraPosition - vWorldPosition);
+                    vec3 reflectDir = reflect(-lightDir, vNormal);
+                    float spec1 = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
+                    
+                    // Noise pattern for surface detail
+                    float noise1 = snoise(vPosition * 2.0 + time * 0.5);
+                    float noise2 = snoise(vPosition * 4.0 - time * 0.3);
+                    float pattern = mix(noise1, noise2, 0.5);
+                    
+                    // Fresnel effect for edge glow
+                    float fresnel = pow(1.0 - max(dot(vNormal, viewDir), 0.0), 3.0);
+                    
+                    // Combine lighting components
+                    float pulse = sin(time * pulseSpeed) * 0.15 + 0.85;
+                    vec3 baseColor = color * 0.3;
+                    vec3 diffuseColor = baseColor * (diff1 * 0.6 + diff2 * 0.3 + 0.2);
+                    vec3 specularColor = vec3(1.0) * spec1 * 0.5;
+                    vec3 fresnelColor = color * fresnel * glowIntensity;
+                    
+                    // Add pattern if enabled
+                    if (hasPattern > 0.5) {
+                        float patternIntensity = (pattern * 0.5 + 0.5) * 0.15;
+                        diffuseColor += color * patternIntensity;
+                    }
+                    
+                    // Combine all
+                    vec3 finalColor = (diffuseColor + specularColor) * pulse + fresnelColor;
+                    
+                    // Add subtle glow to the edges
+                    float edgeGlow = pow(fresnel, 2.0) * 0.5;
+                    finalColor += color * edgeGlow;
+                    
+                    gl_FragColor = vec4(finalColor, 1.0);
+                }
+            `
+        });
+
+        const sphere = new THREE.Mesh(geometry, sphereMaterial);
+        scene.add(sphere);
+
+        // Create outer glow sphere
+        const outerGlowGeometry = new THREE.SphereGeometry(2.4, 64, 64);
+        const outerGlowMaterial = new THREE.ShaderMaterial({
+            uniforms: {
+                time: { value: 0 },
+                color: { value: new THREE.Color(0x00ffff) }
+            },
+            vertexShader: `
+                varying vec3 vNormal;
+                void main() {
+                    vNormal = normalize(normalMatrix * normal);
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform float time;
+                uniform vec3 color;
+                varying vec3 vNormal;
+                void main() {
+                    float intensity = pow(0.6 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.0);
+                    float pulse = sin(time * 1.5) * 0.1 + 0.9;
+                    gl_FragColor = vec4(color, intensity * 0.4 * pulse);
+                }
+            `,
+            side: THREE.BackSide,
+            blending: THREE.AdditiveBlending,
+            transparent: true
+        });
+
+        const outerGlow = new THREE.Mesh(outerGlowGeometry, outerGlowMaterial);
+        scene.add(outerGlow);
+
+        // Add multiple colored lights for better 3D effect
+        const lights = [
+            { light: new THREE.PointLight(0x00ffff, 1, 100), pos: [5, 5, 5], speed: 0.5 },
+            { light: new THREE.PointLight(0xff00ff, 0.8, 100), pos: [-5, 5, 5], speed: 0.3 },
+            { light: new THREE.PointLight(0x0066ff, 0.6, 100), pos: [0, -5, 8], speed: 0.4 }
+        ];
+
+        lights.forEach(l => {
+            l.light.position.set(...l.pos);
+            scene.add(l.light);
+        });
+
+        // Add ambient light
+        const ambientLight = new THREE.AmbientLight(0x202030, 0.3);
+        scene.add(ambientLight);
+
+        // Mouse interaction
+        let mouseX = 0;
+        let mouseY = 0;
+        let targetRotationX = 0;
+        let targetRotationY = 0;
+
+        document.addEventListener('mousemove', (event) => {
+            mouseX = (event.clientX - window.innerWidth / 2) / window.innerWidth;
+            mouseY = (event.clientY - window.innerHeight / 2) / window.innerHeight;
+            targetRotationY = mouseX * Math.PI;
+            targetRotationX = mouseY * Math.PI;
+        });
+
+        // Touch support
+        document.addEventListener('touchmove', (event) => {
+            if (event.touches.length > 0) {
+                mouseX = (event.touches[0].clientX - window.innerWidth / 2) / window.innerWidth;
+                mouseY = (event.touches[0].clientY - window.innerHeight / 2) / window.innerHeight;
+                targetRotationY = mouseX * Math.PI;
+                targetRotationX = mouseY * Math.PI;
+            }
+        });
+
+        // Color palette
+        const colors = [
+            0x00ffff, // Cyan
+            0xff00ff, // Magenta
+            0x00ff00, // Green
+            0xff6600, // Orange
+            0x0066ff, // Blue
+            0xff0066, // Pink
+            0xffff00, // Yellow
+            0xff3333  // Red
+        ];
+        let colorIndex = 0;
+
+        // Animation state
+        let autoRotate = true;
+        let autoRotateSpeed = 0.005;
+        let pulseEnabled = true;
+        let patternEnabled = true;
+
+        // Button controls
+        document.getElementById('colorBtn').addEventListener('click', () => {
+            colorIndex = (colorIndex + 1) % colors.length;
+            const newColor = new THREE.Color(colors[colorIndex]);
+            sphereMaterial.uniforms.color.value = newColor;
+            outerGlowMaterial.uniforms.color.value = newColor;
+            lights[0].light.color = newColor;
+        });
+
+        document.getElementById('speedBtn').addEventListener('click', () => {
+            autoRotateSpeed = autoRotateSpeed === 0.005 ? 0.015 : 0.005;
+        });
+
+        document.getElementById('pulseBtn').addEventListener('click', () => {
+            pulseEnabled = !pulseEnabled;
+            sphereMaterial.uniforms.glowIntensity.value = pulseEnabled ? 0.8 : 0.4;
+        });
+
+        document.getElementById('patternBtn').addEventListener('click', () => {
+            patternEnabled = !patternEnabled;
+            sphereMaterial.uniforms.hasPattern.value = patternEnabled ? 1.0 : 0.0;
+        });
+
+        // Animation loop
+        let time = 0;
+        function animate() {
+            requestAnimationFrame(animate);
+
+            time += 0.016;
+
+            // Update shader time
+            sphereMaterial.uniforms.time.value = time;
+            outerGlowMaterial.uniforms.time.value = time;
+
+            // Auto rotation
+            if (autoRotate) {
+                sphere.rotation.y += autoRotateSpeed;
+                sphere.rotation.x += autoRotateSpeed * 0.3;
+            }
+
+            // Mouse-based rotation with smooth interpolation
+            sphere.rotation.y += (targetRotationY - sphere.rotation.y) * 0.05;
+            sphere.rotation.x += (targetRotationX - sphere.rotation.x) * 0.05;
+
+            // Subtle scale pulse
+            if (pulseEnabled) {
+                const pulse = Math.sin(time * 1.5) * 0.01 + 1;
+                sphere.scale.set(pulse, pulse, pulse);
+                outerGlow.scale.set(pulse * 1.2, pulse * 1.2, pulse * 1.2);
+            }
+
+            // Animate lights in orbits
+            lights.forEach(l => {
+                l.light.position.x = Math.sin(time * l.speed) * l.pos[0] * 0.5;
+                l.light.position.y = Math.cos(time * l.speed) * l.pos[1] * 0.5;
+                l.light.position.z = l.pos[2] + Math.sin(time * 0.5) * 2;
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Start animation
+        animate();
+
+        console.log('3D Glowing Sphere initialized successfully');
+    </script>
+</body>
+
+</html>
