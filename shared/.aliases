@@ -2276,3 +2276,17 @@ alias aiderq1='aider --model ollama/qwen2.5-coder:7b'
 
 
 alias proton-ge='STEAM_COMPAT_DATA_PATH="$HOME/.ge-prefix" STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.steam/steam" "$HOME/.config/heroic/tools/proton/GE-Proton-latest/proton" run'
+
+# ----------------------------------------------------------------------------
+# Ani-CLI & Media
+# ----------------------------------------------------------------------------
+# ani-cli (User prefers dub)
+alias ani='ani-cli --dub'    # Default to Dub
+alias anis='ani-cli'         # Explicit Sub (default behavior)
+alias anid='ani-cli --dub'   # Explicit Dub
+alias anidl='ani-cli -d --dub'     # Download
+alias anic='ani-cli -c'      # Continue watching
+
+# viu-media
+alias viu='viu-media'
+alias vm='viu-media'
