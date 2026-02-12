@@ -2275,7 +2275,72 @@ alias aiderq1='aider --model ollama/qwen2.5-coder:7b'
 
 
 
-alias proton-ge='STEAM_COMPAT_DATA_PATH="$HOME/.ge-prefix" STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.steam/steam" "$HOME/.config/heroic/tools/proton/GE-Proton-latest/proton" run'
+# Enhanced GE-Proton wrapper with auto-detection
+proton-ge() {
+    local proton_dir
+    local candidates=(
+        "$HOME/.local/share/Steam/compatibilitytools.d/GE-Proton-Latest"
+        "$HOME/.steam/root/compatibilitytools.d/GE-Proton-Latest"
+        "$HOME/.config/heroic/tools/proton/GE-Proton-Latest"
+        "$HOME/.var/app/com.valvesoftware.Steam/data/Steam/compatibilitytools.d/GE-Proton-Latest"
+        "$HOME/.var/app/com.heroicgameslauncher.hgl/config/heroic/tools/proton/GE-Proton-Latest"
+        "$HOME/.var/app/com.heroicgameslauncher.hgl/config/heroic/tools/proton/GE-Proton-latest"
+    )
+
+    for dir in "${candidates[@]}"; do
+        if [[ -d "$dir" ]]; then
+            proton_dir="$dir"
+            break
+        fi
+    done
+
+    # Fallback: Auto-detect latest GE-Proton if "Latest" symlink is missing
+    if [[ -z "$proton_dir" ]]; then
+        local search_paths=(
+            "$HOME/.local/share/Steam/compatibilitytools.d"
+            "$HOME/.steam/root/compatibilitytools.d"
+            "$HOME/.config/heroic/tools/proton"
+            "$HOME/.var/app/com.valvesoftware.Steam/data/Steam/compatibilitytools.d"
+            "$HOME/.var/app/com.heroicgameslauncher.hgl/config/heroic/tools/proton"
+        )
+        
+        for base_dir in "${search_paths[@]}"; do
+            if [[ -d "$base_dir" ]]; then
+                 # Use find with -L to follow symlinks and case-insensitive name match
+                 local latest=$(find -L "$base_dir" -maxdepth 1 -type d -iname "GE-Proton*" 2>/dev/null | sort -V | tail -n 1)
+                 if [[ -n "$latest" ]]; then
+                     proton_dir="$latest"
+                     echo "Found GE-Proton: $(basename "$latest")"
+                     break
+                 fi
+            fi
+        done
+    fi
+
+    if [[ -z "$proton_dir" ]]; then
+        echo "Error: GE-Proton not found."
+        echo "Please ensure you have GE-Proton installed in your compatibility tools directory."
+        return 1
+    fi
+
+    # Create ~/.proton-pfx if missing
+    local pfx_dir="$HOME/.proton-pfx"
+    if [[ ! -d "$pfx_dir" ]]; then
+        mkdir -p "$pfx_dir"
+        echo "Created '$pfx_dir'"
+    fi
+
+    # Determine Steam install path for Proton environment
+    # Proton requires STEAM_COMPAT_CLIENT_INSTALL_PATH to be set
+    local steam_root="$HOME/.steam/root"
+    [[ ! -d "$steam_root" ]] && steam_root="$HOME/.local/share/Steam"
+    [[ ! -d "$steam_root" ]] && steam_root="$HOME/.steam" # Fallback
+
+    # Execute the given executable using proton
+    STEAM_COMPAT_CLIENT_INSTALL_PATH="$steam_root" \
+    STEAM_COMPAT_DATA_PATH="$pfx_dir" \
+    "$proton_dir/proton" run "$@"
+}
 
 # ----------------------------------------------------------------------------
 # Ani-CLI & Media
