@@ -4,7 +4,31 @@
 # - Secure Credentials (SSH, GPG, AWS, Keys, configs)
 # - Git Repositories (list of paths and remotes)
 # - Flatpak Apps (remotes and installed application lists)
-#
+show_title() {
+  local title="$1"
+  cat <<'EOF'
+===================================================
+   ____            _        _                 _
+  / ___| _   _ ___| |_ __ _| | ___   __ _  __| |
+  \\___ \\| | | / __| __/ _` | |/ _ \\ / _` |/ _` |
+   ___) | |_| \\__ \\ || (_| | | (_) | (_| | (_| |
+  |____/ \\__,_|___/\\__\\,_,_|_|\\___/ \\__,_|\\__,_|
+
+  $title
+  Author: ShadowHarvy
+===================================================
+EOF
+}
+fake_load() {
+  local msg="$1"
+  echo -n "[${msg}]"
+  for i in {1..5}; do
+    sleep 0.3
+    echo -n "."
+  done
+  echo " done"
+}
+
 # USAGE:
 #   system_backup.sh backup [options]
 #   system_backup.sh restore [options]
@@ -95,6 +119,9 @@ fi
 #                 BACKUP
 # ==========================================
 do_backup() {
+  show_title "System Backup"
+  fake_load "Collecting credentials"
+
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --encrypt-symmetric) ENCRYPT_MODE="symmetric"; shift ;;
@@ -124,6 +151,7 @@ do_backup() {
   echo "========================================="
   echo "          COLLECTING CREDENTIALS         "
   echo "========================================="
+  fake_load "Backing up credentials"
   
   # 1) SSH
   if [[ -d "$HOME/.ssh" ]]; then
@@ -261,6 +289,7 @@ do_backup() {
   echo "========================================="
   echo "         COLLECTING GIT PROJECTS         "
   echo "========================================="
+  fake_load "Backing up git repositories"
   GIT_ROOT="$HOME/git"
   GIT_BACKUP_FILE="$WORK_DIR/git_backup_list.txt"
   > "$GIT_BACKUP_FILE"
@@ -284,6 +313,7 @@ do_backup() {
   echo "========================================="
   echo "          COLLECTING FLATPAKS            "
   echo "========================================="
+  fake_load "Backing up flatpaks"
   if command -v flatpak >/dev/null 2>&1; then
     echo "[info] Saving Flatpak remotes"
     echo -e "name\turl" > "$FLAT_DIR/remotes.tsv"
@@ -305,6 +335,7 @@ do_backup() {
   echo "========================================="
   echo "         CREATING MASTER ARCHIVE         "
   echo "========================================="
+  fake_load "Compressing archive"
   
   if [[ $DRY_RUN -eq 1 ]]; then
     echo "[dry-run] Would create maximum compressed archive: $ARCHIVE_PATH"
@@ -354,6 +385,9 @@ do_backup() {
 #                 RESTORE
 # ==========================================
 do_restore() {
+  show_title "System Restore"
+  fake_load "Preparing restore"
+
   while [[ $# -gt 0 ]]; do
     case "$1" in
       -f|--file)               ARCHIVE_FILE="${2:-}"; shift 2 ;;
@@ -458,6 +492,7 @@ do_restore() {
     echo "========================================="
     echo "          RESTORING CREDENTIALS          "
     echo "========================================="
+    fake_load "Restoring credentials"
     C_DIR="$WORK_DIR/credentials"
 
     if [[ $SKIP_SSH -eq 0 && -d "$C_DIR/ssh" ]]; then
@@ -580,6 +615,7 @@ do_restore() {
     echo "========================================="
     echo "             RESTORING GITS              "
     echo "========================================="
+    fake_load "Restoring git repositories"
     GIT_ROOT="$HOME/git"
     mkdir -p "$GIT_ROOT"
     
@@ -608,6 +644,7 @@ do_restore() {
     echo "========================================="
     echo "           RESTORING FLATPAKS            "
     echo "========================================="
+    fake_load "Restoring flatpaks"
     if ! command -v flatpak >/dev/null 2>&1; then
       echo "[error] flatpak CLI not found. Can't restore flatpaks."
     else
