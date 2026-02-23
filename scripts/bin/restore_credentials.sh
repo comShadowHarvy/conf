@@ -20,6 +20,9 @@
 #   --skip-keyring            Don't restore system keyring
 #   --skip-gemini             Don't restore Gemini CLI config
 #   --skip-package-managers   Don't restore npm/PyPI/Cargo credentials
+#   --skip-ani-cli            Don't restore ani-cli history/config
+#   --skip-viu-media          Don't restore viu-media config/sessions
+#   --skip-komikku            Don't restore komikku config/database
 #   --add-ssh-keys            Automatically add SSH keys to agent after restore
 #   --no-ssh-agent            Don't automatically add SSH keys to agent
 #
@@ -47,6 +50,9 @@ SKIP_KUBE=0
 SKIP_KEYRING=0
 SKIP_GEMINI=0
 SKIP_PACKAGE_MANAGERS=0
+SKIP_ANI_CLI=0
+SKIP_VIU_MEDIA=0
+SKIP_KOMIKKU=0
 ADD_SSH_KEYS=1
 NO_SSH_AGENT=0
 
@@ -66,6 +72,9 @@ while [[ $# -gt 0 ]]; do
     --skip-keyring)          SKIP_KEYRING=1; shift ;;
     --skip-gemini)           SKIP_GEMINI=1; shift ;;
     --skip-package-managers) SKIP_PACKAGE_MANAGERS=1; shift ;;
+    --skip-ani-cli)          SKIP_ANI_CLI=1; shift ;;
+    --skip-viu-media)        SKIP_VIU_MEDIA=1; shift ;;
+    --skip-komikku)          SKIP_KOMIKKU=1; shift ;;
     --add-ssh-keys)          ADD_SSH_KEYS=1; shift ;;
     --no-ssh-agent)          NO_SSH_AGENT=1; ADD_SSH_KEYS=0; shift ;;
     -h|--help)
@@ -436,6 +445,98 @@ if [[ $SKIP_GEMINI -eq 0 && -d "$WORK_DIR/gemini" ]]; then
     find "$HOME/.gemini" -type d -exec chmod 700 {} \; || true
     
     echo "[info] Restored Gemini CLI config"
+  fi
+fi
+
+# 13) ani-cli
+if [[ $SKIP_ANI_CLI -eq 0 && -d "$WORK_DIR/ani-cli" ]]; then
+  echo "[info] Restoring ani-cli history and configuration"
+  if [[ -d "$WORK_DIR/ani-cli/state" ]]; then
+    mkdir -p "$HOME/.local/state/ani-cli"
+    if [[ $DRY_RUN -eq 1 ]]; then
+      echo "[dry-run] Would restore ani-cli state to ~/.local/state/ani-cli"
+    else
+      rsync -a "$WORK_DIR/ani-cli/state/" "$HOME/.local/state/ani-cli/"
+      echo "[info] Restored ani-cli state"
+    fi
+  fi
+  if [[ -d "$WORK_DIR/ani-cli/config" ]]; then
+    mkdir -p "$HOME/.config/ani-cli"
+    if [[ $DRY_RUN -eq 1 ]]; then
+      echo "[dry-run] Would restore ani-cli config to ~/.config/ani-cli"
+    else
+      rsync -a "$WORK_DIR/ani-cli/config/" "$HOME/.config/ani-cli/"
+      echo "[info] Restored ani-cli config"
+    fi
+  fi
+fi
+
+# 14) viu-media
+if [[ $SKIP_VIU_MEDIA -eq 0 ]]; then
+  if [[ -d "$WORK_DIR/viu" ]]; then
+    echo "[info] Restoring viu-media configuration (~/.config/viu)"
+    mkdir -p "$HOME/.config/viu"
+    if [[ $DRY_RUN -eq 1 ]]; then
+      echo "[dry-run] Would restore viu-media config to ~/.config/viu"
+    else
+      rsync -a "$WORK_DIR/viu/" "$HOME/.config/viu/"
+      echo "[info] Restored viu-media config (~/.config/viu)"
+    fi
+  fi
+  if [[ -d "$WORK_DIR/viu-media" ]]; then
+    echo "[info] Restoring viu-media configuration (~/.config/viu-media)"
+    mkdir -p "$HOME/.config/viu-media"
+    if [[ $DRY_RUN -eq 1 ]]; then
+      echo "[dry-run] Would restore viu-media config to ~/.config/viu-media"
+    else
+      rsync -a "$WORK_DIR/viu-media/" "$HOME/.config/viu-media/"
+      echo "[info] Restored viu-media config (~/.config/viu-media)"
+    fi
+  fi
+fi
+
+# 15) Komikku
+if [[ $SKIP_KOMIKKU -eq 0 && -d "$WORK_DIR/komikku" ]]; then
+  echo "[info] Restoring Komikku configuration and database"
+  
+  if [[ -d "$WORK_DIR/komikku/config" ]]; then
+    mkdir -p "$HOME/.config/komikku"
+    if [[ $DRY_RUN -eq 1 ]]; then
+      echo "[dry-run] Would restore Komikku config to ~/.config/komikku"
+    else
+      rsync -a "$WORK_DIR/komikku/config/" "$HOME/.config/komikku/"
+      echo "[info] Restored Komikku config"
+    fi
+  fi
+  
+  if [[ -d "$WORK_DIR/komikku/data" ]]; then
+    mkdir -p "$HOME/.local/share/komikku"
+    if [[ $DRY_RUN -eq 1 ]]; then
+      echo "[dry-run] Would restore Komikku database to ~/.local/share/komikku"
+    else
+      cp -f "$WORK_DIR/komikku/data/"*.db "$HOME/.local/share/komikku/" 2>/dev/null || true
+      echo "[info] Restored Komikku database"
+    fi
+  fi
+  
+  if [[ -d "$WORK_DIR/komikku/flatpak-config" ]]; then
+    mkdir -p "$HOME/.var/app/info.febvre.Komikku/config/komikku"
+    if [[ $DRY_RUN -eq 1 ]]; then
+      echo "[dry-run] Would restore Komikku Flatpak config"
+    else
+      rsync -a "$WORK_DIR/komikku/flatpak-config/" "$HOME/.var/app/info.febvre.Komikku/config/komikku/"
+      echo "[info] Restored Komikku Flatpak config"
+    fi
+  fi
+  
+  if [[ -d "$WORK_DIR/komikku/flatpak-data" ]]; then
+    mkdir -p "$HOME/.var/app/info.febvre.Komikku/data/komikku"
+    if [[ $DRY_RUN -eq 1 ]]; then
+      echo "[dry-run] Would restore Komikku Flatpak database"
+    else
+      cp -f "$WORK_DIR/komikku/flatpak-data/"*.db "$HOME/.var/app/info.febvre.Komikku/data/komikku/" 2>/dev/null || true
+      echo "[info] Restored Komikku Flatpak database"
+    fi
   fi
 fi
 

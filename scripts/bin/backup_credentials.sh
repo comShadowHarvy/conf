@@ -226,6 +226,53 @@ if [[ -d "$HOME/.gemini" ]]; then
   rsync -a "$HOME/.gemini/" "$WORK_DIR/gemini/" || true
 fi
 
+# 13) ani-cli (history and config)
+if [[ -d "$HOME/.local/state/ani-cli" ]]; then
+  echo "[info] Backing up ani-cli history (~/.local/state/ani-cli)"
+  mkdir -p "$WORK_DIR/ani-cli/state"
+  rsync -a "$HOME/.local/state/ani-cli/" "$WORK_DIR/ani-cli/state/" || true
+fi
+if [[ -d "$HOME/.config/ani-cli" ]]; then
+  echo "[info] Backing up ani-cli config (~/.config/ani-cli)"
+  mkdir -p "$WORK_DIR/ani-cli/config"
+  rsync -a "$HOME/.config/ani-cli/" "$WORK_DIR/ani-cli/config/" || true
+fi
+
+# 14) viu-media (config and sessions)
+if [[ -d "$HOME/.config/viu" ]]; then
+  echo "[info] Backing up viu-media config (~/.config/viu)"
+  mkdir -p "$WORK_DIR/viu"
+  rsync -a "$HOME/.config/viu/" "$WORK_DIR/viu/" || true
+fi
+if [[ -d "$HOME/.config/viu-media" ]]; then
+  echo "[info] Backing up viu-media config (~/.config/viu-media)"
+  mkdir -p "$WORK_DIR/viu-media"
+  rsync -a "$HOME/.config/viu-media/" "$WORK_DIR/viu-media/" || true
+fi
+
+# 15) Komikku (config and database)
+if [[ -d "$HOME/.config/komikku" ]]; then
+  echo "[info] Backing up Komikku config (~/.config/komikku)"
+  mkdir -p "$WORK_DIR/komikku/config"
+  rsync -a "$HOME/.config/komikku/" "$WORK_DIR/komikku/config/" || true
+fi
+for db in "$HOME/.local/share/komikku/"*.db; do
+  echo "[info] Backing up Komikku database ($db)"
+  mkdir -p "$WORK_DIR/komikku/data"
+  cp -f "$db" "$WORK_DIR/komikku/data/" || true
+done
+
+if [[ -d "$HOME/.var/app/info.febvre.Komikku/config/komikku" ]]; then
+  echo "[info] Backing up Komikku Flatpak config"
+  mkdir -p "$WORK_DIR/komikku/flatpak-config"
+  rsync -a "$HOME/.var/app/info.febvre.Komikku/config/komikku/" "$WORK_DIR/komikku/flatpak-config/" || true
+fi
+for db in "$HOME/.var/app/info.febvre.Komikku/data/komikku/"*.db; do
+  echo "[info] Backing up Komikku Flatpak database ($db)"
+  mkdir -p "$WORK_DIR/komikku/flatpak-data"
+  cp -f "$db" "$WORK_DIR/komikku/flatpak-data/" || true
+done
+
 # Summary manifest
 {
   echo "Backup timestamp: $TS"
