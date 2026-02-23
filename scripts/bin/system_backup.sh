@@ -5,19 +5,8 @@
 # - Git Repositories (list of paths and remotes)
 # - Flatpak Apps (remotes and installed application lists)
 show_title() {
-  local title="$1"
-  cat <<'EOF'
-===================================================
-   ____            _        _                 _
-  / ___| _   _ ___| |_ __ _| | ___   __ _  __| |
-  \\___ \\| | | / __| __/ _` | |/ _ \\ / _` |/ _` |
-   ___) | |_| \\__ \\ || (_| | | (_) | (_| | (_| |
-  |____/ \\__,_|___/\\__\\,_,_|_|\\___/ \\__,_|\\__,_|
-
-  $title
-  Author: ShadowHarvy
-===================================================
-EOF
+  echo "===== Backup ====="
+  echo "Author: ShadowHarvy"
 }
 fake_load() {
   local msg="$1"
