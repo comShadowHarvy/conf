@@ -50,6 +50,18 @@ packages:
     hooks:
       post_stow: "echo 'Zsh configuration updated. Run: source ~/.zshrc'"
 
+  fish:
+    priority: 1
+    category: core
+    description: "Fish shell configuration with starship prompt and aliases"
+    dependencies:
+      - shared
+    conflicts:
+      - ".config/fish"
+    backup_policy: backup
+    hooks:
+      post_stow: "echo 'Fish configuration updated. Restart fish or run: fish'"
+
   git:
     priority: 2
     category: core
@@ -160,7 +172,8 @@ packages:
 groups:
   essential:
     - bash
-    - zsh  
+    - zsh
+    - fish
     - git
     - shared
     - scripts
@@ -182,6 +195,7 @@ groups:
   full:
     - bash
     - zsh
+    - fish
     - git
     - shared
     - scripts
