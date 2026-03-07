@@ -1,0 +1,9 @@
+#!/bin/bash
+# Keep the shell alive. If it dies, wait 2 seconds and respawn.
+while true; do
+  echo "Starting Caelestia..."
+  # Replace this with your actual launch command, e.g., 'caelestia-shell'
+  caelestia-shell
+  echo "Shell crashed! Respawning in 2s..."
+  sleep 2
+done

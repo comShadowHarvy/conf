@@ -128,6 +128,9 @@ bind = SUPER, F10, exec, hyprctl keyword monitor ,preferred,auto,1.2      # codi
 # Launch terminal (kitty with zsh)
 bind = SUPER, return, exec, kitty -e zsh
 
+# Toggle floating/tiling on active window
+bind = SUPER, space, togglefloating
+
 # Move active window plus switch to workspace 1–10 (Super+Shift+number)
 bind = SUPER SHIFT, 1, movetoworkspace, 1
 bind = SUPER SHIFT, 2, movetoworkspace, 2
