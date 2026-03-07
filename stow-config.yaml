@@ -41,7 +41,8 @@ packages:
     priority: 1
     category: core
     description: "Advanced zsh configuration with modern features"
-    dependencies: ["shared"]
+     dependencies:
+       - shared
     conflicts:
       - ".zshrc"
       - ".antigenrc"
@@ -117,6 +118,21 @@ packages:
       - ".config/waybar"
     backup_policy: backup
 
+  # === MEDIA PACKAGES ===
+  yt-x:
+    priority: 9
+    category: optional
+    description: "yt-x configuration for media management"
+    backup_policy: skip
+
+  yt-dlp:
+    priority: 9
+    category: optional
+    description: "yt-dlp configuration for YouTube downloads"
+    conflicts:
+      - ".config/yt-dlp"
+    backup_policy: skip
+
   # === OPTIONAL/UTILITY PACKAGES ===
   wget:
     priority: 9
@@ -175,6 +191,12 @@ groups:
     - hyprland
     - waybar
     - wget
+    - yt-x
+    - yt-dlp
+
+  media:
+    - yt-x
+    - yt-dlp
 
 # System-specific configurations
 systems:
