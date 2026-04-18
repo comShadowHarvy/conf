@@ -86,6 +86,21 @@ DEBUG_ZSHRC=1 exec zsh -l          # Enable debug logging
 
 ---
 
+## 2025-04-18 - Volume Controls & Restore Script Improvements
+
+### Added
+- Volume control keybindings in Hyprland (`customize.yaml`):
+  - `Super+F1` - Toggle mute/unmute audio
+  - `Super+F2` - Volume down 5%
+  - `Super+F3` - Volume up 5%
+
+### Changed
+- `restore-all.sh`: Improved conflict cleanup to remove additional config files (`~/.antigenrc`, `~/.aliases.d`, `~/.bin`) and `~/.local` directory
+- `restore-all.sh`: Changed stow command to use explicit `-v -t ~ -d /home/me/git/conf` flags for better reliability
+- `restore-all.sh`: Removed `set -e` flag to allow partial completion even if one package fails
+
+---
+
 **Validation Status**: ✅ Syntax validated with `zsh -n`  
 **Testing**: ✅ All major functions tested  
 **Backup Created**: ✅ `.zshrc.orig-$(date)` available for rollback

@@ -6,7 +6,7 @@
 # Usage: ./restore-all.sh [--full|--essential|--media|--all]
 # =============================================================================
 
-set -euo pipefail
+set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 STOW_MANAGER="${SCRIPT_DIR}/stow-manager.sh"
@@ -94,11 +94,12 @@ done
 
 if [[ "$CONFLICTS_FOUND" == "true" ]]; then
     echo -e "${YELLOW}Some conflicts detected. Removing conflicting files...${RESET}"
-    rm -f ~/.bashrc ~/.bash_profile ~/.bash_logout ~/.zshrc ~/.aliases ~/.gitconfig
+    rm -f ~/.bashrc ~/.bash_profile ~/.bash_logout ~/.zshrc ~/.antigenrc ~/.aliases ~/.aliases.d ~/.gitconfig ~/.bin
+    rmdir ~/.local 2>/dev/null || true
     echo -e "${GREEN}Cleaned up conflicts${RESET}"
 fi
 
-# Stow packages
+# Stow packages to home directory
 echo -e "${BLUE}Stowing packages...${RESET}"
 echo ""
 
@@ -106,7 +107,7 @@ SUCCESS_COUNT=0
 FAIL_COUNT=0
 
 for package in "${PACKAGES[@]}"; do
-    if "$STOW_MANAGER" stow "$package" 2>/dev/null; then
+    if stow -v -t ~ -d /home/me/git/conf "$package" 2>&1; then
         echo -e "${GREEN}✓${RESET} $package"
         ((SUCCESS_COUNT++))
     else
