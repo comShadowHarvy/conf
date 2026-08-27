@@ -1,0 +1,708 @@
+#!/usr/bin/env python3
+"""
+Proton Launcher CLI
+-------------------
+Seamlessly launch Windows executables with Proton outside of Steam.
+Automatically chooses the best Proton runner available in the following priority order:
+  1. Proton-CachyOS (Latest)
+  2. Proton-GE / GE-Proton (Latest)
+  3. Proton Experimental (Latest)
+  4. Any other Proton / Compatibility Runner (Latest)
+
+Usage:
+  proton <path to exe> [arguments...]
+  proton "path with spaces/game.exe" [arguments...]
+  proton path to exe
+  proton --list
+  proton --help
+"""
+
+import os
+import sys
+import re
+import shutil
+import subprocess
+from pathlib import Path
+
+# Terminal ANSI styling
+BOLD = "\033[1m"
+DIM = "\033[2m"
+RED = "\033[31m"
+GREEN = "\033[32m"
+YELLOW = "\033[33m"
+BLUE = "\033[34m"
+MAGENTA = "\033[35m"
+CYAN = "\033[36m"
+WHITE = "\033[37m"
+RESET = "\033[0m"
+
+
+def color_text(text: str, color_code: str) -> str:
+    """Format text with ANSI colors if stdout is a TTY."""
+    if sys.stdout.isatty():
+        return f"{color_code}{text}{RESET}"
+    return text
+
+
+def find_steam_install() -> Path:
+    """Locate the Steam installation directory."""
+    if "STEAM_COMPAT_CLIENT_INSTALL_PATH" in os.environ:
+        custom_path = Path(os.environ["STEAM_COMPAT_CLIENT_INSTALL_PATH"]).expanduser()
+        if custom_path.exists():
+            return custom_path
+
+    candidates = [
+        Path.home() / ".local/share/Steam",
+        Path.home() / ".steam/root",
+        Path.home() / ".steam/steam",
+        Path.home() / ".steam",
+        Path.home() / ".var/app/com.valvesoftware.Steam/data/Steam",
+        Path("/usr/share/steam"),
+        Path("/usr/lib/steam"),
+    ]
+
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate.resolve()
+
+    # Default fallback
+    default_path = Path.home() / ".local/share/Steam"
+    default_path.mkdir(parents=True, exist_ok=True)
+    return default_path
+
+
+def parse_vdf_libraries() -> list[Path]:
+    """Parse Steam libraryfolders.vdf files to find extra steamapps directories."""
+    vdf_candidates = [
+        Path.home() / ".local/share/Steam/config/libraryfolders.vdf",
+        Path.home() / ".local/share/Steam/steamapps/libraryfolders.vdf",
+        Path.home() / ".steam/steam/config/libraryfolders.vdf",
+        Path.home() / ".steam/root/config/libraryfolders.vdf",
+        Path.home() / ".var/app/com.valvesoftware.Steam/data/Steam/config/libraryfolders.vdf",
+    ]
+
+    extra_dirs: list[Path] = []
+    for vdf_file in vdf_candidates:
+        if not vdf_file.is_file():
+            continue
+        try:
+            with open(vdf_file, "r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    match = re.search(r'\"path\"\s+\"([^\"]+)\"', line)
+                    if match:
+                        lib_path = Path(match.group(1)).expanduser()
+                        common_dir = lib_path / "steamapps" / "common"
+                        compat_dir = lib_path / "compatibilitytools.d"
+                        if common_dir.is_dir() and common_dir not in extra_dirs:
+                            extra_dirs.append(common_dir)
+                        if compat_dir.is_dir() and compat_dir not in extra_dirs:
+                            extra_dirs.append(compat_dir)
+        except Exception:
+            pass
+
+    return extra_dirs
+
+
+def get_search_directories() -> list[Path]:
+    """Return all known directory paths where Proton installations can live."""
+    base_dirs = [
+        # Compatibility tools directories
+        Path.home() / ".local/share/Steam/compatibilitytools.d",
+        Path.home() / ".steam/root/compatibilitytools.d",
+        Path.home() / ".steam/steam/compatibilitytools.d",
+        Path.home() / ".steam/compatibilitytools.d",
+        Path("/usr/share/steam/compatibilitytools.d"),
+        Path("/usr/local/share/steam/compatibilitytools.d"),
+        Path.home() / ".var/app/com.valvesoftware.Steam/data/Steam/compatibilitytools.d",
+        Path("/var/lib/flatpak/app/com.valvesoftware.Steam/x86_64/current/active/files/share/steam/compatibilitytools.d"),
+        
+        # Steam common installations (Proton Experimental, Proton 9, 8, etc.)
+        Path.home() / ".local/share/Steam/steamapps/common",
+        Path.home() / ".steam/steam/steamapps/common",
+        Path.home() / ".steam/root/steamapps/common",
+        Path.home() / ".var/app/com.valvesoftware.Steam/data/Steam/steamapps/common",
+        
+        # Heroic, Lutris, Bottles, UMU directories
+        Path.home() / ".config/heroic/tools/proton",
+        Path.home() / ".config/heroic/tools/wine",
+        Path.home() / ".local/share/lutris/runners/proton",
+        Path.home() / ".local/share/lutris/runners/wine",
+        Path.home() / ".local/share/bottles/runners",
+        Path.home() / ".local/share/umu",
+        
+        # System paths
+        Path("/opt"),
+        Path("/usr/lib/steam"),
+    ]
+
+    # Add custom user environment path if specified
+    if "PROTON_DIR" in os.environ:
+        base_dirs.insert(0, Path(os.environ["PROTON_DIR"]).expanduser())
+    if "PROTONPATH" in os.environ:
+        base_dirs.insert(0, Path(os.environ["PROTONPATH"]).expanduser())
+
+    # Include extra Steam library folders
+    base_dirs.extend(parse_vdf_libraries())
+
+    # Deduplicate and return existing directories
+    unique_dirs = []
+    seen = set()
+    for d in base_dirs:
+        try:
+            resolved = d.resolve()
+            if resolved not in seen and resolved.is_dir():
+                seen.add(resolved)
+                unique_dirs.append(resolved)
+        except Exception:
+            pass
+
+    return unique_dirs
+
+
+def parse_proton_info(tool_dir: Path) -> dict | None:
+    """Inspect a directory to check if it's a valid Proton installation and extract metadata."""
+    proton_script = tool_dir / "proton"
+    if not (proton_script.is_file() and os.access(proton_script, os.X_OK)):
+        return None
+
+    # Read version file if available
+    ver_str = ""
+    ver_timestamp = 0
+    version_file = tool_dir / "version"
+    if version_file.is_file():
+        try:
+            with open(version_file, "r", encoding="utf-8", errors="ignore") as vf:
+                raw_ver = vf.read().strip()
+                parts = raw_ver.split(None, 1)
+                if parts and parts[0].isdigit():
+                    ver_timestamp = int(parts[0])
+                    ver_str = parts[1] if len(parts) > 1 else parts[0]
+                else:
+                    ver_str = raw_ver
+        except Exception:
+            pass
+
+    # Read compatibilitytool.vdf display_name if available
+    display_name = ""
+    vdf_file = tool_dir / "compatibilitytool.vdf"
+    if vdf_file.is_file():
+        try:
+            with open(vdf_file, "r", encoding="utf-8", errors="ignore") as vf:
+                content = vf.read()
+                m = re.search(r'\"display_name\"\s+\"([^\"]+)\"', content)
+                if m:
+                    display_name = m.group(1)
+        except Exception:
+            pass
+
+    # Determine modification time
+    try:
+        mtime = tool_dir.stat().st_mtime
+    except Exception:
+        mtime = 0.0
+
+    return {
+        "name": tool_dir.name,
+        "path": tool_dir,
+        "proton_script": proton_script,
+        "version_str": ver_str,
+        "timestamp": ver_timestamp,
+        "display_name": display_name or tool_dir.name,
+        "mtime": mtime,
+    }
+
+
+def classify_and_score(info: dict) -> tuple[int, str, tuple]:
+    """
+    Classify a Proton installation into 4 priority tiers:
+      Tier 1: Proton-CachyOS (Latest)
+      Tier 2: Proton-GE / GE-Proton (Latest)
+      Tier 3: Proton Experimental (Latest)
+      Tier 4: Other / Whatever is available
+    
+    Returns (tier_number, tier_name, sort_key) where higher sort_key is newer/better.
+    """
+    name_low = info["name"].lower()
+    disp_low = info["display_name"].lower()
+    ver_low = info["version_str"].lower()
+    combined = f"{name_low} {disp_low} {ver_low}"
+
+    # Tier 1: Proton-CachyOS
+    if "cachyos" in combined or "cachy" in combined or "protoncashyos" in combined:
+        tier = 1
+        tier_name = "Proton-CachyOS"
+    # Tier 2: Proton-GE
+    elif any(k in combined for k in ["proton-ge", "ge-proton", "proton_ge", "protonge", "gloriouseggroll"]):
+        tier = 2
+        tier_name = "Proton-GE"
+    # Tier 3: Proton Experimental
+    elif "experimental" in combined or "exparamental" in combined:
+        tier = 3
+        tier_name = "Proton Experimental"
+    # Tier 4: Other / Whatever there is
+    else:
+        tier = 4
+        tier_name = "Other Proton"
+
+    # Sorting score within tier:
+    # 1. "latest" indicator (1 if "latest" in name/version, else 0)
+    is_latest = 1 if "latest" in combined else 0
+
+    # 2. Extracted numeric version sequence (e.g. 11.0, 20260703, etc.)
+    # Search in version_str first, then display_name, then directory name
+    version_text = info["version_str"] or info["display_name"] or info["name"]
+    nums = [int(n) for n in re.findall(r"\d+", version_text)]
+
+    # 3. Timestamp from version file (if available)
+    timestamp = info.get("timestamp", 0)
+
+    # 4. Filesystem mtime
+    mtime = info.get("mtime", 0.0)
+
+    # Higher numbers sort first
+    sort_key = (is_latest, nums, timestamp, mtime)
+    return tier, tier_name, sort_key
+
+
+def discover_all_protons() -> list[dict]:
+    """Scan all directories and return all discovered Proton versions with metadata and ranking."""
+    search_dirs = get_search_directories()
+    seen_paths = set()
+    protons = []
+
+    for sdir in search_dirs:
+        if not sdir.is_dir():
+            continue
+        try:
+            # Check direct directory if it is a proton tool itself
+            direct_info = parse_proton_info(sdir)
+            if direct_info:
+                real_p = direct_info["path"].resolve()
+                if real_p not in seen_paths:
+                    seen_paths.add(real_p)
+                    protons.append(direct_info)
+
+            # Check subdirectories
+            for entry in sdir.iterdir():
+                if entry.is_dir():
+                    real_entry = entry.resolve()
+                    if real_entry in seen_paths:
+                        continue
+                    info = parse_proton_info(real_entry)
+                    if info:
+                        seen_paths.add(real_entry)
+                        protons.append(info)
+        except Exception:
+            continue
+
+    # Enrich each proton info with tier and sort score
+    for p in protons:
+        tier, tier_name, sort_key = classify_and_score(p)
+        p["tier"] = tier
+        p["tier_name"] = tier_name
+        p["sort_key"] = sort_key
+
+    return protons
+
+
+def get_grouped_protons() -> dict[int, list[dict]]:
+    """Return discovered protons grouped by tier and sorted within each tier (best/latest first)."""
+    protons = discover_all_protons()
+    grouped: dict[int, list[dict]] = {1: [], 2: [], 3: [], 4: []}
+    for p in protons:
+        grouped[p["tier"]].append(p)
+
+    for tier in grouped:
+        grouped[tier].sort(key=lambda x: x["sort_key"], reverse=True)
+
+    return grouped
+
+
+def select_best_proton(preferred_tier: int | None = None) -> tuple[dict | None, str]:
+    """
+    Select the optimal Proton version according to priority order:
+      1. Proton-CachyOS (Latest)
+      2. Proton-GE (Latest)
+      3. Proton Experimental (Latest)
+      4. Other Proton (Latest)
+    """
+    # Check if PROTON_PATH or PROTONPATH is explicitly set
+    forced_path = os.environ.get("PROTON_PATH") or os.environ.get("PROTONPATH")
+    if forced_path:
+        p_path = Path(forced_path).expanduser().resolve()
+        if (p_path / "proton").is_file():
+            info = parse_proton_info(p_path)
+            if info:
+                tier, tier_name, sort_key = classify_and_score(info)
+                info["tier"] = tier
+                info["tier_name"] = tier_name
+                info["sort_key"] = sort_key
+                return info, "Environment override (PROTON_PATH)"
+
+    grouped = get_grouped_protons()
+
+    if preferred_tier and preferred_tier in grouped and grouped[preferred_tier]:
+        tier_names = {
+            1: "Proton-CachyOS",
+            2: "Proton-GE",
+            3: "Proton Experimental",
+            4: "Other Proton",
+        }
+        return grouped[preferred_tier][0], f"User selected tier: {tier_names.get(preferred_tier)}"
+
+    # Follow the required priority order: 1 -> 2 -> 3 -> 4
+    for tier in [1, 2, 3, 4]:
+        if grouped[tier]:
+            reasons = {
+                1: "Tier 1: Proton-CachyOS (Latest available)",
+                2: "Tier 2: Proton-GE (Latest available)",
+                3: "Tier 3: Proton Experimental (Latest available)",
+                4: "Tier 4: Alternative Proton runner (Latest available)",
+            }
+            return grouped[tier][0], reasons[tier]
+
+    return None, "No Proton installation detected on system."
+
+
+def list_protons(selected_proton: dict | None) -> None:
+    """Print all discovered Proton installations formatted in a clean overview."""
+    grouped = get_grouped_protons()
+    tier_labels = {
+        1: "Tier 1: Proton-CachyOS (Highest Priority)",
+        2: "Tier 2: Proton-GE / GE-Proton",
+        3: "Tier 3: Proton Experimental",
+        4: "Tier 4: Other Compatibility Tools & Custom Protons",
+    }
+
+    print(color_text(f"{BOLD}🔍 Discovered Proton Installations:{RESET}", BOLD))
+    print("=" * 68)
+
+    total_found = sum(len(items) for items in grouped.values())
+    if total_found == 0:
+        print(color_text("  [!] No Proton installations found in standard paths.", RED))
+        print("      Locations searched include Steam compatibilitytools.d, steamapps/common, Heroic, Lutris, and /usr/share.")
+        print("=" * 68)
+        return
+
+    for tier in [1, 2, 3, 4]:
+        items = grouped[tier]
+        print(f"\n{color_text(tier_labels[tier], CYAN + BOLD)}")
+        if not items:
+            print(color_text("  (None installed)", DIM))
+            continue
+
+        for i, item in enumerate(items):
+            is_active = (selected_proton and selected_proton["path"] == item["path"])
+            prefix = color_text("  ★ [SELECTED DEFAULT] ", GREEN + BOLD) if is_active else "    • "
+            
+            ver_info = f" ({item['version_str']})" if item["version_str"] else ""
+            name_display = color_text(item["display_name"] or item["name"], BOLD if is_active else WHITE)
+            latest_badge = color_text(" [Latest]", YELLOW) if i == 0 and len(items) > 1 else ""
+            
+            print(f"{prefix}{name_display}{ver_info}{latest_badge}")
+            print(f"      {color_text(str(item['path']), DIM)}")
+
+    print("\n" + "=" * 68)
+
+
+def resolve_target(args: list[str]) -> tuple[str | None, list[str]]:
+    """
+    Intelligently resolve the target executable and remaining arguments.
+    Supports:
+      - proton path/to/game.exe --arg1
+      - proton "path with spaces/game.exe" --arg1
+      - proton path to exe (unquoted multi-word arguments forming a valid path)
+      - Windows built-in tools (cmd, winecfg, regedit, notepad, taskmgr, etc.)
+    """
+    if not args:
+        return None, []
+
+    # 1. Exact match on first argument
+    first_arg = Path(args[0]).expanduser()
+    if first_arg.is_file():
+        return str(first_arg.resolve()), args[1:]
+
+    # 2. Check if combining first N arguments forms an existing file path (spaces in unquoted path)
+    for i in range(len(args), 0, -1):
+        combined = " ".join(args[:i])
+        cand = Path(combined).expanduser()
+        if cand.is_file():
+            return str(cand.resolve()), args[i:]
+
+    # 3. Known Windows utilities & Wine tools
+    known_windows_tools = {
+        "cmd", "cmd.exe", "winecfg", "winecfg.exe",
+        "regedit", "regedit.exe", "notepad", "notepad.exe",
+        "explorer", "explorer.exe", "taskmgr", "taskmgr.exe",
+        "control", "control.exe", "winetricks", "dxdiag", "dxdiag.exe",
+        "msiexec", "msiexec.exe", "ipconfig", "ipconfig.exe",
+        "wineserver", "wine",
+    }
+    if args[0].lower() in known_windows_tools:
+        return args[0], args[1:]
+
+    # 4. Check if any argument ends in .exe / .bat / .msi and combine up to it
+    for i in range(len(args)):
+        arg_lower = args[i].lower()
+        if arg_lower.endswith(".exe") or arg_lower.endswith(".bat") or arg_lower.endswith(".msi") or arg_lower.endswith(".cmd"):
+            candidate = " ".join(args[:i+1])
+            return candidate, args[i+1:]
+
+    # 5. Fallback: treat first argument as target
+    return args[0], args[1:]
+
+
+def print_help() -> None:
+    """Print comprehensive help and documentation."""
+    help_text = f"""{BOLD}Proton Launcher CLI{RESET}
+Run Windows executables seamlessly with Proton outside of Steam.
+
+{CYAN}{BOLD}USAGE:{RESET}
+  {BOLD}proton{RESET} [OPTIONS] <path_to_exe> [arguments...]
+  {BOLD}proton{RESET} path to exe [arguments...]
+
+{CYAN}{BOLD}AUTOMATIC VERSION SELECTION ORDER:{RESET}
+  1. {GREEN}Proton-CachyOS{RESET} (Latest)
+  2. {GREEN}Proton-GE / GE-Proton{RESET} (Latest)
+  3. {GREEN}Proton Experimental{RESET} (Latest)
+  4. {GREEN}Other Proton builds{RESET} (Latest available: DW-Proton, Proton 9/8, Valve Proton, etc.)
+
+{CYAN}{BOLD}OPTIONS:{RESET}
+  {BOLD}-l, --list{RESET}                   List all detected Proton versions and show the active default
+  {BOLD}-p, --prefix <DIR>{RESET}           Specify custom Wine/Proton prefix directory
+                               (Default: ~/.local/share/proton/prefixes/default)
+  {BOLD}-t, --type <TYPE>{RESET}             Force a specific Proton tier:
+                               cachyos | ge | experimental | other
+  {BOLD}--proton <PATH>{RESET}               Explicitly specify a Proton tool directory
+  {BOLD}-d, --dry-run{RESET}                 Show command line, environment, and Proton path without running
+  {BOLD}-v, --verb <VERB>{RESET}             Set Proton verb (default: waitforexitandrun, options: run, runinprefix)
+  {BOLD}-g, --gameid <ID>{RESET}             Set custom Steam Game / App ID (default: 0)
+  {BOLD}-h, --help{RESET}                    Show this help message and exit
+  {BOLD}-V, --version{RESET}                 Show currently selected Proton runner version
+
+{CYAN}{BOLD}ENVIRONMENT VARIABLES:{RESET}
+  {BOLD}STEAM_COMPAT_DATA_PATH{RESET}       Proton prefix directory
+  {BOLD}PROTON_PREFIX{RESET}                Alias for prefix directory
+  {BOLD}WINEPREFIX{RESET}                   Alias for prefix directory
+  {BOLD}PROTON_PATH / PROTONPATH{RESET}     Override Proton runner path
+  {BOLD}PROTON_VERB{RESET}                  Proton verb (waitforexitandrun / run)
+  {BOLD}STEAM_COMPAT_APP_ID{RESET}          Steam App ID (defaults to 0)
+  {BOLD}PROTON_ENABLE_NVAPI{RESET}          Enable Nvidia NVAPI / DLSS support (1/0)
+  {BOLD}PROTON_ENABLE_WAYLAND{RESET}        Enable Wine Wayland driver if supported (1/0)
+  {BOLD}DXVK_ASYNC{RESET}                   Enable DXVK asynchronous pipeline (1/0)
+
+{CYAN}{BOLD}EXAMPLES:{RESET}
+  {DIM}# Run an executable with auto-detected latest Proton:{RESET}
+  proton /path/to/game.exe
+
+  {DIM}# Run an executable with spaces without quotes:{RESET}
+  proton /home/me/Games/Epic Game/game.exe --fullscreen
+
+  {DIM}# Run Wine configuration tool in the default proton prefix:{RESET}
+  proton winecfg
+
+  {DIM}# Force Proton-GE instead of CachyOS:{RESET}
+  proton --type ge game.exe
+
+  {DIM}# Run with a dedicated game prefix:{RESET}
+  proton --prefix ~/.local/share/proton/prefixes/mygame game.exe
+
+  {DIM}# List all available Proton versions on your system:{RESET}
+  proton --list
+"""
+    print(help_text)
+
+
+def main() -> int:
+    raw_args = sys.argv[1:]
+
+    if not raw_args:
+        best_proton, reason = select_best_proton()
+        print_help()
+        print("─" * 68)
+        if best_proton:
+            print(f"{color_text('Current Default Runner:', GREEN + BOLD)} {best_proton['display_name']} ({reason})")
+            print(f"{color_text('Path:', DIM)} {best_proton['path']}")
+        else:
+            print(color_text("Warning: No Proton runner found on system.", RED))
+        return 0
+
+    # Parse CLI flags
+    prefix_override: Path | None = None
+    tier_override: int | None = None
+    proton_path_override: Path | None = None
+    dry_run = False
+    custom_verb: str | None = None
+    game_id: str = "0"
+    remaining_args: list[str] = []
+
+    i = 0
+    while i < len(raw_args):
+        arg = raw_args[i]
+
+        if arg in ("-h", "--help"):
+            print_help()
+            return 0
+        elif arg in ("-l", "--list"):
+            best_proton, _ = select_best_proton(tier_override)
+            list_protons(best_proton)
+            return 0
+        elif arg in ("-V", "--version"):
+            best_proton, reason = select_best_proton(tier_override)
+            if best_proton:
+                print(f"{best_proton['display_name']} [{best_proton['version_str'] or 'unknown version'}]")
+                print(f"Selection: {reason}")
+                print(f"Location: {best_proton['path']}")
+            else:
+                print("No Proton runner found.")
+            return 0
+        elif arg in ("-p", "--prefix"):
+            if i + 1 < len(raw_args):
+                prefix_override = Path(raw_args[i + 1]).expanduser()
+                i += 2
+                continue
+            else:
+                print(color_text("Error: --prefix requires a directory path argument", RED), file=sys.stderr)
+                return 1
+        elif arg in ("-t", "--type"):
+            if i + 1 < len(raw_args):
+                t_val = raw_args[i + 1].lower()
+                if "cachy" in t_val:
+                    tier_override = 1
+                elif "ge" in t_val:
+                    tier_override = 2
+                elif "exp" in t_val:
+                    tier_override = 3
+                elif "other" in t_val or "any" in t_val:
+                    tier_override = 4
+                else:
+                    print(color_text(f"Unknown tier '{t_val}'. Choose: cachyos, ge, experimental, other", RED), file=sys.stderr)
+                    return 1
+                i += 2
+                continue
+            else:
+                print(color_text("Error: --type requires a type argument (cachyos, ge, experimental, other)", RED), file=sys.stderr)
+                return 1
+        elif arg == "--proton":
+            if i + 1 < len(raw_args):
+                proton_path_override = Path(raw_args[i + 1]).expanduser().resolve()
+                i += 2
+                continue
+            else:
+                print(color_text("Error: --proton requires a path argument", RED), file=sys.stderr)
+                return 1
+        elif arg in ("-d", "--dry-run"):
+            dry_run = True
+            i += 1
+            continue
+        elif arg in ("-v", "--verb"):
+            if i + 1 < len(raw_args):
+                custom_verb = raw_args[i + 1]
+                i += 2
+                continue
+            else:
+                print(color_text("Error: --verb requires a verb argument (e.g. waitforexitandrun, run)", RED), file=sys.stderr)
+                return 1
+        elif arg in ("-g", "--gameid"):
+            if i + 1 < len(raw_args):
+                game_id = raw_args[i + 1]
+                i += 2
+                continue
+            else:
+                print(color_text("Error: --gameid requires an ID argument", RED), file=sys.stderr)
+                return 1
+        else:
+            # Everything from here on is part of target / target arguments
+            remaining_args = raw_args[i:]
+            break
+
+    # Resolve target executable and args
+    target_exe, target_args = resolve_target(remaining_args)
+    if not target_exe:
+        print(color_text("Error: No executable specified to run.", RED), file=sys.stderr)
+        print("Usage: proton [OPTIONS] <path_to_exe> [arguments...]")
+        print("Type 'proton --help' for options.")
+        return 1
+
+    # Select Proton runner
+    if proton_path_override:
+        if not (proton_path_override / "proton").is_file():
+            print(color_text(f"Error: Specified Proton directory does not contain an executable 'proton' script: {proton_path_override}", RED), file=sys.stderr)
+            return 1
+        selected_proton = parse_proton_info(proton_path_override)
+        selection_reason = "Manual override (--proton)"
+    else:
+        selected_proton, selection_reason = select_best_proton(tier_override)
+
+    if not selected_proton:
+        print(color_text("❌ Error: No compatible Proton runner was found on this system.", RED), file=sys.stderr)
+        print("Please install Proton via Steam, ProtonPlus, or pacman (e.g., proton-cachyos, proton-ge-custom).", file=sys.stderr)
+        print("Searched locations include:", file=sys.stderr)
+        for sdir in get_search_directories()[:6]:
+            print(f"  - {sdir}", file=sys.stderr)
+        return 1
+
+    # Setup prefix directory
+    if prefix_override:
+        prefix_dir = prefix_override
+    elif "STEAM_COMPAT_DATA_PATH" in os.environ:
+        prefix_dir = Path(os.environ["STEAM_COMPAT_DATA_PATH"]).expanduser()
+    elif "PROTON_PREFIX" in os.environ:
+        prefix_dir = Path(os.environ["PROTON_PREFIX"]).expanduser()
+    elif "WINEPREFIX" in os.environ:
+        prefix_dir = Path(os.environ["WINEPREFIX"]).expanduser()
+    else:
+        prefix_dir = Path.home() / ".local/share/proton/prefixes/default"
+
+    # Ensure prefix directory exists
+    prefix_dir.mkdir(parents=True, exist_ok=True)
+
+    # Locate Steam install directory
+    steam_client_dir = find_steam_install()
+
+    # Determine verb
+    verb = custom_verb or os.environ.get("PROTON_VERB") or "waitforexitandrun"
+
+    # Build environment dictionary
+    env = os.environ.copy()
+    env["STEAM_COMPAT_CLIENT_INSTALL_PATH"] = str(steam_client_dir)
+    env["STEAM_COMPAT_DATA_PATH"] = str(prefix_dir)
+    env["STEAM_COMPAT_APP_ID"] = env.get("STEAM_COMPAT_APP_ID", game_id)
+    env["SteamAppId"] = env.get("SteamAppId", game_id)
+    env["SteamGameId"] = env.get("SteamGameId", game_id)
+
+    # Build execution command line
+    proton_bin = str(selected_proton["proton_script"])
+    cmd = [proton_bin, verb, target_exe] + target_args
+
+    # Formatted terminal output
+    print(f"{color_text('▶ Launching with Proton:', BOLD + CYAN)} {color_text(selected_proton['display_name'], GREEN + BOLD)}")
+    print(f"  {color_text('• Tier/Source:', DIM)} {selection_reason}")
+    print(f"  {color_text('• Proton Bin :', DIM)} {proton_bin}")
+    print(f"  {color_text('• Wine Prefix:', DIM)} {prefix_dir}")
+    print(f"  {color_text('• Executable :', DIM)} {target_exe}")
+    if target_args:
+        print(f"  {color_text('• Arguments  :', DIM)} {' '.join(target_args)}")
+    print("─" * 68)
+
+    if dry_run:
+        print(color_text("[Dry Run] Command that would be executed:", YELLOW + BOLD))
+        print(f"  {' '.join(cmd)}")
+        print("\nEnvironment Variables:")
+        for k in ["STEAM_COMPAT_CLIENT_INSTALL_PATH", "STEAM_COMPAT_DATA_PATH", "STEAM_COMPAT_APP_ID", "SteamAppId", "SteamGameId"]:
+            print(f"  {k}={env.get(k)}")
+        return 0
+
+    # Execute the command
+    try:
+        res = subprocess.run(cmd, env=env)
+        return res.returncode
+    except KeyboardInterrupt:
+        return 130
+    except Exception as e:
+        print(color_text(f"Error launching Proton process: {e}", RED), file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
