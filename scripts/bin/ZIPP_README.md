@@ -90,7 +90,7 @@ Sample configuration:
 ```ini
 [DEFAULT]
 format = tar.gz
-level = 6
+level = 9
 preserve_timestamps = true
 threads = 0
 excludes = .git/** __pycache__/** *.pyc .DS_Store Thumbs.db node_modules/**
@@ -118,8 +118,8 @@ Config locations (in order of precedence):
 ### Compression Levels
 - **Level 0**: Fastest, minimal compression
 - **Level 1-3**: Fast compression, good for large files
-- **Level 6**: Default balance (recommended)
-- **Level 9**: Maximum compression, slower
+- **Level 6**: Balanced compression
+- **Level 9**: Maximum compression (default)
 
 ## 🔧 Command Reference
 
@@ -131,7 +131,7 @@ zipp [-h] [-o OUTPUT] [-f FORMAT] [-l LEVEL] [-x EXCLUDE] [-j THREADS]
 Options:
   -o, --output OUTPUT       Output archive name (auto-generated if not specified)
   -f, --format FORMAT       Compression format: auto, zip, tar.gz, tar.xz, 7z
-  -l, --level LEVEL         Compression level 0-9 (0=fastest, 9=best)
+  -l, --level LEVEL         Compression level 0-9 (0=fastest, 9=best, default: 9)
   -x, --exclude PATTERN     Exclude files matching pattern (repeatable)
   -j, --threads THREADS     Number of threads for parallel compression
   -q, --quiet               Suppress non-essential output

@@ -28,7 +28,7 @@ class CompressionError(Exception):
 class Compressor(ABC):
     """Abstract base class for compression backends."""
     
-    def __init__(self, level: int = 6, preserve_timestamps: bool = True, threads: Optional[int] = None):
+    def __init__(self, level: int = 9, preserve_timestamps: bool = True, threads: Optional[int] = None):
         self.level = max(0, min(9, level))  # Clamp to 0-9
         self.preserve_timestamps = preserve_timestamps
         self.threads = threads or os.cpu_count()
@@ -124,15 +124,13 @@ class TarGzCompressor(Compressor):
         for pattern in excludes:
             exclude_args.extend(['--exclude', pattern])
         
-        # Use pigz with threads if available
+        # Use pigz with threads if available, otherwise gzip
         if gzip_cmd == 'pigz':
-            env_var = f"PIGZ=-{self.level} -p{self.threads}"
-            cmd = ['env', env_var, 'tar']
+            compress_prog = f"pigz -{self.level} -p{self.threads}"
         else:
-            env_var = f"GZIP=-{self.level}"
-            cmd = ['env', env_var, 'tar']
+            compress_prog = f"gzip -{self.level}"
         
-        cmd.extend(['-czf', output])
+        cmd = ['tar', f'--use-compress-program={compress_prog}', '-cf', output]
         cmd.extend(exclude_args)
         cmd.extend(sources)
         
@@ -155,8 +153,8 @@ class TarXzCompressor(Compressor):
     
     def build_command(self, sources: List[str], output: str, excludes: List[str]) -> List[str]:
         # XZ compression level mapping (0-9)
-        env_var = f"XZ_OPT=-{self.level} -T{self.threads}"
-        cmd = ['env', env_var, 'tar', '-cJf', output]
+        compress_prog = f"xz -{self.level} -T{self.threads}"
+        cmd = ['tar', f'--use-compress-program={compress_prog}', '-cf', output]
         
         # Add excludes
         for pattern in excludes:
@@ -208,7 +206,7 @@ class ZippConfig:
     
     DEFAULT_CONFIG = {
         'format': 'auto',
-        'level': '6',
+        'level': '9',
         'preserve_timestamps': 'true',
         'threads': '0',  # 0 means auto-detect
         'excludes': '.git/** __pycache__/** *.pyc .DS_Store Thumbs.db'
@@ -256,7 +254,7 @@ class ZippConfig:
         with open(path, 'w') as f:
             f.write("# Zipp Configuration File\n")
             f.write("# Format: auto, zip, tar.gz, tar.xz, 7z\n")
-            f.write("# Level: 0-9 (0=fastest, 9=best compression)\n")
+            f.write("# Level: 0-9 (0=fastest, 9=best compression, default=9)\n")
             f.write("# Excludes: space-separated patterns\n\n")
             config.write(f)
 
@@ -494,8 +492,8 @@ Examples:
                            default='auto', help='Compression format (default: auto-detect from output name)')
         
         # Compression level
-        parser.add_argument('-l', '--level', type=int, choices=range(10), default=6,
-                           help='Compression level 0-9 (0=fastest, 9=best, default=6)')
+        parser.add_argument('-l', '--level', type=int, choices=range(10), default=None,
+                           help='Compression level 0-9 (0=fastest, 9=best, default: 9 / best)')
         
         # Exclude patterns
         parser.add_argument('-x', '--exclude', action='append', default=[],
@@ -591,7 +589,14 @@ Examples:
         if format_name == 'auto' and config.get('format') != 'auto':
             format_name = config.get('format')
         
-        level = parsed_args.level
+        if parsed_args.level is not None:
+            level = parsed_args.level
+        else:
+            try:
+                level = int(config.get('level', '9'))
+                level = max(0, min(9, level))
+            except (ValueError, TypeError):
+                level = 9
         excludes = parsed_args.exclude.copy()
         excludes.extend(config.get_excludes())
         
