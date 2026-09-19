@@ -30,6 +30,7 @@ TEMP_DIR=""
 SUPPRESS_PATTERNS=()
 INCLUDE_PATTERNS=()
 MONITORING_ACTIVE="false"
+FORCE_WATCH="false"
 
 # --- Cleanup Function ---
 cleanup() {
@@ -69,6 +70,7 @@ usage() {
     echo "  -x, --exclude PATTERN    Alias for --suppress"
     echo "  -u, --no-ufw             Quick shortcut to suppress UFW firewall messages ([UFW BLOCK], etc.)"
     echo "  -i, --include PATTERN    Only show messages matching pattern/regex"
+    echo "  -w, --watch              Force polling mode using watch utility"
     echo "  -n, --lines NUM          Number of lines to display (default: $DEFAULT_LINES)"
     echo "  -h, --help               Show this help message"
     echo ""
@@ -261,6 +263,10 @@ parse_arguments() {
                 INCLUDE_PATTERNS+=("$2")
                 shift 2
                 ;;
+            -w|--watch)
+                FORCE_WATCH="true"
+                shift
+                ;;
             -n|--lines)
                 if [ -z "${2:-}" ]; then
                     echo -e "${RED}Error: $1 requires a number argument${NC}"
@@ -410,12 +416,12 @@ main() {
     # Clear screen for cleaner display
     clear
     
-    # Choose monitoring method based on dmesg capabilities
-    if check_dmesg_follow; then
+    # Choose monitoring method based on dmesg capabilities and user flag
+    if [ "$FORCE_WATCH" = "false" ] && check_dmesg_follow; then
         echo -e "${GREEN}Using modern dmesg --follow method with color coding${NC}"
         monitor_with_follow
     else
-        echo -e "${YELLOW}Falling back to polling method${NC}"
+        echo -e "${YELLOW}Using polling method (watch)${NC}"
         monitor_with_watch
     fi
 }
