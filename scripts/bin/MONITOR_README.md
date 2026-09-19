@@ -35,22 +35,31 @@ The monitor script uses intelligent color coding to help you quickly identify di
 ### Basic Usage
 ```bash
 monitor              # Show last 20 lines (default)
-monitor 50           # Show last 50 lines  
+monitor 50           # Show last 50 lines
+monitor --no-ufw     # Suppress UFW firewall noise ([UFW BLOCK], etc.)
+monitor -u 50        # Show last 50 lines without UFW messages
+monitor -s "pattern" # Suppress any custom message pattern
+monitor -i "usb"     # Only display USB-related kernel messages
 monitor --help       # Show help information
 ```
 
 ### Command Options
 ```bash
-monitor [number_of_lines]
+monitor [options] [number_of_lines]
 
 Arguments:
-  number_of_lines    Number of lines to display (default: 20)
+  number_of_lines          Number of lines to display (default: 20)
 
 Options:
-  -h, --help         Show help message with color legend
+  -s, --suppress PATTERN   Suppress messages matching pattern/regex (can be used multiple times)
+  -x, --exclude PATTERN    Alias for --suppress
+  -u, --no-ufw             Quick shortcut to suppress UFW firewall messages ([UFW BLOCK], etc.)
+  -i, --include PATTERN    Only show messages matching pattern/regex
+  -n, --lines NUM          Number of lines to display (default: 20)
+  -h, --help               Show help message with color legend
 
 Controls:
-  Ctrl+C             Stop monitoring and exit
+  Ctrl+C                   Stop monitoring and exit
 ```
 
 ## 📋 Requirements
