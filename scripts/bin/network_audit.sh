@@ -731,7 +731,7 @@ if [[ $HAS_NMAP -eq 1 && $SKIP_VULN -eq 0 ]]; then
     vuln_out="$VULN_RESULTS_DIR/${r_ip}_vuln.txt"
     
     # Run NSE vulnerability and security audit scripts
-    nmap -sV --script "vuln and not (dos or brute)" -p "$r_ports" "$r_ip" -oN "$vuln_out" >/dev/null 2>&1 || true
+    nmap -sV --version-light --script "vuln and not (dos or brute)" --script-timeout 30s -p "$r_ports" "$r_ip" -oN "$vuln_out" >/dev/null 2>&1 || true
 
     # Extract detected CVEs or vulnerabilities
     cve_found=$(grep -E 'VULNERABLE|CVE-[0-9]{4}-[0-9]+' "$vuln_out" 2>/dev/null | head -n5 || true)
