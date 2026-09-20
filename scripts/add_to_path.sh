@@ -1,0 +1,1 @@
+/home/me/git/conf/scripts/bin/add_to_path.sh
