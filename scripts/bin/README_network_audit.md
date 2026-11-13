@@ -11,10 +11,10 @@
    ╚═╝  ╚═══╝╚══════╝   ╚═╝       ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚═╝   ╚═╝   
 ```
 
-**Automated Subnet Detection • Host Discovery Sweep • OS Fingerprinting • Vulnerability Audit • Markdown Summary Report**
+**Multi-Protocol Discovery • Parallel Batch Scan • Smart Categorization • Active Risk Probes • Rogue Device Diffing • Interactive HTML Dashboard**
 
 **Author:** ShadowHarvy  
-**Version:** 1.0.0  
+**Version:** 2.0.0 (High-Speed Multi-Threaded Edition)  
 **License:** MIT
 
 </div>
@@ -24,59 +24,71 @@
 ## 📋 Table of Contents
 
 - [Overview](#-overview)
-- [Key Features](#-key-features)
+- [Key Features (v2.0)](#-key-features-v20)
 - [How It Works](#-how-it-works)
-  - [Phase 1: Subnet Auto-Detection](#phase-1-subnet-auto-detection)
-  - [Phase 2: Ping & Host Discovery Sweep](#phase-2-ping--host-discovery-sweep)
-  - [Phase 3: OS & Device Identification](#phase-3-os--device-identification)
-  - [Phase 4: Vulnerability & Security Risk Assessment](#phase-4-vulnerability--security-risk-assessment)
-  - [Phase 5: Markdown Summary Report](#phase-5-markdown-summary-report)
+  - [Phase 1: Subnet Auto-Detection & Safety Guards](#phase-1-subnet-auto-detection--safety-guards)
+  - [Phase 2: Multi-Protocol Discovery (ARP, ICMP, SSDP, mDNS)](#phase-2-multi-protocol-discovery)
+  - [Phase 3: Parallel Port Scanning & Device Categorization](#phase-3-parallel-port-scanning--device-categorization)
+  - [Phase 4: Targeted Vulnerability Scripting](#phase-4-targeted-vulnerability-scripting)
+  - [Phase 5: Multi-Format Reporting & Rogue Device Diffing](#phase-5-multi-format-reporting--rogue-device-diffing)
 - [Requirements & Installation](#-requirements--installation)
 - [Usage & Examples](#-usage--examples)
-- [Sample Report Output](#-sample-report-output)
+- [Output Formats](#-output-formats)
 
 ---
 
 ## 🌟 Overview
 
-`network_audit.sh` is an automated security audit and inventory tool designed specifically for home and private office local networks. It automatically detects your active network interface and CIDR subnet (e.g. `192.168.1.0/24`), sweeps the network to find every active connected device, determines the operating system and manufacturer of each, tests for exposed security risks and common CVE vulnerabilities, and outputs both a color-coded terminal table and an executive Markdown report.
+`network_audit.sh` is a high-speed, automated network security auditing and inventory tool designed for personal networks, smart homes, homelabs, and private office subnets. It automatically discovers all active devices—even stealthy IoT devices that drop ICMP pings—identifies operating systems and manufacturers, classifies devices into functional categories (Routers, PCs, IoT, Mobile, Servers, Cameras), conducts active security probes on risky services (Redis, Docker APIs, Telnet, RTSP, Anonymous FTP), tracks network changes against prior audits to spot rogue devices, and outputs Markdown, JSON, and a standalone interactive dark-mode HTML dashboard.
 
 ---
 
-## 🚀 Key Features
+## 🚀 Key Features (v2.0)
 
-- 🔍 **Zero-Configuration Auto-Detection**: Detects active network adapter (`wlan0`, `eth0`), default gateway, local IP, and subnet CIDR automatically.
-- 🏓 **Host Discovery Sweep**: Pings and ARP-sweeps all addresses to build a live device list.
-- 💻 **OS & Hardware Fingerprinting**: Uses Nmap OS fingerprinting (`-O`) with MAC vendor lookup and TTL analysis fallback.
-- 🛡️ **Vulnerability Assessment**:
-  - Scans for dangerous plaintext protocols (Telnet on port 23, FTP on port 21).
-  - Checks for exposed remote access (RDP 3389, VNC 5900, SMB 445).
-  - Checks for exposed databases (MySQL, PostgreSQL, Redis, MongoDB).
-  - Runs automated CVE vulnerability scripts (`nmap --script vuln`) against open services.
-- 📄 **Executive Markdown Reports**: Automatically generates timestamped reports in `./reports/network_audit_<date>.md` with an executive summary, device inventory table, risk details, and defensive hardening advice.
+- ⚡ **High-Speed Parallel Batch Scanning**: Uses Nmap's parallel C++ batch scanning engine combined with Python thread pools (default 16 threads) for 5x–10x faster execution than sequential scanners.
+- 📡 **Multi-Protocol Discovery**: Catches silent devices that ignore ICMP echo by broadcasting SSDP (UPnP) M-SEARCH and mDNS discovery queries alongside ARP sweeps.
+- 🏷️ **Smart Device Categorization**: Automatically classifies devices into functional categories with intuitive icons:
+  - 🌐 **Gateway / Router**
+  - 💻 **Workstation / PC**
+  - 📱 **Mobile / Tablet**
+  - 💡 **Smart Home / IoT**
+  - 🗄️ **Server / NAS / Homelab**
+  - 📺 **Smart TV / Streaming Media**
+  - 📷 **Security Camera**
+  - 🖨️ **Printer / Office**
+  - 🎮 **Gaming Console**
+- 🛡️ **Active Security & Risk Probing**:
+  - Live socket test for unauthenticated Redis servers (`PING` $\to$ `+PONG`).
+  - Active probe for unauthenticated Docker daemon APIs on port 2375/2376 (root RCE risk).
+  - Anonymous FTP login verification.
+  - Plaintext protocol alerts (Telnet 23/2323, VNC 5900, HTTP without HTTPS).
+  - RTSP IP camera feed detection (port 554).
+  - Gateway UPnP WAN hole-punching vulnerability checks.
+- 🚨 **Network Change & Rogue Device Diffing**: Compares current audit state against previous scans (`.network_audit_last.json`) to highlight new unknown devices, newly opened ports, and disconnected devices.
+- 📊 **Triple-Format Reporting**:
+  - **Interactive Dark-Mode HTML Dashboard**: Standalone single-file dashboard with live search, category filter pills, expandable host drawers, and print-to-PDF formatting (zero external CDN dependencies).
+  - **Executive Markdown Report**: Clean tabular summaries with actionable step-by-step remediation guidance.
+  - **Structured JSON Export**: Machine-readable output for home lab automations, CI/CD, and SIEM pipelines.
+- 🛑 **Subnet Safety Guards**: Automatically detects wide subnets (e.g. `/16` or `/8` on Docker/VPNs) and constrains to a safe local `/24` unless explicitly overridden with `--force`.
 
 ---
 
 ## ⚙️ How It Works
 
-### Phase 1: Subnet Auto-Detection
-The script inspects your system's default route via `ip route show to default` and resolves your active IPv4 interface and subnet mask (e.g. `192.168.1.164/24` $\to$ `192.168.1.0/24`). You can also override the subnet manually with `-r <CIDR>`.
+### Phase 1: Subnet Auto-Detection & Safety Guards
+Inspects the default kernel routing table (`ip -4 route show to default`) to resolve the primary network adapter, IP, gateway, and CIDR. If a wide subnet prefix is detected ($< /24$), it protects your machine by defaulting to the local `/24` unless `--force` is specified.
 
-### Phase 2: Ping & Host Discovery Sweep
-Performs a fast discovery sweep combining ICMP echo, ARP ping, and common TCP SYN probes to find all online phones, laptops, smart TVs, routers, and IoT devices.
+### Phase 2: Multi-Protocol Discovery
+Runs Nmap's ARP/ping sweep concurrently with UDP multicast probes (SSDP on `239.255.255.250:1900` and mDNS on `224.0.0.251:5353`) and reads the kernel ARP neighbor cache (`ip neigh`) to find live hosts that block ICMP.
 
-### Phase 3: OS & Device Identification
-Probes responsive hosts with Nmap's TCP/IP stack fingerprinting engine (`-O --osscan-guess`) and service version inspection (`-sV`). If Nmap is not installed, it falls back to ICMP TTL heuristics (TTL $\le 64$ for Linux/Android/Apple, TTL $\le 128$ for Windows, TTL $\ge 255$ for Cisco/network appliances) and service banner inspection.
+### Phase 3: Parallel Port Scanning & Device Categorization
+Discovered targets are scanned simultaneously using Nmap's batch scanning engine. Concurrently, a Python thread pool resolves device hostnames (mDNS, NetBIOS, reverse DNS, and fast HTTP title grabs) and looks up manufacturers across IEEE OUI, Nmap prefixes, and an embedded top-vendor database.
 
-### Phase 4: Vulnerability & Security Risk Assessment
-Performs a security audit of open ports to detect unencrypted credentials, exposed administrative portals, and known CVEs using automated Nmap Scripting Engine (NSE) vulnerability checks.
+### Phase 4: Targeted Vulnerability Scripting
+For hosts with open ports, Nmap Scripting Engine (NSE) vulnerability checks (`--script "vuln and not (dos or brute)"`) execute specifically against those ports.
 
-### Phase 5: Markdown Summary Report
-Compiles all data into a structured report with:
-1. **Executive Summary**: Total devices, clean hosts, hosts with warnings/vulnerabilities.
-2. **Device Inventory Table**: IP, Hostname, MAC Address, Vendor, Detected OS, Open Ports, Risk Status.
-3. **Risk & CVE Breakdown**: Specific findings and CVE descriptions per device.
-4. **Hardening Recommendations**: Actionable guidance to secure your home network.
+### Phase 5: Multi-Format Reporting & Rogue Device Diffing
+Calculates network changes since the previous scan, prints a terminal summary table with color-coded badges, and writes the Markdown report, interactive HTML dashboard, and JSON snapshot.
 
 ---
 
@@ -84,7 +96,7 @@ Compiles all data into a structured report with:
 
 ### Dependencies
 - **iproute2** (`ip`) & **ping** (pre-installed on Linux)
-- **python3** (pre-installed on Linux)
+- **python3** (standard library only; no pip dependencies needed)
 - **nmap** *(Recommended for deep OS detection and vulnerability scripts)*
 
 On Arch Linux / CachyOS:
@@ -112,43 +124,36 @@ Scans top 100 ports and skips heavy vulnerability scripts:
 sudo ./network_audit.sh -q
 ```
 
+### Full 65,535-Port Deep Audit
+```bash
+sudo ./network_audit.sh -f
+```
+
 ### Audit a Specific Network Range
 ```bash
 sudo ./network_audit.sh -r 192.168.1.0/24
 ```
 
-### Save Report to a Custom File
+### Custom Report Output Paths
 ```bash
-sudo ./network_audit.sh -o ~/Desktop/home_lan_audit.md
+sudo ./network_audit.sh -o ./audit.md --html ./dashboard.html --json ./data.json
 ```
 
-### Discovery & OS Identification Only
+### Exclude Specific Hosts (e.g. Gateways or Sensitive Servers)
 ```bash
-sudo ./network_audit.sh --skip-vuln
+sudo ./network_audit.sh --exclude 192.168.1.1,192.168.1.10
+```
+
+### Control Thread Concurrency
+```bash
+sudo ./network_audit.sh -t 32
 ```
 
 ---
 
-## 📊 Sample Report Output
+## 📊 Output Formats
 
-```markdown
-# Network Security Audit Report
-
-**Audit Date:** 2026-09-18 21:30:00  
-**Target Subnet:** `192.168.1.0/24`  
-**Interface:** `wlan0` | **Gateway:** `192.168.1.1`  
-
-## 📊 Executive Summary
-| Metric | Value |
-| :--- | :--- |
-| **Total Devices Detected** | **6** |
-| **Devices With Open Ports / Risks** | **2** |
-| **Clean / No Exposed Risks** | **4** |
-
-## 🖥️ Device Inventory
-| IP Address | Device Name | Manufacturer | MAC Address | Detected OS | Open Ports | Status |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `192.168.1.1` | **eero-09es** | eero inc. | `28:ec:22:bb:8c:92` | Linux 4.4 (Router) | `80/tcp,443/tcp` | 🟢 Clean |
-| `192.168.1.164`| **cachyos-x8664-27**| ASUSTeK COMPUTER INC. | `a4:b1:c2:...` | Arch Linux / CachyOS | `22/tcp` | 🟢 Clean |
-| `192.168.1.210`| **homeassistant** | Private / Randomized MAC | `02:48:59:b6:38:62` | Linux (Home Assistant OS) | `8123/tcp` | 🟢 Clean |
-```
+1. **Terminal Output**: Color-coded ANSI table with category icons, device names, open ports, and risk badges, plus diff alerts for new devices.
+2. **HTML Dashboard (`.html`)**: Modern dark obsidian UI, real-time search box, category tabs, and collapsible finding drawers with remediation instructions.
+3. **Markdown Report (`.md`)**: Comprehensive report formatted for GitHub/GitLab and documentation wikis.
+4. **JSON Snapshot (`.json`)**: Machine-readable data structure for automated tracking.
