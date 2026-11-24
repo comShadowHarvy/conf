@@ -1,0 +1,75 @@
+#!/usr/bin/env python3
+"""Fake udisksctl for the usb-mount/usb-eject harness.
+
+Tracks mounts in $FAKE_STATE/mounted and appends every invocation to
+$FAKE_STATE/calls.log so the tests can assert on the exact arguments used.
+Behaviour is controlled by env vars:
+  FAKE_MOUNT_RO  = 1  -> mounted dirs are created mode 0555 (simulates a
+                         drive the user cannot write to)
+"""
+import os, sys, pathlib
+
+st = pathlib.Path(os.environ["FAKE_STATE"])
+root = st / "run-media"
+log = st / "calls.log"
+
+def rec(line):
+    with open(log, "a") as f:
+        f.write(line + "\n")
+
+def mounted():
+    p = st / "mounted"
+    return [l.split(None, 1) for l in p.read_text().splitlines() if l.strip()] if p.exists() else []
+
+def save(rows):
+    (st / "mounted").write_text("".join("%s %s\n" % (d, m) for d, m in rows))
+
+def label_of(dev):
+    for l in (st / "parts").read_text().splitlines():
+        p = l.split()
+        if p[0] == dev:
+            return p[2] if len(p) > 2 else "USB"
+    return "USB"
+
+args = sys.argv[1:]
+rec("udisksctl " + " ".join(args))
+sub = args[0] if args else ""
+dev = ""
+opts = ""
+i = 1
+while i < len(args):
+    if args[i] in ("-b", "--block-device"):
+        dev = args[i + 1]; i += 2
+    elif args[i] in ("-o", "--options"):
+        opts = args[i + 1]; i += 2
+    else:
+        i += 1
+
+rows = mounted()
+
+if sub == "mount":
+    mnt = str(root / label_of(dev))
+    os.makedirs(mnt, exist_ok=True)
+    os.chmod(mnt, 0o555 if (os.environ.get("FAKE_MOUNT_RO") == "1" and "uid=" not in opts) else 0o755)
+    save([(d, m) for d, m in rows if d != dev] + [(dev, mnt)])
+    print("Mounted %s at %s." % (dev, mnt))
+    sys.exit(0)
+
+if sub == "unmount":
+    if not any(d == dev for d, _ in rows):
+        print("Error: %s is not mounted" % dev, file=sys.stderr)
+        sys.exit(32)
+    save([(d, m) for d, m in rows if d != dev])
+    print("Unmounted %s." % dev)
+    sys.exit(0)
+
+if sub == "power-off":
+    disk = dev.replace("/dev/", "")
+    dp = st / "disks"
+    kept = [l for l in dp.read_text().splitlines() if not l.startswith(disk + " ")]
+    dp.write_text("".join(l + "\n" for l in kept))
+    print("Successfully sent power off to %s" % dev)
+    sys.exit(0)
+
+print("Error: unknown subcommand %s" % sub, file=sys.stderr)
+sys.exit(1)

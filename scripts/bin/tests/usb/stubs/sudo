@@ -1,0 +1,5 @@
+#!/bin/sh
+# Fake sudo: drops privilege and runs the command (for the --dir path test).
+echo "sudo $*" >> "$FAKE_STATE/calls.log"
+shift
+exec "$@"

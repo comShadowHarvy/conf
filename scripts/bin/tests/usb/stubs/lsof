@@ -1,0 +1,7 @@
+#!/bin/sh
+# Fake lsof: reports a holder only when $FAKE_STATE/holders names the path.
+[ -f "$FAKE_STATE/holders" ] || exit 0
+for a in "$@"; do
+  if grep -qx "$a" "$FAKE_STATE/holders" 2>/dev/null; then echo 4242; exit 0; fi
+done
+exit 0

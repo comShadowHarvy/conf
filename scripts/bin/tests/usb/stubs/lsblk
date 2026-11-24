@@ -1,0 +1,122 @@
+#!/usr/bin/env python3
+"""Fake lsblk for the usb-mount/usb-eject harness.
+
+Reads state from $FAKE_STATE so the stubs can agree on what is mounted:
+  state/disks      one line per disk: "name size model usb|no"
+  state/parts      one line per partition: "dev fstype label"
+  state/mounted    one line per mounted part: "dev mountpoint"
+"""
+import os, sys
+
+st = os.environ["FAKE_STATE"]
+a = sys.argv[1:]
+joined = " ".join(a)
+
+
+def load(name):
+    p = os.path.join(st, name)
+    if not os.path.exists(p):
+        return []
+    return [l for l in open(p).read().splitlines() if l.strip()]
+
+
+disks = [l.split(None, 3) for l in load("disks")]
+parts = [l.split(None, 2) for l in load("parts")]
+mounts = dict(l.split(None, 1) for l in load("mounted"))
+
+
+def part_of(disk):
+    return [p for p in parts if p[0].startswith("/dev/" + disk) and p[0] != "/dev/" + disk]
+
+
+def mnt(dev):
+    return mounts.get(dev.strip(), "")
+
+
+# lsblk -dno TRAN /dev/sdb   /  lsblk -dno SIZE /dev/sdb
+if "-dno" in joined and any(x.startswith("/dev/") for x in a):
+    dev = [x for x in a if x.startswith("/dev/")][0].replace("/dev/", "")
+    row = next((d for d in disks if d[0] == dev), None)
+    part = next((p for p in parts if p[0] == "/dev/" + dev), None)
+    if not row and not part:
+        sys.exit(32)
+    cols = a[a.index("-dno") + 1].split(",")
+    vals = []
+    for c in cols:
+        if c == "TYPE":
+            vals.append("disk" if row else "part")
+            continue
+        if row is None:                      # partition: report its disk's values
+            diskname = "".join(ch for ch in dev if not ch.isdigit())
+            row = next(d for d in disks if d[0] == diskname)
+        vals.append({"NAME": row[0], "SIZE": row[1], "MODEL": row[2],
+                     "TRAN": "usb" if row[3] == "usb" else ""}[c])
+    print(" ".join(vals))
+    sys.exit(0)
+
+# lsblk -dno NAME,TRAN  (all disks)
+if joined.startswith("-dno NAME,TRAN") or joined.startswith("-dno NAME "):
+    for d in disks:
+        print("%s %s" % (d[0], "usb" if d[3] == "usb" else ""))
+    sys.exit(0)
+
+# lsblk -dno NAME            (all disks, one column)
+if joined.startswith("-dno NAME") and "," not in joined:
+    for d in disks:
+        print(d[0])
+    sys.exit(0)
+
+# lsblk -lnpo NAME,FSTYPE /dev/sdb
+if "-lnpo" in joined and "FSTYPE" in joined:
+    dev = [x for x in a if x.startswith("/dev/")][0].replace("/dev/", "")
+    print("/dev/" + dev + " ")
+    for p in part_of(dev):
+        print("%s %s" % (p[0], p[1]))
+    sys.exit(0)
+
+# lsblk -lnpo NAME,LABEL
+if "-lnpo" in joined and "LABEL" in joined:
+    for p in parts:
+        print("%s %s" % (p[0], p[2]))
+    sys.exit(0)
+
+# lsblk -lnro NAME,MOUNTPOINT /dev/sdb   (eject script)
+if "-lnro" in joined:
+    dev = [x for x in a if x.startswith("/dev/")][0].replace("/dev/", "")
+    print("/dev/%s %s" % (dev, ""))
+    for p in part_of(dev):
+        print("%s %s" % (p[0], mnt(p[0])))
+    sys.exit(0)
+
+# lsblk -lno NAME,SIZE,FSTYPE,LABEL,MOUNTPOINT /dev/sdb
+if "-lno" in joined and "MOUNTPOINT" in joined:
+    dev = [x for x in a if x.startswith("/dev/")][0].replace("/dev/", "")
+    print("%s %s" % (dev, next(d[1] for d in disks if d[0] == dev)))
+    for p in part_of(dev):
+        print("%s %s %s %s %s" % (p[0].replace("/dev/", ""), "2G", p[1], p[2], mnt(p[0])))
+    sys.exit(0)
+
+# lsblk -no FSTYPE /dev/sdb1
+if joined.startswith("-no FSTYPE"):
+    dev = [x for x in a if x.startswith("/dev/")][0]
+    print(next((p[1] for p in parts if p[0] == dev), ""))
+    sys.exit(0)
+
+# lsblk -lno NAME   (existence check used by both scripts)
+if "-lno" in joined and joined.split()[-1] == "NAME":
+    for d in disks:
+        print(d[0])
+    for p in parts:
+        print(p[0].replace("/dev/", ""))
+    sys.exit(0)
+
+# lsblk -lno NAME,SIZE   (existence check)
+if "-lno" in joined and "SIZE" in joined:
+    for d in disks:
+        print("%s %s" % (d[0], d[1]))
+    for p in parts:
+        print("%s 2G" % p[0].replace("/dev/", ""))
+    sys.exit(0)
+
+print("fake-lsblk: unhandled args: %s" % joined, file=sys.stderr)
+sys.exit(1)
