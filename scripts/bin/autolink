@@ -1,41 +1,524 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# ==============================================================================
+# autolink - Dual Wi-Fi Failover Manager for NetworkManager (nmcli)
+# ==============================================================================
+# Connects a secondary Wi-Fi adapter to the same network as your primary active
+# Wi-Fi adapter using a cloned NetworkManager profile with higher route metrics
+# for clean failover (avoiding asymmetric routing issues).
+# ==============================================================================
 
-# 1. Find the Active Interface and its SSID
-# We search for a wifi device in 'connected' state and grab its connection name (SSID)
-ACTIVE_INFO=$(nmcli -t -f DEVICE,STATE,CONNECTION device | grep ":connected:" | grep -v "lo" | head -n 1)
+set -euo pipefail
 
-if [ -z "$ACTIVE_INFO" ]; then
-  echo "❌ No active Wi-Fi connection found."
-  exit 1
+readonly PROG_NAME="${0##*/}"
+readonly PROFILE_PREFIX="autolink-"
+
+# Defaults
+ACTION="up"
+PRIMARY_IFACE=""
+SECONDARY_IFACE=""
+LINK_ALL=false
+PRIMARY_METRIC=100
+SECONDARY_METRIC=200
+METRIC_STEP=100
+AUTOCONNECT="no"
+KEEP_PROFILE=false
+DRY_RUN=false
+
+# Colors (disabled when piped or NO_COLOR is set)
+if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
+  C_RESET=$'\033[0m'
+  C_BOLD=$'\033[1m'
+  C_RED=$'\033[31m'
+  C_GREEN=$'\033[32m'
+  C_YELLOW=$'\033[33m'
+  C_BLUE=$'\033[34m'
+  C_CYAN=$'\033[36m'
+  C_DIM=$'\033[2m'
+else
+  C_RESET="" C_BOLD="" C_RED="" C_GREEN="" C_YELLOW="" C_BLUE="" C_CYAN="" C_DIM=""
 fi
 
-ACTIVE_IFACE=$(echo "$ACTIVE_INFO" | cut -d':' -f1)
-CURRENT_SSID=$(echo "$ACTIVE_INFO" | cut -d':' -f3)
+info()    { printf '%b[INFO]%b %s\n'  "$C_BLUE"   "$C_RESET" "$*"; }
+ok()      { printf '%b[OK]%b %s\n'    "$C_GREEN"  "$C_RESET" "$*"; }
+warn()    { printf '%b[WARN]%b %s\n'  "$C_YELLOW" "$C_RESET" "$*" >&2; }
+err()     { printf '%b[ERROR]%b %s\n' "$C_RED"    "$C_RESET" "$*" >&2; }
+die()     { err "$@"; exit 1; }
 
-echo "✅ Found active connection on $ACTIVE_IFACE connected to '$CURRENT_SSID'"
+usage() {
+  cat <<EOF
+${C_BOLD}Usage:${C_RESET}
+  ${PROG_NAME} [command] [options]
 
-# 2. Find an Idle Interface
-# We search for a wifi device in 'disconnected' state
-IDLE_IFACE=$(nmcli -t -f DEVICE,TYPE,STATE device | grep ":wifi:disconnected" | head -n 1 | cut -d':' -f1)
+${C_BOLD}Commands:${C_RESET}
+  up, connect       Connect secondary Wi-Fi adapter(s) in failover mode (default)
+  down, disconnect  Disconnect and remove ${PROFILE_PREFIX}* failover profile(s)
+  status            Show Wi-Fi interfaces, profiles, IPs, and default route metrics
 
-if [ -z "$IDLE_IFACE" ]; then
-  echo "⚠️ No idle Wi-Fi interfaces found. Are both already connected?"
-  exit 0
-fi
+${C_BOLD}Options:${C_RESET}
+  -p, --primary IFACE         Primary (active) Wi-Fi interface (auto-detected if omitted)
+  -s, --secondary IFACE       Secondary (target) Wi-Fi interface (auto-detected if omitted)
+  -a, --all                   Link all idle Wi-Fi interfaces (increments metric per adapter)
+      --primary-metric N      Route metric for primary adapter (default: ${PRIMARY_METRIC})
+      --secondary-metric N    Route metric for secondary adapter (default: ${SECONDARY_METRIC})
+      --autoconnect           Allow cloned failover profile(s) to auto-connect
+      --keep-profile          With 'down', disconnect without deleting ${PROFILE_PREFIX}* profiles
+  -n, --dry-run               Show commands that would run without making changes
+  -h, --help                  Show this help message
 
-echo "🔄 Found idle interface: $IDLE_IFACE"
-echo "🚀 Attempting to connect $IDLE_IFACE to '$CURRENT_SSID'..."
+${C_BOLD}Examples:${C_RESET}
+  ${PROG_NAME}                              # Auto-detect adapters and enable failover
+  ${PROG_NAME} --dry-run                    # Preview actions without modifying NetworkManager
+  ${PROG_NAME} -p wlan0 -s wlan1            # Explicitly pick primary and secondary adapters
+  ${PROG_NAME} up --all                     # Link every idle Wi-Fi adapter
+  ${PROG_NAME} status                       # Inspect interfaces and route metrics
+  ${PROG_NAME} down                         # Tear down failover connections and profiles
+  ${PROG_NAME} down -s wlan1 --keep-profile # Disconnect wlan1 but keep its profile
+EOF
+}
 
-# 3. Connect the Idle Interface
-# We try to connect using the existing profile first
-nmcli device wifi connect "$CURRENT_SSID" ifname "$IDLE_IFACE"
+# Unescape nmcli terse output (\: -> :, \\ -> \)
+nmcli_unescape() {
+  local s="$1"
+  s="${s//\\:/:}"
+  s="${s//\\\\/\\}"
+  printf '%s' "$s"
+}
 
-# 4. Optional: Fix Routing Metrics
-# If both connect successfully, one usually blocks the other unless metrics are equal.
-# This sets the new connection's metric to 100 (high priority) so both are "active".
-echo "🔧 Adjusting route metrics to ensure simultaneous usage..."
-nmcli connection modify "$CURRENT_SSID" ipv4.route-metric 100
-# Note: This modifies the profile globally. You might need to bring it up again to apply.
-nmcli device reapply "$IDLE_IFACE"
+validate_metric() {
+  local name="$1" val="$2"
+  if [[ ! "$val" =~ ^[0-9]+$ ]] || (( val > 4294967295 )); then
+    die "Invalid ${name} metric '${val}': must be an integer between 0 and 4294967295."
+  fi
+}
 
-echo "🎉 Done! Both cards should now be connected to $CURRENT_SSID."
+run_cmd() {
+  if [[ "$DRY_RUN" == true ]]; then
+    printf '%b[DRY-RUN]%b' "$C_CYAN" "$C_RESET"
+    printf ' %q' "$@"
+    printf '\n'
+    return 0
+  fi
+  "$@"
+}
+
+check_deps() {
+  command -v nmcli >/dev/null 2>&1 || die "nmcli is not installed. Please install NetworkManager."
+  local running
+  running="$(nmcli -t -f RUNNING general 2>/dev/null || true)"
+  if [[ "$running" != "running" ]]; then
+    die "NetworkManager is not running or unreachable."
+  fi
+}
+
+# Query a single NetworkManager property cleanly
+nm_dev_prop() {
+  local iface="$1" prop="$2"
+  nmcli -g "$prop" device show "$iface" 2>/dev/null | head -n 1 || true
+}
+
+nm_con_prop() {
+  local uuid="$1" prop="$2"
+  nmcli -g "$prop" connection show uuid "$uuid" 2>/dev/null | head -n 1 || true
+}
+
+# Populate associative arrays of all Wi-Fi devices and their states
+declare -A WIFI_STATES=()
+declare -a WIFI_IFACES=()
+
+load_wifi_devices() {
+  WIFI_STATES=()
+  WIFI_IFACES=()
+  local line dev_type dev_state dev_name
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    # TYPE and STATE do not contain colons; DEVICE is the remainder
+    dev_type="${line%%:*}"
+    local rest="${line#*:}"
+    dev_state="${rest%%:*}"
+    dev_name="$(nmcli_unescape "${rest#*:}")"
+    if [[ "$dev_type" == "wifi" && -n "$dev_name" ]]; then
+      WIFI_IFACES+=("$dev_name")
+      WIFI_STATES["$dev_name"]="$dev_state"
+    fi
+  done < <(nmcli -t -f TYPE,STATE,DEVICE device status 2>/dev/null || true)
+}
+
+# Find all connection UUIDs matching a given name (or prefix if mode="prefix")
+find_con_uuids() {
+  local pattern="$1" mode="${2:-exact}"
+  local line uuid name
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    uuid="${line%%:*}"
+    name="$(nmcli_unescape "${line#*:}")"
+    if [[ "$mode" == "prefix" ]]; then
+      [[ "$name" == "${pattern}"* ]] && printf '%s\n' "$uuid"
+    else
+      [[ "$name" == "$pattern" ]] && printf '%s\n' "$uuid"
+    fi
+  done < <(nmcli -t -f UUID,NAME connection show 2>/dev/null || true)
+}
+
+is_con_active() {
+  local target_uuid="$1"
+  local uuid
+  while IFS= read -r uuid; do
+    [[ "$uuid" == "$target_uuid" ]] && return 0
+  done < <(nmcli -t -f UUID connection show --active 2>/dev/null || true)
+  return 1
+}
+
+# Set IPv4/IPv6 route metrics on a connection UUID when those families are enabled
+apply_metrics() {
+  local uuid="$1" metric="$2" iface="$3" reapply="${4:-false}"
+  local ipv4_method ipv6_method cur_v4 cur_v6
+  local -a mod_args=()
+
+  ipv4_method="$(nm_con_prop "$uuid" ipv4.method)"
+  ipv6_method="$(nm_con_prop "$uuid" ipv6.method)"
+  cur_v4="$(nm_con_prop "$uuid" ipv4.route-metric)"
+  cur_v6="$(nm_con_prop "$uuid" ipv6.route-metric)"
+
+  if [[ "$ipv4_method" != "disabled" && "$ipv4_method" != "ignore" && "$cur_v4" != "$metric" ]]; then
+    mod_args+=(ipv4.route-metric "$metric")
+  fi
+  if [[ "$ipv6_method" != "disabled" && "$ipv6_method" != "ignore" && "$cur_v6" != "$metric" ]]; then
+    mod_args+=(ipv6.route-metric "$metric")
+  fi
+
+  if (( ${#mod_args[@]} == 0 )); then
+    info "Metrics on ${iface} already set to ${metric}."
+    return 0
+  fi
+
+  info "Setting route metric=${metric} on ${iface}..."
+  run_cmd nmcli connection modify uuid "$uuid" "${mod_args[@]}"
+  if [[ "$reapply" == true ]]; then
+    run_cmd nmcli device reapply "$iface"
+  fi
+}
+
+cmd_up() {
+  load_wifi_devices
+
+  if (( ${#WIFI_IFACES[@]} == 0 )); then
+    die "No Wi-Fi interfaces found on this system."
+  fi
+
+  if (( PRIMARY_METRIC >= SECONDARY_METRIC )); then
+    warn "Primary metric (${PRIMARY_METRIC}) >= secondary metric (${SECONDARY_METRIC}); secondary may take precedence over primary."
+  fi
+
+  # 1. Resolve primary Wi-Fi interface
+  local primary="$PRIMARY_IFACE"
+  if [[ -n "$primary" ]]; then
+    if [[ -z "${WIFI_STATES[$primary]+x}" ]]; then
+      die "Primary interface '${primary}' is not a Wi-Fi device."
+    fi
+    if [[ "${WIFI_STATES[$primary]}" != "connected" ]]; then
+      die "Primary interface '${primary}' is not connected (state: ${WIFI_STATES[$primary]})."
+    fi
+  else
+    local dev con_name
+    for dev in "${WIFI_IFACES[@]}"; do
+      if [[ "${WIFI_STATES[$dev]}" == "connected" ]]; then
+        con_name="$(nmcli_unescape "$(nm_dev_prop "$dev" GENERAL.CONNECTION)")"
+        # Skip existing autolink failover interfaces when choosing the primary
+        if [[ "$con_name" != "${PROFILE_PREFIX}"* ]]; then
+          primary="$dev"
+          break
+        fi
+      fi
+    done
+    if [[ -z "$primary" ]]; then
+      die "No active primary Wi-Fi connection found."
+    fi
+  fi
+
+  local primary_uuid primary_con primary_ssid
+  primary_uuid="$(nm_dev_prop "$primary" GENERAL.CON-UUID)"
+  primary_con="$(nmcli_unescape "$(nm_dev_prop "$primary" GENERAL.CONNECTION)")"
+  if [[ -z "$primary_uuid" ]]; then
+    die "Could not determine active NetworkManager connection UUID for '${primary}'."
+  fi
+  primary_ssid="$(nmcli_unescape "$(nm_con_prop "$primary_uuid" 802-11-wireless.ssid)")"
+  [[ -z "$primary_ssid" ]] && primary_ssid="$primary_con"
+
+  ok "Primary Wi-Fi: ${primary} -> SSID '${primary_ssid}' (profile: ${primary_con})"
+
+  # 2. Resolve secondary Wi-Fi interface(s)
+  local -a targets=()
+  if [[ -n "$SECONDARY_IFACE" ]]; then
+    if [[ -z "${WIFI_STATES[$SECONDARY_IFACE]+x}" ]]; then
+      die "Secondary interface '${SECONDARY_IFACE}' is not a Wi-Fi device."
+    fi
+    if [[ "$SECONDARY_IFACE" == "$primary" ]]; then
+      die "Secondary interface cannot be the same as primary ('${primary}')."
+    fi
+    local sec_state="${WIFI_STATES[$SECONDARY_IFACE]}"
+    if [[ "$sec_state" == "unavailable" || "$sec_state" == "unmanaged" ]]; then
+      die "Secondary interface '${SECONDARY_IFACE}' is ${sec_state} (check rfkill / Wi-Fi radio)."
+    fi
+    targets+=("$SECONDARY_IFACE")
+  else
+    local dev
+    for dev in "${WIFI_IFACES[@]}"; do
+      [[ "$dev" == "$primary" ]] && continue
+      if [[ "${WIFI_STATES[$dev]}" == "disconnected" ]]; then
+        targets+=("$dev")
+        [[ "$LINK_ALL" == false ]] && break
+      fi
+    done
+
+    if (( ${#targets[@]} == 0 )); then
+      if (( ${#WIFI_IFACES[@]} < 2 )); then
+        die "Only one Wi-Fi interface (${primary}) detected; a second Wi-Fi adapter is required."
+      fi
+      warn "No idle Wi-Fi interfaces found (other adapters may already be connected or unavailable)."
+      info "Run '${PROG_NAME} status' to inspect all Wi-Fi interfaces."
+      return 0
+    fi
+  fi
+
+  # 3. Ensure primary has the lower failover metric
+  apply_metrics "$primary_uuid" "$PRIMARY_METRIC" "$primary" true
+
+  # 4. Clone and connect each secondary interface
+  local idx=0 sec_iface sec_metric clone_name existing_uuid clone_uuid
+  local ipv4_method ipv6_method
+  ipv4_method="$(nm_con_prop "$primary_uuid" ipv4.method)"
+  ipv6_method="$(nm_con_prop "$primary_uuid" ipv6.method)"
+
+  for sec_iface in "${targets[@]}"; do
+    sec_metric=$(( SECONDARY_METRIC + idx * METRIC_STEP ))
+    clone_name="${PROFILE_PREFIX}${sec_iface}"
+    idx=$(( idx + 1 ))
+
+    info "Configuring failover on ${sec_iface} (profile: ${clone_name}, metric: ${sec_metric})..."
+
+    # Remove any previous autolink profile for this interface to prevent duplicates/stale SSIDs
+    while IFS= read -r existing_uuid; do
+      [[ -z "$existing_uuid" ]] && continue
+      if is_con_active "$existing_uuid"; then
+        run_cmd nmcli connection down uuid "$existing_uuid"
+      fi
+      run_cmd nmcli connection delete uuid "$existing_uuid"
+    done < <(find_con_uuids "$clone_name" exact)
+
+    # Clone preserves security credentials (WPA2/WPA3/802.1X) without re-prompting
+    run_cmd nmcli connection clone "$primary_uuid" "$clone_name"
+
+    local -a clone_mod=(
+      connection.interface-name "$sec_iface"
+      connection.autoconnect "$AUTOCONNECT"
+      802-11-wireless.mac-address ""
+    )
+    if [[ "$ipv4_method" != "disabled" && "$ipv4_method" != "ignore" ]]; then
+      clone_mod+=(ipv4.route-metric "$sec_metric")
+    fi
+    if [[ "$ipv6_method" != "disabled" && "$ipv6_method" != "ignore" ]]; then
+      clone_mod+=(ipv6.route-metric "$sec_metric")
+    fi
+
+    if [[ "$DRY_RUN" == true ]]; then
+      run_cmd nmcli connection modify "$clone_name" "${clone_mod[@]}"
+      run_cmd nmcli connection up "$clone_name" ifname "$sec_iface"
+    else
+      clone_uuid="$(find_con_uuids "$clone_name" exact | head -n 1)"
+      [[ -n "$clone_uuid" ]] || die "Failed to locate cloned profile '${clone_name}'."
+      nmcli connection modify uuid "$clone_uuid" "${clone_mod[@]}"
+      nmcli connection up uuid "$clone_uuid" ifname "$sec_iface"
+    fi
+
+    ok "Linked ${sec_iface} -> '${primary_ssid}' (failover metric ${sec_metric})"
+  done
+
+  if [[ "$DRY_RUN" == true ]]; then
+    info "Dry run complete — no changes were applied."
+  else
+    ok "Failover ready: ${primary} (metric ${PRIMARY_METRIC}) -> ${targets[*]} (metric ${SECONDARY_METRIC}+)"
+  fi
+}
+
+cmd_down() {
+  local -a uuids=()
+  local u
+
+  if [[ -n "$SECONDARY_IFACE" ]]; then
+    while IFS= read -r u; do
+      [[ -n "$u" ]] && uuids+=("$u")
+    done < <(find_con_uuids "${PROFILE_PREFIX}${SECONDARY_IFACE}" exact)
+  else
+    while IFS= read -r u; do
+      [[ -n "$u" ]] && uuids+=("$u")
+    done < <(find_con_uuids "$PROFILE_PREFIX" prefix)
+  fi
+
+  if (( ${#uuids[@]} == 0 )); then
+    info "No ${PROFILE_PREFIX}* failover profiles found."
+    return 0
+  fi
+
+  local name
+  for u in "${uuids[@]}"; do
+    name="$(nmcli_unescape "$(nm_con_prop "$u" connection.id)")"
+    if is_con_active "$u"; then
+      info "Disconnecting ${name}..."
+      run_cmd nmcli connection down uuid "$u"
+    fi
+    if [[ "$KEEP_PROFILE" == false ]]; then
+      info "Removing profile ${name}..."
+      run_cmd nmcli connection delete uuid "$u"
+    fi
+  done
+
+  if [[ "$DRY_RUN" == true ]]; then
+    info "Dry run complete — no changes were applied."
+  elif [[ "$KEEP_PROFILE" == true ]]; then
+    ok "Disconnected failover connection(s) (profiles kept)."
+  else
+    ok "Disconnected and removed ${#uuids[@]} failover profile(s)."
+  fi
+}
+
+cmd_status() {
+  load_wifi_devices
+
+  if (( ${#WIFI_IFACES[@]} == 0 )); then
+    warn "No Wi-Fi interfaces found."
+    return 0
+  fi
+
+  printf '%b%-14s %-14s %-10s %-22s %-18s %-18s %s%b\n' \
+    "$C_BOLD" "INTERFACE" "STATE" "ROLE" "PROFILE" "SSID" "IPv4" "METRIC" "$C_RESET"
+  printf '%b%s%b\n' "$C_DIM" "------------------------------------------------------------------------------------------------------------" "$C_RESET"
+
+  local dev state uuid con_name ssid ipv4 metric role
+  for dev in "${WIFI_IFACES[@]}"; do
+    state="${WIFI_STATES[$dev]}"
+    uuid="$(nm_dev_prop "$dev" GENERAL.CON-UUID)"
+    con_name="$(nmcli_unescape "$(nm_dev_prop "$dev" GENERAL.CONNECTION)")"
+    ipv4="$(nm_dev_prop "$dev" 'IP4.ADDRESS[1]')"
+    ssid="-"
+    metric="-"
+    role="idle"
+
+    if [[ -n "$uuid" && "$uuid" != "--" ]]; then
+      ssid="$(nmcli_unescape "$(nm_con_prop "$uuid" 802-11-wireless.ssid)")"
+      metric="$(nm_con_prop "$uuid" ipv4.route-metric)"
+      [[ "$metric" == "-1" || -z "$metric" ]] && metric="auto"
+      if [[ "$con_name" == "${PROFILE_PREFIX}"* ]]; then
+        role="failover"
+      elif [[ "$state" == "connected" ]]; then
+        role="primary"
+      else
+        role="other"
+      fi
+    elif [[ "$state" != "disconnected" ]]; then
+      role="$state"
+    fi
+
+    [[ -z "$con_name" || "$con_name" == "--" ]] && con_name="-"
+    [[ -z "$ssid" ]] && ssid="-"
+    [[ -z "$ipv4" ]] && ipv4="-"
+
+    printf '%-14s %-14s %-10s %-22s %-18s %-18s %s\n' \
+      "$dev" "$state" "$role" "$con_name" "$ssid" "$ipv4" "$metric"
+  done
+
+  if command -v ip >/dev/null 2>&1; then
+    local routes
+    routes="$(ip -4 route show default 2>/dev/null || true)"
+    if [[ -n "$routes" ]]; then
+      printf '\n%bDefault IPv4 routes (lowest metric wins):%b\n' "$C_BOLD" "$C_RESET"
+      printf '%s\n' "$routes"
+    fi
+  fi
+}
+
+parse_args() {
+  if (( $# > 0 )); then
+    case "$1" in
+      up|connect)
+        ACTION="up"
+        shift
+        ;;
+      down|disconnect)
+        ACTION="down"
+        shift
+        ;;
+      status)
+        ACTION="status"
+        shift
+        ;;
+      -h|--help)
+        usage
+        exit 0
+        ;;
+    esac
+  fi
+
+  while (( $# > 0 )); do
+    case "$1" in
+      -p|--primary)
+        [[ $# -ge 2 ]] || die "Option '$1' requires an interface name."
+        PRIMARY_IFACE="$2"
+        shift 2
+        ;;
+      -s|--secondary)
+        [[ $# -ge 2 ]] || die "Option '$1' requires an interface name."
+        SECONDARY_IFACE="$2"
+        shift 2
+        ;;
+      -a|--all)
+        LINK_ALL=true
+        shift
+        ;;
+      --primary-metric)
+        [[ $# -ge 2 ]] || die "Option '$1' requires a numeric value."
+        PRIMARY_METRIC="$2"
+        shift 2
+        ;;
+      --secondary-metric)
+        [[ $# -ge 2 ]] || die "Option '$1' requires a numeric value."
+        SECONDARY_METRIC="$2"
+        shift 2
+        ;;
+      --autoconnect)
+        AUTOCONNECT="yes"
+        shift
+        ;;
+      --keep-profile)
+        KEEP_PROFILE=true
+        shift
+        ;;
+      -n|--dry-run)
+        DRY_RUN=true
+        shift
+        ;;
+      -h|--help)
+        usage
+        exit 0
+        ;;
+      *)
+        die "Unknown argument: '$1'. Use --help for usage."
+        ;;
+    esac
+  done
+
+  validate_metric "primary" "$PRIMARY_METRIC"
+  validate_metric "secondary" "$SECONDARY_METRIC"
+}
+
+main() {
+  parse_args "$@"
+  check_deps
+
+  case "$ACTION" in
+    up)     cmd_up ;;
+    down)   cmd_down ;;
+    status) cmd_status ;;
+  esac
+}
+
+main "$@"
