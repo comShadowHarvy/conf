@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# autolink - Dual Wi-Fi Failover Manager for NetworkManager (nmcli)
+# autolink - Dual Wi-Fi Failover & Speed-Based Routing Manager (nmcli)
 # ==============================================================================
-# Connects a secondary Wi-Fi adapter to the same network as your primary active
-# Wi-Fi adapter using a cloned NetworkManager profile with higher route metrics
-# for clean failover (avoiding asymmetric routing issues).
+# Connects secondary Wi-Fi adapter(s) to the same network as your primary active
+# Wi-Fi adapter using cloned NetworkManager profiles with failover route metrics,
+# and optionally benchmarks connected Wi-Fi adapters to temporarily promote the
+# fastest one as the default route.
 # ==============================================================================
 
 set -euo pipefail
@@ -23,6 +24,13 @@ METRIC_STEP=100
 AUTOCONNECT="no"
 KEEP_PROFILE=false
 DRY_RUN=false
+
+# Speedtest options
+RUN_FASTEST=false
+SPEED_URL="https://speed.cloudflare.com/__down?bytes=10000000"
+SPEED_TIMEOUT=8
+SPEED_PERSIST=false
+SPEED_NO_APPLY=false
 
 # Colors (disabled when piped or NO_COLOR is set)
 if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
@@ -50,29 +58,40 @@ ${C_BOLD}Usage:${C_RESET}
   ${PROG_NAME} [command] [options]
 
 ${C_BOLD}Commands:${C_RESET}
-  up, connect       Connect secondary Wi-Fi adapter(s) in failover mode (default)
-  down, disconnect  Disconnect and remove ${PROFILE_PREFIX}* failover profile(s)
-  status            Show Wi-Fi interfaces, profiles, IPs, and default route metrics
+  up, connect              Connect secondary Wi-Fi adapter(s) in failover mode (default)
+  down, disconnect         Disconnect and remove ${PROFILE_PREFIX}* failover profile(s)
+  speedtest, bench         Test download speed per connected Wi-Fi adapter and temporarily
+                           promote the fastest as the default route
+  status                   Show Wi-Fi interfaces, profiles, IPs, and default route metrics
 
 ${C_BOLD}Options:${C_RESET}
   -p, --primary IFACE         Primary (active) Wi-Fi interface (auto-detected if omitted)
   -s, --secondary IFACE       Secondary (target) Wi-Fi interface (auto-detected if omitted)
   -a, --all                   Link all idle Wi-Fi interfaces (increments metric per adapter)
-      --primary-metric N      Route metric for primary adapter (default: ${PRIMARY_METRIC})
-      --secondary-metric N    Route metric for secondary adapter (default: ${SECONDARY_METRIC})
+  -f, --fastest               With 'up', run speedtest after linking and temporarily make
+                              the fastest Wi-Fi adapter the default route
+      --primary-metric N      Route metric for primary/fastest adapter (default: ${PRIMARY_METRIC})
+      --secondary-metric N    Route metric for secondary adapter(s) (default: ${SECONDARY_METRIC})
       --autoconnect           Allow cloned failover profile(s) to auto-connect
       --keep-profile          With 'down', disconnect without deleting ${PROFILE_PREFIX}* profiles
+      --speed-url URL         Download URL for speedtest (default: 10MB Cloudflare test)
+      --speed-timeout SEC     Max seconds per interface speedtest (default: ${SPEED_TIMEOUT})
+      --persist               With 'speedtest'/'--fastest', save winning metrics to profiles
+                              instead of applying them temporarily in runtime only
+      --no-apply              With 'speedtest', print results without changing route metrics
   -n, --dry-run               Show commands that would run without making changes
   -h, --help                  Show this help message
 
 ${C_BOLD}Examples:${C_RESET}
   ${PROG_NAME}                              # Auto-detect adapters and enable failover
+  ${PROG_NAME} up --fastest                 # Link secondary adapter, test speeds, set fastest as temp default
+  ${PROG_NAME} speedtest                    # Benchmark connected Wi-Fi cards & temporarily promote fastest
+  ${PROG_NAME} speedtest --no-apply         # Benchmark only without changing routes
+  ${PROG_NAME} speedtest --persist          # Benchmark and save winning metrics to profiles
   ${PROG_NAME} --dry-run                    # Preview actions without modifying NetworkManager
   ${PROG_NAME} -p wlan0 -s wlan1            # Explicitly pick primary and secondary adapters
-  ${PROG_NAME} up --all                     # Link every idle Wi-Fi adapter
   ${PROG_NAME} status                       # Inspect interfaces and route metrics
   ${PROG_NAME} down                         # Tear down failover connections and profiles
-  ${PROG_NAME} down -s wlan1 --keep-profile # Disconnect wlan1 but keep its profile
 EOF
 }
 
@@ -88,6 +107,13 @@ validate_metric() {
   local name="$1" val="$2"
   if [[ ! "$val" =~ ^[0-9]+$ ]] || (( val > 4294967295 )); then
     die "Invalid ${name} metric '${val}': must be an integer between 0 and 4294967295."
+  fi
+}
+
+validate_positive_int() {
+  local name="$1" val="$2"
+  if [[ ! "$val" =~ ^[1-9][0-9]*$ ]]; then
+    die "Invalid ${name} '${val}': must be a positive integer."
   fi
 }
 
@@ -110,6 +136,11 @@ check_deps() {
   fi
 }
 
+check_speedtest_deps() {
+  command -v curl >/dev/null 2>&1 || die "curl is required for speedtest."
+  command -v awk  >/dev/null 2>&1 || die "awk is required for speedtest."
+}
+
 # Query a single NetworkManager property cleanly
 nm_dev_prop() {
   local iface="$1" prop="$2"
@@ -119,6 +150,18 @@ nm_dev_prop() {
 nm_con_prop() {
   local uuid="$1" prop="$2"
   nmcli -g "$prop" connection show uuid "$uuid" 2>/dev/null | head -n 1 || true
+}
+
+# Get the active kernel default IPv4 route metric for a device (empty if none)
+live_route_metric() {
+  local iface="$1" route_line
+  if ! command -v ip >/dev/null 2>&1; then
+    return 0
+  fi
+  route_line="$(ip -4 route show default dev "$iface" 2>/dev/null | head -n 1 || true)"
+  if [[ "$route_line" =~ metric[[:space:]]+([0-9]+) ]]; then
+    printf '%s' "${BASH_REMATCH[1]}"
+  fi
 }
 
 # Populate associative arrays of all Wi-Fi devices and their states
@@ -168,8 +211,8 @@ is_con_active() {
   return 1
 }
 
-# Set IPv4/IPv6 route metrics on a connection UUID when those families are enabled
-apply_metrics() {
+# Set IPv4/IPv6 route metrics persistently on a connection UUID when enabled
+apply_profile_metrics() {
   local uuid="$1" metric="$2" iface="$3" reapply="${4:-false}"
   local ipv4_method ipv6_method cur_v4 cur_v6
   local -a mod_args=()
@@ -187,14 +230,207 @@ apply_metrics() {
   fi
 
   if (( ${#mod_args[@]} == 0 )); then
-    info "Metrics on ${iface} already set to ${metric}."
+    info "Profile metrics on ${iface} already set to ${metric}."
     return 0
   fi
 
-  info "Setting route metric=${metric} on ${iface}..."
+  info "Setting saved route metric=${metric} on ${iface}..."
   run_cmd nmcli connection modify uuid "$uuid" "${mod_args[@]}"
   if [[ "$reapply" == true ]]; then
     run_cmd nmcli device reapply "$iface"
+  fi
+}
+
+# Set IPv4/IPv6 route metrics temporarily on the active device (does not modify saved profile)
+apply_runtime_metrics() {
+  local uuid="$1" metric="$2" iface="$3"
+  local ipv4_method ipv6_method
+  local -a mod_args=()
+
+  ipv4_method="$(nm_con_prop "$uuid" ipv4.method)"
+  ipv6_method="$(nm_con_prop "$uuid" ipv6.method)"
+
+  if [[ "$ipv4_method" != "disabled" && "$ipv4_method" != "ignore" ]]; then
+    mod_args+=(ipv4.route-metric "$metric")
+  fi
+  if [[ "$ipv6_method" != "disabled" && "$ipv6_method" != "ignore" ]]; then
+    mod_args+=(ipv6.route-metric "$metric")
+  fi
+
+  if (( ${#mod_args[@]} == 0 )); then
+    warn "No IPv4/IPv6 addressing enabled on ${iface}; skipping metric update."
+    return 0
+  fi
+
+  info "Setting temporary route metric=${metric} on ${iface} (runtime only)..."
+  run_cmd nmcli device modify "$iface" "${mod_args[@]}"
+}
+
+# Wait briefly for an interface to obtain an IP address after activation
+wait_for_ip() {
+  local iface="$1" tries=10 ip4 ip6
+  while (( tries > 0 )); do
+    ip4="$(nm_dev_prop "$iface" 'IP4.ADDRESS[1]')"
+    ip6="$(nm_dev_prop "$iface" 'IP6.ADDRESS[1]')"
+    if [[ -n "$ip4" || -n "$ip6" ]]; then
+      return 0
+    fi
+    sleep 0.5
+    tries=$(( tries - 1 ))
+  done
+  warn "Timed out waiting for IP address on ${iface}."
+  return 1
+}
+
+# Measure download throughput for a single interface via curl --interface
+# Outputs tab-separated: bytes_per_sec  ttfb_sec  mbps  ttfb_ms  status_label
+measure_iface_speed() {
+  local iface="$1"
+  local out rc=0 speed_bps ttfb size_bytes http_code mbps ttfb_ms
+
+  out="$(
+    curl --interface "$iface" \
+      -L -s -S -o /dev/null \
+      --connect-timeout 5 \
+      --max-time "$SPEED_TIMEOUT" \
+      -w '%{speed_download}\t%{time_starttransfer}\t%{size_download}\t%{http_code}' \
+      "$SPEED_URL" 2>/dev/null
+  )" || rc=$?
+
+  IFS=$'\t' read -r speed_bps ttfb size_bytes http_code <<< "$out"
+  speed_bps="${speed_bps:-0}"
+  ttfb="${ttfb:-999}"
+  size_bytes="${size_bytes:-0}"
+  http_code="${http_code:-000}"
+
+  # Exit code 28 (timeout) is valid if we already downloaded data with an HTTP 2xx response
+  local valid=false
+  if [[ "$http_code" =~ ^2[0-9][0-9]$ ]] && (( size_bytes > 0 )); then
+    if (( rc == 0 || rc == 28 )); then
+      valid=true
+    fi
+  fi
+
+  if [[ "$valid" == true ]]; then
+    mbps="$(awk -v bps="$speed_bps" 'BEGIN { printf "%.2f", (bps * 8) / 1000000 }')"
+    ttfb_ms="$(awk -v t="$ttfb" 'BEGIN { printf "%.0f", t * 1000 }')"
+    printf '%s\t%s\t%s\t%s\tok\n' "$speed_bps" "$ttfb" "$mbps" "$ttfb_ms"
+  else
+    printf '0\t999\t0.00\t-\tfailed(rc=%d,http=%s)\n' "$rc" "$http_code"
+  fi
+}
+
+cmd_speedtest() {
+  check_speedtest_deps
+  load_wifi_devices
+
+  if (( ${#WIFI_IFACES[@]} == 0 )); then
+    die "No Wi-Fi interfaces found on this system."
+  fi
+
+  local -a connected=()
+  local dev
+  for dev in "${WIFI_IFACES[@]}"; do
+    if [[ "${WIFI_STATES[$dev]}" == "connected" ]]; then
+      connected+=("$dev")
+    fi
+  done
+
+  if (( ${#connected[@]} == 0 )); then
+    die "No connected Wi-Fi interfaces found to benchmark."
+  fi
+
+  info "Benchmarking ${#connected[@]} connected Wi-Fi adapter(s) (timeout: ${SPEED_TIMEOUT}s each)..."
+  info "Test URL: ${SPEED_URL}"
+
+  local -a raw_results=()
+  local res speed_bps ttfb mbps ttfb_ms st
+  for dev in "${connected[@]}"; do
+    printf '  Testing %b%s%b ... ' "$C_BOLD" "$dev" "$C_RESET"
+    res="$(measure_iface_speed "$dev")"
+    IFS=$'\t' read -r speed_bps ttfb mbps ttfb_ms st <<< "$res"
+    if [[ "$st" == "ok" ]]; then
+      printf '%b%s Mbps%b (TTFB: %s ms)\n' "$C_GREEN" "$mbps" "$C_RESET" "$ttfb_ms"
+    else
+      printf '%b%s%b\n' "$C_RED" "$st" "$C_RESET"
+    fi
+    raw_results+=("${speed_bps}"$'\t'"${ttfb}"$'\t'"${dev}"$'\t'"${mbps}"$'\t'"${ttfb_ms}"$'\t'"${st}")
+  done
+
+  # Sort fastest first (speed_bps desc, then ttfb asc)
+  local -a ranked=()
+  local line
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && ranked+=("$line")
+  done < <(printf '%s\n' "${raw_results[@]}" | sort -t$'\t' -k1,1gr -k2,2g)
+
+  printf '\n%b%-6s %-14s %-14s %-12s %s%b\n' \
+    "$C_BOLD" "RANK" "INTERFACE" "DOWNLOAD" "TTFB" "STATUS" "$C_RESET"
+  printf '%b%s%b\n' "$C_DIM" "----------------------------------------------------------------" "$C_RESET"
+
+  local rank=1
+  local -a ranked_ifaces=()
+  local best_iface="" best_mbps="" best_ok=false
+  for line in "${ranked[@]}"; do
+    IFS=$'\t' read -r speed_bps ttfb dev mbps ttfb_ms st <<< "$line"
+    printf '#%-5d %-14s %-14s %-12s %s\n' \
+      "$rank" "$dev" "${mbps} Mbps" "${ttfb_ms} ms" "$st"
+    ranked_ifaces+=("$dev")
+    if (( rank == 1 )) && [[ "$st" == "ok" ]]; then
+      best_iface="$dev"
+      best_mbps="$mbps"
+      best_ok=true
+    fi
+    rank=$(( rank + 1 ))
+  done
+  printf '\n'
+
+  if [[ "$best_ok" == false ]]; then
+    die "All speed tests failed; route metrics were not changed."
+  fi
+
+  if [[ "$SPEED_NO_APPLY" == true ]]; then
+    ok "Fastest adapter: ${best_iface} (${best_mbps} Mbps) — no route changes applied (--no-apply)."
+    return 0
+  fi
+
+  if (( ${#ranked_ifaces[@]} < 2 )); then
+    ok "Only one connected Wi-Fi adapter (${best_iface}: ${best_mbps} Mbps); nothing to reprioritize."
+    return 0
+  fi
+
+  if (( PRIMARY_METRIC >= SECONDARY_METRIC )); then
+    warn "Primary metric (${PRIMARY_METRIC}) >= secondary metric (${SECONDARY_METRIC}); ranking may not match expected failover order."
+  fi
+
+  local idx=0 metric uuid
+  for dev in "${ranked_ifaces[@]}"; do
+    if (( idx == 0 )); then
+      metric="$PRIMARY_METRIC"
+    else
+      metric=$(( SECONDARY_METRIC + (idx - 1) * METRIC_STEP ))
+    fi
+    uuid="$(nm_dev_prop "$dev" GENERAL.CON-UUID)"
+    if [[ -z "$uuid" || "$uuid" == "--" ]]; then
+      warn "Could not find active connection UUID for ${dev}; skipping."
+      idx=$(( idx + 1 ))
+      continue
+    fi
+
+    if [[ "$SPEED_PERSIST" == true ]]; then
+      apply_profile_metrics "$uuid" "$metric" "$dev" true
+    else
+      apply_runtime_metrics "$uuid" "$metric" "$dev"
+    fi
+    idx=$(( idx + 1 ))
+  done
+
+  if [[ "$DRY_RUN" == true ]]; then
+    info "Dry run complete — no route metrics were changed."
+  elif [[ "$SPEED_PERSIST" == true ]]; then
+    ok "Saved ${best_iface} (${best_mbps} Mbps) as persistent default (metric ${PRIMARY_METRIC})."
+  else
+    ok "Set ${best_iface} (${best_mbps} Mbps) as temporary default (metric ${PRIMARY_METRIC}; resets on reconnect/reboot)."
   fi
 }
 
@@ -275,13 +511,18 @@ cmd_up() {
         die "Only one Wi-Fi interface (${primary}) detected; a second Wi-Fi adapter is required."
       fi
       warn "No idle Wi-Fi interfaces found (other adapters may already be connected or unavailable)."
-      info "Run '${PROG_NAME} status' to inspect all Wi-Fi interfaces."
+      if [[ "$RUN_FASTEST" == true ]]; then
+        info "Running speedtest on currently connected Wi-Fi adapters..."
+        cmd_speedtest
+        return 0
+      fi
+      info "Run '${PROG_NAME} status' to inspect all Wi-Fi interfaces, or '${PROG_NAME} speedtest' to rank connected ones."
       return 0
     fi
   fi
 
   # 3. Ensure primary has the lower failover metric
-  apply_metrics "$primary_uuid" "$PRIMARY_METRIC" "$primary" true
+  apply_profile_metrics "$primary_uuid" "$PRIMARY_METRIC" "$primary" true
 
   # 4. Clone and connect each secondary interface
   local idx=0 sec_iface sec_metric clone_name existing_uuid clone_uuid
@@ -334,9 +575,24 @@ cmd_up() {
   done
 
   if [[ "$DRY_RUN" == true ]]; then
+    if [[ "$RUN_FASTEST" == true ]]; then
+      printf '%b[DRY-RUN]%b Would run speedtest across connected Wi-Fi adapters and set the fastest as temporary default (metric %s).\n' \
+        "$C_CYAN" "$C_RESET" "$PRIMARY_METRIC"
+    fi
     info "Dry run complete — no changes were applied."
-  else
-    ok "Failover ready: ${primary} (metric ${PRIMARY_METRIC}) -> ${targets[*]} (metric ${SECONDARY_METRIC}+)"
+    return 0
+  fi
+
+  local sec_label="metric ${SECONDARY_METRIC}"
+  (( ${#targets[@]} > 1 )) && sec_label="metric ${SECONDARY_METRIC}+"
+  ok "Failover ready: ${primary} (metric ${PRIMARY_METRIC}) -> ${targets[*]} (${sec_label})"
+
+  if [[ "$RUN_FASTEST" == true ]]; then
+    for sec_iface in "${targets[@]}"; do
+      wait_for_ip "$sec_iface" || true
+    done
+    printf '\n'
+    cmd_speedtest
   fi
 }
 
@@ -393,20 +649,33 @@ cmd_status() {
     "$C_BOLD" "INTERFACE" "STATE" "ROLE" "PROFILE" "SSID" "IPv4" "METRIC" "$C_RESET"
   printf '%b%s%b\n' "$C_DIM" "------------------------------------------------------------------------------------------------------------" "$C_RESET"
 
-  local dev state uuid con_name ssid ipv4 metric role
+  local dev state uuid con_name ssid ipv4 prof_metric live_metric metric_display role
   for dev in "${WIFI_IFACES[@]}"; do
     state="${WIFI_STATES[$dev]}"
     uuid="$(nm_dev_prop "$dev" GENERAL.CON-UUID)"
     con_name="$(nmcli_unescape "$(nm_dev_prop "$dev" GENERAL.CONNECTION)")"
     ipv4="$(nm_dev_prop "$dev" 'IP4.ADDRESS[1]')"
     ssid="-"
-    metric="-"
+    metric_display="-"
     role="idle"
 
     if [[ -n "$uuid" && "$uuid" != "--" ]]; then
       ssid="$(nmcli_unescape "$(nm_con_prop "$uuid" 802-11-wireless.ssid)")"
-      metric="$(nm_con_prop "$uuid" ipv4.route-metric)"
-      [[ "$metric" == "-1" || -z "$metric" ]] && metric="auto"
+      prof_metric="$(nm_con_prop "$uuid" ipv4.route-metric)"
+      live_metric="$(live_route_metric "$dev")"
+
+      if [[ -n "$live_metric" ]]; then
+        if [[ -n "$prof_metric" && "$prof_metric" != "-1" && "$live_metric" != "$prof_metric" ]]; then
+          metric_display="${live_metric} (temp)"
+        else
+          metric_display="$live_metric"
+        fi
+      elif [[ "$prof_metric" == "-1" || -z "$prof_metric" ]]; then
+        metric_display="auto"
+      else
+        metric_display="$prof_metric"
+      fi
+
       if [[ "$con_name" == "${PROFILE_PREFIX}"* ]]; then
         role="failover"
       elif [[ "$state" == "connected" ]]; then
@@ -423,7 +692,7 @@ cmd_status() {
     [[ -z "$ipv4" ]] && ipv4="-"
 
     printf '%-14s %-14s %-10s %-22s %-18s %-18s %s\n' \
-      "$dev" "$state" "$role" "$con_name" "$ssid" "$ipv4" "$metric"
+      "$dev" "$state" "$role" "$con_name" "$ssid" "$ipv4" "$metric_display"
   done
 
   if command -v ip >/dev/null 2>&1; then
@@ -445,6 +714,10 @@ parse_args() {
         ;;
       down|disconnect)
         ACTION="down"
+        shift
+        ;;
+      speedtest|bench|fastest)
+        ACTION="speedtest"
         shift
         ;;
       status)
@@ -474,6 +747,10 @@ parse_args() {
         LINK_ALL=true
         shift
         ;;
+      -f|--fastest)
+        RUN_FASTEST=true
+        shift
+        ;;
       --primary-metric)
         [[ $# -ge 2 ]] || die "Option '$1' requires a numeric value."
         PRIMARY_METRIC="$2"
@@ -492,6 +769,24 @@ parse_args() {
         KEEP_PROFILE=true
         shift
         ;;
+      --speed-url)
+        [[ $# -ge 2 ]] || die "Option '$1' requires a URL."
+        SPEED_URL="$2"
+        shift 2
+        ;;
+      --speed-timeout)
+        [[ $# -ge 2 ]] || die "Option '$1' requires a timeout in seconds."
+        SPEED_TIMEOUT="$2"
+        shift 2
+        ;;
+      --persist)
+        SPEED_PERSIST=true
+        shift
+        ;;
+      --no-apply)
+        SPEED_NO_APPLY=true
+        shift
+        ;;
       -n|--dry-run)
         DRY_RUN=true
         shift
@@ -508,6 +803,7 @@ parse_args() {
 
   validate_metric "primary" "$PRIMARY_METRIC"
   validate_metric "secondary" "$SECONDARY_METRIC"
+  validate_positive_int "speed timeout" "$SPEED_TIMEOUT"
 }
 
 main() {
@@ -515,9 +811,10 @@ main() {
   check_deps
 
   case "$ACTION" in
-    up)     cmd_up ;;
-    down)   cmd_down ;;
-    status) cmd_status ;;
+    up)        cmd_up ;;
+    down)      cmd_down ;;
+    speedtest) cmd_speedtest ;;
+    status)    cmd_status ;;
   esac
 }
 
